@@ -1,0 +1,47 @@
+version: '3.8'
+# Add a name so my friend and I can have two containers simultaneously
+name: wirachat-toktickit
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: toktickit-db
+    environment:
+      POSTGRES_USER: toktickit
+      POSTGRES_PASSWORD: toktickit
+      POSTGRES_DB: toktickit
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: toktickit-server
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    env_file:
+      - ./server/.env
+    depends_on:
+      - db
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: toktickit-client
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    command: npm run dev -- --host
+
+volumes:
+  pgdata:
