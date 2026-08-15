@@ -38,3 +38,16 @@ docker-compose exec client npm test
 ```bash
 docker-compose exec server npm test
 ```
+
+### Performing API Health Check
+
+You can verify the backend API health in two ways:
+
+1. **Via Browser:** 
+   Navigate to [http://localhost:3000/api/health](http://localhost:3000/api/health). You should see a JSON response: `{"status":"ok","service":"TokTickIT API"}`.
+
+2. **Via Supertest:**
+   Run the backend test suite which includes a Supertest verification of the health endpoint:
+   ```bash
+   docker-compose exec server npm test
+   ```
