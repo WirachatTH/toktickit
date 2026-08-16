@@ -51,3 +51,27 @@ You can verify the backend API health in two ways:
    ```bash
    docker-compose exec server npm test
    ```
+
+### Verifying Database & Seed Data
+
+You can manually verify that the database table was created and the default categories were seeded correctly. 
+
+1. **Verify Database Records:**
+   Run a Prisma client query directly inside the server container to fetch and print all records. This avoids any SQL quoting issues across different terminal environments like PowerShell:
+   ```bash
+   docker-compose exec server npx tsx -e "import { PrismaClient } from '@prisma/client'; new PrismaClient().category.findMany().then(console.log)"
+   ```
+   *Expected result: A JSON array showing the four categories (Account and Access, Hardware, Software, Network) along with their IDs and timestamps.*
+
+2. **Verify Seed Idempotency (Safe from Duplicates):**
+   The seed script is designed to safely update or skip existing records without creating duplicates. Test this by running the seed script manually:
+   ```bash
+   docker-compose exec server npm run prisma:seed
+   ```
+   *Expected result: The script will output "Seeding complete". Running the Prisma query command from Step 1 again will confirm there are still exactly four records.*
+
+3. **Verify Database Credentials Are Not Committed:**
+   The project is designed to keep secrets out of version control. To verify this:
+   - Check the `server/.env` file. This file contains your actual database credentials (like `DATABASE_URL`) but it is safely ignored by Git.
+   - Run `git status` or look at `.gitignore` to confirm that `.env` is ignored. 
+   - Check `server/.env.example`. This file is committed to Git but only contains safe placeholder values.
