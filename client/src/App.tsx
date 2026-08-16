@@ -33,6 +33,18 @@ export default function App() {
       {state === "success" && (
         <div className="mt-4">
           <p>System Status: <span className="text-success fw-bold">Online</span></p>
+          <h2 className="h4 mt-4 mb-3">IT Request Categories</h2>
+          {categories.length > 0 ? (
+            <ul className="list-group">
+              {categories.map((category) => (
+                <li key={category.id} className="list-group-item">
+                  {category.name}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No categories found.</p>
+          )}
         </div>
       )}
 
