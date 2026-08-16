@@ -75,3 +75,28 @@ You can manually verify that the database table was created and the default cate
    - Check the `server/.env` file. This file contains your actual database credentials (like `DATABASE_URL`) but it is safely ignored by Git.
    - Run `git status` or look at `.gitignore` to confirm that `.env` is ignored. 
    - Check `server/.env.example`. This file is committed to Git but only contains safe placeholder values.
+
+### Verifying IT Request Category List
+
+To verify the implementation of the IT request category list feature:
+
+1. **Verify Backend API (/api/categories):**
+   Navigate to [http://localhost:3000/api/categories](http://localhost:3000/api/categories) in your browser. You should see a JSON array containing the 4 seeded categories with their `id` and `name` attributes, sorted by `id` ascending.
+
+2. **Verify Frontend UI:**
+   Navigate to [http://localhost:5173](http://localhost:5173). You should see the "Check System" button. Clicking it should briefly display a "Loading…" state, followed by an "Online" status and a list of the 4 seeded IT request categories fetched from the API.
+
+3. **Verify Automated Tests:**
+   The automated test suite verifies the API response and React UI states. Run the test suites via Docker to confirm:
+   
+   **Run Backend Tests (Vitest + Supertest):**
+   ```bash
+   docker-compose exec server npm test
+   ```
+   *Expected result: `health.test.ts` and `categories.test.ts` pass, using Supertest to verify the API returns HTTP 200 and the categories in order.*
+
+   **Run Frontend Tests (Vitest):**
+   ```bash
+   docker-compose exec client npm test
+   ```
+   *Expected result: `App.test.tsx` passes with assertions for "Online", the seeded categories, and "Offline" error messages, verifying UI behavior through Vitest.*
