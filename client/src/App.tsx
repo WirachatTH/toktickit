@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { checkSystem, Category } from "./api.js";
+import { RequesterProvider, useRequester } from "./contexts/RequesterContext.js";
+import { MockLogin } from "./components/MockLogin.js";
+import { Navbar } from "./components/Navbar.js";
 
 // UI states you must handle for Issue 4: idle, loading, success, error.
 type UiState = "idle" | "loading" | "success" | "error";
 
-export default function App() {
+function Dashboard() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
   void categories;
@@ -56,4 +59,23 @@ export default function App() {
       )}
     </div>
   );
+}
+
+export default function App() {
+  return (
+    <RequesterProvider>
+      <Navbar />
+      <MainContent />
+    </RequesterProvider>
+  );
+}
+
+function MainContent() {
+  const { currentRequester } = useRequester();
+  
+  if (!currentRequester) {
+    return <MockLogin />;
+  }
+  
+  return <Dashboard />;
 }

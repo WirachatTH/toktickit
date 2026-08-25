@@ -4,11 +4,20 @@ import userEvent from "@testing-library/user-event";
 import App from "../../src/App.js";
 import * as api from "../../src/api.js";
 
+vi.mock("../../src/contexts/RequesterContext.js", () => ({
+  useRequester: () => ({
+    currentRequester: { id: 1, name: "Test User", email: "test@example.com" },
+    setCurrentRequester: vi.fn(),
+  }),
+  RequesterProvider: ({ children }: any) => <>{children}</>,
+}));
+
 describe("App", () => {
   // WORKED EXAMPLE — provided for you.
   it("renders the TokTickIT heading", () => {
     render(<App />);
-    expect(screen.getByText(/TokTickIT/i)).toBeInTheDocument();
+    const elements = screen.getAllByText(/TokTickIT/i);
+    expect(elements.length).toBeGreaterThan(0);
   });
 
   // Issue 4 — write these yourself. Hint: mock the api module with

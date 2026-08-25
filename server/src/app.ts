@@ -1,6 +1,9 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
+import requestersRouter from "./routes/requesters.js";
+import systemsRouter from "./routes/systems.js";
+
 // getPrisma() is your lazy database handle. Call it INSIDE a route when you
 // need the DB (Issue 4). It is intentionally unused until then.
 void getPrisma;
@@ -39,5 +42,8 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
   }
 });
 // ---------------------------------------------------------------------------
+
+app.use("/api/requesters", requestersRouter);
+app.use("/api/systems", systemsRouter);
 
 export default app;
