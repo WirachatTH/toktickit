@@ -100,3 +100,12 @@ To verify the implementation of the IT request category list feature:
    docker-compose exec client npm test
    ```
    *Expected result: `App.test.tsx` passes with assertions for "Online", the seeded categories, and "Offline" error messages, verifying UI behavior through Vitest.*
+
+### Lab 2: Requester MVP
+In this phase of the project, we have implemented the MVP feature set for Requesters:
+- **Mock Login**: Select a development requester context.
+- **Create Ticket**: Submit a new IT request ticket with attachments.
+- **My Tickets**: View, search, filter, and sort submitted tickets.
+- **Ticket Details**: View details and manage attachments.
+
+For full engineering specifications and API contracts, refer to the documents in `docs/lab-02/`.

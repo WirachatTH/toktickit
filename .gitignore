@@ -12,3 +12,9 @@ server/prisma/*.db
 # logs & OS
 *.log
 .DS_Store
+.vite/
+
+# Lab Backups and Plans
+lab01.zip
+implementation plan.md
+issues.md
