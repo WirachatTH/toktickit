@@ -18,4 +18,98 @@ model Category {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   createdAt DateTime @default(now())
+
+  tickets Ticket[]
+}
+
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 2 — Data model for Requester ticketing
+// See docs/lab-02/specification.md §7 for field-by-field rationale.
+// ---------------------------------------------------------------------------
+
+// Testing-only identity for Lab 2 (BR-03, BR-47/48). Not an authentication
+// mechanism — no password/session field exists here on purpose, and Lab 3
+// replaces this model's role rather than extending it.
+model RequesterUser {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tickets Ticket[]
+
+  @@index([isActive])
+}
+
+model RelatedSystem {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tickets Ticket[]
+
+  @@index([isActive])
+}
+
+enum RequestedPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Only NEW is reachable in Lab 2 (ticket lifecycle beyond creation is out of
+// scope this sprint). Later labs extend this enum rather than Lab 2
+// pre-building unused status values.
+enum TicketStatus {
+  NEW
+}
+
+model Ticket {
+  id     Int    @id @default(autoincrement())
+  // Backend-generated after insert, format TCK-###### derived from `id`
+  // (BR-01). Stored (not just computed on read) so it can carry a real
+  // unique constraint and be searched/sorted on directly.
+  ticketNumber String @unique
+
+  requesterId     Int
+  requester       RequesterUser @relation(fields: [requesterId], references: [id], onDelete: Restrict)
+  categoryId      Int
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystemId Int
+  relatedSystem   RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+
+  summary           String            @db.VarChar(120)
+  description       String            @db.VarChar(2000)
+  requestedPriority RequestedPriority @default(MEDIUM)
+  currentStatus     TicketStatus      @default(NEW)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attachments Attachment[]
+
+  @@index([requesterId])
+  @@index([requesterId, createdAt])
+}
+
+model Attachment {
+  id       Int    @id @default(autoincrement())
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  originalFilename String
+  // Generated, collision-proof, path-traversal-safe on-disk name (BR-33) —
+  // unrelated to originalFilename on purpose.
+  storedFilename String @unique
+  mimeType       String
+  sizeBytes      Int
+
+  uploadedAt    DateTime  @default(now())
+  isRemoved     Boolean   @default(false)
+  removedAt     DateTime?
+  removedReason String?
+
+  @@index([ticketId, isRemoved])
 }
