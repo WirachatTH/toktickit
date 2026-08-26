@@ -1,0 +1,291 @@
+/* Zen Green Theme tokens and shared component classes.
+   See docs/lab-02/ui-spec.md for the full specification these implement. */
+
+:root {
+  --zg-primary: #006B3C;
+  --zg-secondary: #0B7A46;
+  --zg-pale: #EAF6EF;
+  --zg-bg: #F5F7F6;
+  --zg-surface: #FFFFFF;
+  --zg-border: #D8E3DD;
+  --zg-text: #1B2B22;
+  --zg-text-muted: #5B6B62;
+  --zg-readonly-bg: #EFEDE4;
+  --zg-readonly-border: #DDD8C8;
+  --zg-error-text: #8A1F11;
+  --zg-error-border: #C0392B;
+  --zg-error-bg: #FBEAE2;
+  --zg-warning-bg: #FFF4DE;
+  --zg-warning-text: #8A5A00;
+  --zg-success-text: #0B7A46;
+}
+
+body {
+  background: var(--zg-bg);
+  color: var(--zg-text);
+}
+
+/* ---------------------------------------------------------------------
+   Fields (ui-spec.md §3)
+   --------------------------------------------------------------------- */
+
+.zg-field {
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0 0.75rem;
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: 0.375rem;
+  color: var(--zg-text);
+  font-size: 1rem;
+}
+
+textarea.zg-field {
+  height: auto;
+  min-height: 160px;
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+}
+
+.zg-field:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 1px;
+}
+
+.zg-field--readonly,
+.zg-field--readonly:focus-visible {
+  background: var(--zg-readonly-bg);
+  border-color: var(--zg-readonly-border);
+  color: var(--zg-text);
+  cursor: default;
+  outline: none;
+}
+
+.zg-field.is-invalid {
+  border-color: var(--zg-error-border);
+}
+
+.zg-field:disabled {
+  background: var(--zg-readonly-bg);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zg-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.25rem;
+  color: var(--zg-text);
+}
+
+.zg-required {
+  color: var(--zg-error-text);
+  margin-left: 0.125rem;
+}
+
+.zg-field-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--zg-error-text);
+}
+
+/* ---------------------------------------------------------------------
+   Buttons (ui-spec.md §4)
+   --------------------------------------------------------------------- */
+
+.zg-btn-primary {
+  background: var(--zg-primary);
+  border-color: var(--zg-primary);
+  color: #fff;
+}
+.zg-btn-primary:hover:not(:disabled) {
+  background: #00552f;
+  border-color: #00552f;
+  color: #fff;
+}
+
+.zg-btn-secondary {
+  background: #fff;
+  border: 1px solid var(--zg-secondary);
+  color: var(--zg-secondary);
+}
+.zg-btn-secondary:hover:not(:disabled) {
+  background: var(--zg-pale);
+  color: var(--zg-secondary);
+}
+
+.zg-btn-tertiary {
+  background: transparent;
+  border: none;
+  color: var(--zg-secondary);
+  text-decoration: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+.zg-btn-tertiary:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.zg-btn-destructive {
+  background: var(--zg-error-border);
+  border-color: var(--zg-error-border);
+  color: #fff;
+}
+.zg-btn-destructive:hover:not(:disabled) {
+  background: var(--zg-error-text);
+  border-color: var(--zg-error-text);
+  color: #fff;
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zg-btn--busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zg-spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: zg-spin 0.6s linear infinite;
+}
+
+@keyframes zg-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------------------------------------------------------------
+   Badges (ui-spec.md §5)
+   --------------------------------------------------------------------- */
+
+.zg-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.zg-badge--priority-low { background: #EAF6EF; color: #0B7A46; }
+.zg-badge--priority-medium { background: #E8EEF7; color: #2A4D7A; }
+.zg-badge--priority-high { background: #FBEAE2; color: #B23A24; }
+.zg-badge--status-new { background: #EAF6EF; color: #0B7A46; }
+/* Fallback for a value outside the known set (e.g. malformed API data) —
+   visibly distinct rather than an unstyled/blank badge. */
+.zg-badge--unknown { background: #E5E5E5; color: #4A4A4A; }
+
+/* ---------------------------------------------------------------------
+   Loading / empty / error states
+   --------------------------------------------------------------------- */
+
+.zg-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--zg-text-muted);
+  padding: 1rem 0;
+}
+
+.zg-empty-state,
+.zg-error-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  background: var(--zg-surface);
+}
+
+.zg-empty-state {
+  color: var(--zg-text-muted);
+}
+
+.zg-error-state {
+  background: var(--zg-error-bg);
+  border-color: var(--zg-error-border);
+  color: var(--zg-error-text);
+}
+
+/* ---------------------------------------------------------------------
+   App shell (ui-spec.md §6.1)
+   --------------------------------------------------------------------- */
+
+.zg-shell-header {
+  background: var(--zg-primary);
+  color: #fff;
+}
+
+.zg-shell-brand {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-decoration: none;
+}
+
+.zg-nav-link {
+  color: #fff;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.zg-nav-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.zg-nav-link--active {
+  border-bottom-color: #fff;
+  font-weight: 700;
+}
+
+.zg-shell-requester,
+/* Higher specificity than .zg-btn-tertiary alone, so the header's dark
+   background always wins regardless of stylesheet declaration order —
+   the plain .zg-btn-tertiary color assumes a light surface and would be
+   near-invisible on --zg-primary otherwise. */
+.zg-shell-nav .zg-btn-tertiary.zg-shell-requester {
+  color: #fff;
+}
+
+.zg-shell-nav .zg-btn-tertiary.zg-shell-requester:hover:not(:disabled) {
+  color: #fff;
+}
+
+.zg-shell-toggle {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+}
+
+@media (max-width: 767.98px) {
+  .zg-shell-nav {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+  }
+  .zg-shell-nav.zg-shell-nav--open {
+    display: flex;
+  }
+}
+
+@media (min-width: 768px) {
+  .zg-shell-toggle {
+    display: none;
+  }
+}
