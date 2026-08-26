@@ -12,6 +12,7 @@ router.get("/", async (_req: Request, res: Response) => {
     });
     res.status(200).json(requesters);
   } catch (error) {
+    console.error("Database error in /api/requesters:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

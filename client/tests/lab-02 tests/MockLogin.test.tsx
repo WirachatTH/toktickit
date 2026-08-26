@@ -1,8 +1,9 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MockLogin } from "../../src/components/MockLogin.js";
-import { RequesterProvider } from "../../src/contexts/RequesterContext.js";
+import { RequesterProvider, useRequester } from "../../src/contexts/RequesterContext.js";
 import * as api from "../../src/api.js";
 
 // Mock the API module
@@ -67,5 +68,48 @@ describe("MockLogin Component", () => {
     // Check button CSS
     const button = screen.getByRole("button", { name: /Simulate Login/i });
     expect(button.className).toContain("btn-success");
+  });
+
+  it("renders empty state when no active requesters exist", async () => {
+    (api.getRequesters as any).mockResolvedValue([]);
+    
+    render(
+      <RequesterProvider>
+        <MockLogin />
+      </RequesterProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("empty-state")).toBeInTheDocument();
+    });
+  });
+
+  it("updates global context when a requester is selected and submitted", async () => {
+    const user = userEvent.setup();
+    const mockRequesters = [
+      { id: 1, name: "John Doe", email: "john@example.com" },
+      { id: 2, name: "Jane Smith", email: "jane@example.com" },
+    ];
+    (api.getRequesters as any).mockResolvedValue(mockRequesters);
+    
+    const ContextObserver = () => {
+      const { currentRequester } = useRequester();
+      return <div data-testid="context-value">{currentRequester?.name || "None"}</div>;
+    };
+
+    render(
+      <RequesterProvider>
+        <MockLogin />
+        <ContextObserver />
+      </RequesterProvider>
+    );
+
+    const select = await screen.findByRole("combobox");
+    await user.selectOptions(select, "2");
+    
+    const button = screen.getByRole("button", { name: /Simulate Login/i });
+    await user.click(button);
+    
+    expect(screen.getByTestId("context-value")).toHaveTextContent("Jane Smith");
   });
 });
