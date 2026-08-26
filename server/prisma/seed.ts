@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@prisma/client";
 import { getPrisma } from "../src/prisma.js";
 
@@ -68,9 +69,12 @@ export async function seed(prisma: PrismaClient) {
 
   console.log("Seeding development requesters...");
   for (const { name, email, isActive } of requesters) {
+    // No-op update, matching Category/RelatedSystem above: seeding only
+    // ensures these rows exist. It must never silently overwrite a row a
+    // later feature (or a manual test tweak) has since changed.
     await prisma.requesterUser.upsert({
       where: { email },
-      update: { name, isActive },
+      update: {},
       create: { name, email, isActive },
     });
     console.log(`Upserted requester: ${name} (${isActive ? "active" : "inactive"})`);
@@ -83,11 +87,19 @@ async function main() {
   await seed(getPrisma());
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await getPrisma().$disconnect();
-  });
+// Only run when this file is executed directly (`tsx prisma/seed.ts` /
+// `npm run prisma:seed`), never as a side effect of being imported — tests
+// import { seed } to call it explicitly against the shared Prisma client,
+// and an unguarded top-level call here would both reseed and disconnect
+// that shared client the moment the module loads.
+const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
+if (isDirectRun) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await getPrisma().$disconnect();
+    });
+}

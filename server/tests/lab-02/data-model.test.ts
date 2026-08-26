@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
@@ -61,6 +61,14 @@ describe("Ticket schema constraints", () => {
   let categoryId: number;
   let relatedSystemId: number;
 
+  // Every Ticket/Category row a test below creates on purpose (to prove a
+  // constraint fires) is tracked here and removed in afterAll. Without this,
+  // the rows survive the test run (that's the whole point of proving RESTRICT
+  // blocks the delete) and silently break both this file's own "exactly 4
+  // categories" assertion and tests/lab-01/categories.test.ts on the next run.
+  const createdTicketIds: number[] = [];
+  const createdCategoryIds: number[] = [];
+
   beforeAll(async () => {
     await seed(prisma);
     const requester = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: true } });
@@ -69,6 +77,17 @@ describe("Ticket schema constraints", () => {
     requesterId = requester.id;
     categoryId = category.id;
     relatedSystemId = relatedSystem.id;
+  });
+
+  afterAll(async () => {
+    // Tickets first — Category can't be deleted while a Ticket still
+    // references it (that's the exact rule under test above).
+    if (createdTicketIds.length > 0) {
+      await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
+    }
+    if (createdCategoryIds.length > 0) {
+      await prisma.category.deleteMany({ where: { id: { in: createdCategoryIds } } });
+    }
   });
 
   it("rejects two Tickets with the same ticketNumber (unique constraint)", async () => {
@@ -82,7 +101,8 @@ describe("Ticket schema constraints", () => {
       description: "Used to verify the ticketNumber unique constraint at the DB level.",
     };
 
-    await prisma.ticket.create({ data: base });
+    const created = await prisma.ticket.create({ data: base });
+    createdTicketIds.push(created.id);
 
     await expect(prisma.ticket.create({ data: base })).rejects.toThrow();
   });
@@ -97,12 +117,14 @@ describe("Ticket schema constraints", () => {
       description: "Used to verify the requesterId foreign key constraint.",
     };
 
+    // Rejected before insert, so nothing is created and nothing needs tracking.
     await expect(prisma.ticket.create({ data: bogus })).rejects.toThrow();
   });
 
   it("blocks deleting a Category that a Ticket still references (onDelete: Restrict)", async () => {
     const category = await prisma.category.create({ data: { name: `Temp Category ${Date.now()}` } });
-    await prisma.ticket.create({
+    createdCategoryIds.push(category.id);
+    const ticket = await prisma.ticket.create({
       data: {
         requesterId,
         categoryId: category.id,
@@ -112,6 +134,7 @@ describe("Ticket schema constraints", () => {
         description: "Used to verify Category cannot be deleted while referenced.",
       },
     });
+    createdTicketIds.push(ticket.id);
 
     await expect(prisma.category.delete({ where: { id: category.id } })).rejects.toThrow();
   });
