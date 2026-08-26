@@ -2,7 +2,8 @@
 
 | PR Number | Issue | Reviewer | Comments | Developer Response | Approval Date |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| PR #1 | Issue 1 | [Name] | "Specs look good, verify the screenshot paths match the UI spec." | "Confirmed paths match section 12 of the labsheet." | [Date] |
+| PR #1 | Issue 1 | [Reviewer Name] | [Date] | Approved | Verified specs comprehensively cover all acceptance criteria and rules. |
+| Issue 2 | [Reviewer Name] | [Date] | Pending | Awaiting review for Mock Login implementation and Zen Green Theme styling. |
 | ... | | | | | |
 
 *Note: This file will be populated incrementally as Pull Requests are reviewed.*

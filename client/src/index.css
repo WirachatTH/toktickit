@@ -1,0 +1,39 @@
+body {
+  background-color: #F5F7F6 !important;
+}
+
+/* Zen Green Theme */
+.btn-success {
+  background-color: #006B3C !important;
+  border-color: #006B3C !important;
+  color: white !important;
+}
+
+.btn-success:hover {
+  background-color: #005630 !important;
+  border-color: #005630 !important;
+}
+
+.btn-outline-success {
+  color: #006B3C !important;
+  border-color: #006B3C !important;
+}
+
+.btn-outline-success:hover {
+  background-color: #006B3C !important;
+  color: white !important;
+}
+
+.text-success {
+  color: #006B3C !important;
+}
+
+.bg-pale-green {
+  background-color: #EAF6EF !important;
+}
+
+/* Accessibility Focus */
+*:focus-visible {
+  outline: 2px solid #006B3C !important;
+  outline-offset: 2px;
+}

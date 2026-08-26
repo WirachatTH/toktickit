@@ -10,6 +10,17 @@ export interface SystemStatus {
   categories: Category[];
 }
 
+export interface RequesterUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface RelatedSystem {
+  id: number;
+  name: string;
+}
+
 // Issue 2 + Issue 4 — call the backend.
 // Steps: fetch `${API_URL}/api/health`; if not ok, throw.
 //        then fetch `${API_URL}/api/categories`; if not ok, throw.
@@ -29,4 +40,20 @@ export async function checkSystem(): Promise<SystemStatus> {
   const categories: Category[] = await categoriesRes.json();
   
   return { online: true, categories };
+}
+
+export async function getRequesters(): Promise<RequesterUser[]> {
+  const res = await fetch(`${API_URL}/api/requesters`);
+  if (!res.ok) {
+    throw new Error("Unable to fetch requesters");
+  }
+  return res.json();
+}
+
+export async function getSystems(): Promise<RelatedSystem[]> {
+  const res = await fetch(`${API_URL}/api/systems`);
+  if (!res.ok) {
+    throw new Error("Unable to fetch systems");
+  }
+  return res.json();
 }

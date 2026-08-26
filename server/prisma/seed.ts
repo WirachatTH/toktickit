@@ -23,6 +23,43 @@ async function main() {
     });
     console.log(`Upserted category: ${name}`);
   }
+
+  const systems = [
+    "ERP",
+    "HRIS",
+    "Email",
+    "Intranet",
+    "CRM",
+    "Finance"
+  ];
+
+  console.log("Seeding related systems...");
+  for (const name of systems) {
+    await prisma.relatedSystem.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+    console.log(`Upserted related system: ${name}`);
+  }
+
+  const requesters = [
+    { name: "John Doe", email: "john@example.com", isActive: true },
+    { name: "Jane Smith", email: "jane@example.com", isActive: true },
+    { name: "Alice Johnson", email: "alice@example.com", isActive: true },
+    { name: "Bob Inactive", email: "bob@example.com", isActive: false },
+  ];
+
+  console.log("Seeding requester users...");
+  for (const user of requesters) {
+    await prisma.requesterUser.upsert({
+      where: { email: user.email },
+      update: { name: user.name, isActive: user.isActive },
+      create: user,
+    });
+    console.log(`Upserted requester: ${user.name}`);
+  }
+
   console.log("Seeding complete.");
 }
 
