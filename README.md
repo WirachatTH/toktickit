@@ -101,10 +101,45 @@ To verify the implementation of the IT request category list feature:
    ```
    *Expected result: `App.test.tsx` passes with assertions for "Online", the seeded categories, and "Offline" error messages, verifying UI behavior through Vitest.*
 
-### Lab 2: Requester MVP
-In this phase of the project, we have implemented the MVP feature set for Requesters:
-- **Mock Login**: Select a development requester context.
-- **Create Ticket**: Submit a new IT request ticket with attachments.
+### Verifying the Mock Login Feature
+
+The application includes a Mock Login system to simulate authenticated requester sessions.
+
+1. **Verify Backend Requesters API:**
+   Navigate to [http://localhost:3000/api/requesters](http://localhost:3000/api/requesters) in your browser. You should see a list of Active Requester profiles.
+2. **Verify Frontend UI State:**
+   Navigate to [http://localhost:5173](http://localhost:5173). You will be greeted by the Mock Login screen. Selecting a user locks in your session context, granting access to the main dashboard.
+3. **Verify Automated Tests:**
+   Run the test suites to confirm that inactive users are filtered out and that context propagation works seamlessly:
+   ```bash
+   docker-compose exec server npm test
+   docker-compose exec client npm test
+   ```
+
+### Verifying the Create Ticket Feature
+
+The application enables requesters to submit fully validated IT tickets with file attachments.
+
+1. **Verify Database Records:**
+   You can run a direct Prisma query to view all created tickets and their related entities. Inside your terminal, run:
+   ```bash
+   docker-compose exec server npx tsx -e "import { PrismaClient } from '@prisma/client'; new PrismaClient().ticket.findMany({ include: { category: true, system: true, requester: true, attachments: true } }).then(x => console.log(JSON.stringify(x, null, 2)))"
+   ```
+   *Expected result: A JSON array showing all tickets, including their generated Ticket IDs, status, and related metadata.*
+
+2. **Verify Frontend Form Validation:**
+   In the client application ([http://localhost:5173](http://localhost:5173)), navigate to the **Create Ticket** screen. 
+   - Attempt to upload an `.exe` file or more than 5 files to trigger the client-side attachment protection.
+   - Attempt to bypass the 120-character limit on the summary to observe the instant validation UI.
+
+3. **Verify Automated Tests:**
+   The test suites strictly enforce maximum file sizes, transaction rollbacks, HTML sanitization, and database constraints.
+   ```bash
+   docker-compose exec server npm test
+   docker-compose exec client npm test
+   ```
+
+### Future Iterations (Coming Soon)
 - **My Tickets**: View, search, filter, and sort submitted tickets.
 - **Ticket Details**: View details and manage attachments.
 

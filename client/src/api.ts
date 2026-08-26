@@ -57,3 +57,11 @@ export async function getSystems(): Promise<RelatedSystem[]> {
   }
   return res.json();
 }
+
+export async function getCategories(): Promise<Category[]> {
+  const res = await fetch(`${API_URL}/api/categories`);
+  if (!res.ok) {
+    throw new Error("Unable to fetch categories");
+  }
+  return res.json();
+}

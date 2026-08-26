@@ -43,7 +43,10 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 });
 // ---------------------------------------------------------------------------
 
+import ticketsRouter from "./routes/tickets.js";
+
 app.use("/api/requesters", requestersRouter);
 app.use("/api/systems", systemsRouter);
+app.use("/api/tickets", ticketsRouter);
 
 export default app;

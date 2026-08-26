@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { checkSystem, Category } from "./api.js";
 import { RequesterProvider, useRequester } from "./contexts/RequesterContext.js";
 import { MockLogin } from "./components/MockLogin.js";
 import { Navbar } from "./components/Navbar.js";
+import { CreateTicket } from "./components/CreateTicket.js";
 
-// UI states you must handle for Issue 4: idle, loading, success, error.
+type View = "dashboard" | "create-ticket";
+
+import { checkSystem, Category } from "./api.js";
+
 type UiState = "idle" | "loading" | "success" | "error";
 
-function Dashboard() {
+function Dashboard({ setView }: { setView: (v: View) => void }) {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
-  void categories;
 
   async function handleCheck() {
     setState("loading");
@@ -28,13 +30,18 @@ function Dashboard() {
       <h1 className="h3 mb-4">
         TokTickIT <span className="text-success">IT Service Desk</span>
       </h1>
-
-      <button className="btn btn-success" onClick={handleCheck} disabled={state === "loading"}>
-        {state === "loading" ? "Loading…" : "Check System"}
-      </button>
+      
+      <div className="d-flex gap-3 mb-4">
+        <button className="btn btn-success" onClick={() => setView("create-ticket")}>
+          Create New Ticket
+        </button>
+        <button className="btn btn-outline-success" onClick={handleCheck} disabled={state === "loading"}>
+          {state === "loading" ? "Loading…" : "Check System"}
+        </button>
+      </div>
 
       {state === "success" && (
-        <div className="mt-4">
+        <div className="mt-4 border-top pt-4">
           <p>System Status: <span className="text-success fw-bold">Online</span></p>
           <h2 className="h4 mt-4 mb-3">IT Request Categories</h2>
           {categories.length > 0 ? (
@@ -52,7 +59,7 @@ function Dashboard() {
       )}
 
       {state === "error" && (
-        <div className="mt-4">
+        <div className="mt-4 border-top pt-4">
           <p className="mb-1">System Status: <span className="text-danger fw-bold">Offline</span></p>
           <p className="text-danger">Unable to connect to TokTickIT API</p>
         </div>
@@ -72,10 +79,24 @@ export default function App() {
 
 function MainContent() {
   const { currentRequester } = useRequester();
+  const [view, setView] = useState<View>("dashboard");
   
   if (!currentRequester) {
     return <MockLogin />;
   }
   
-  return <Dashboard />;
+  if (view === "create-ticket") {
+    return (
+      <div>
+        <div className="container mt-3">
+          <button className="btn btn-outline-secondary btn-sm" onClick={() => setView("dashboard")}>
+            &larr; Back to Dashboard
+          </button>
+        </div>
+        <CreateTicket />
+      </div>
+    );
+  }
+
+  return <Dashboard setView={setView} />;
 }
