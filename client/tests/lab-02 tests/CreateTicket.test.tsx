@@ -176,4 +176,53 @@ describe("CreateTicket Component", () => {
     expect(newCategorySelect.value).toBe("");
     expect(newSystemSelect.value).toBe("");
   });
+
+  it("prevents duplicate submissions on rapid double click", async () => {
+    const user = userEvent.setup();
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 2, ticketNumber: "TICK-8888" })
+    });
+
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText(/Create New IT Request/)).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText(/Summary/), "Rapid summary");
+    await user.type(screen.getByLabelText(/Description/), "Rapid description");
+    await user.selectOptions(screen.getByLabelText(/Category/), "1");
+    await user.selectOptions(screen.getByLabelText(/Related System/), "1");
+
+    const submitBtn = screen.getByRole("button", { name: /Create Ticket/ });
+    // Rapidly click 3 times
+    await user.click(submitBtn);
+    await user.click(submitBtn);
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Ticket Created Successfully!/)).toBeInTheDocument();
+    });
+
+    // We only expect 1 network request for ticket creation since button disables
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows file count rejection for 6+ files", async () => {
+    const user = userEvent.setup();
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText(/Create New IT Request/)).toBeInTheDocument();
+    });
+
+    const files = Array.from({ length: 6 }).map((_, i) => new File(["dummy content"], `file${i}.pdf`, { type: "application/pdf" }));
+
+    const input = screen.getByLabelText(/Attachments/) as HTMLInputElement;
+    await user.upload(input, files);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Maximum of 5 files/i)).toBeInTheDocument();
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
 });

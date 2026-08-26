@@ -20,6 +20,7 @@ export function CreateTicket() {
   const [fileError, setFileError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [ticketNumber, setTicketNumber] = useState("");
+  const [failedFiles, setFailedFiles] = useState<string[]>([]);
   const [validated, setValidated] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +106,7 @@ export function CreateTicket() {
       const ticket = await res.json();
 
       // 2. Upload attachments sequentially
+      const failed: string[] = [];
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
@@ -114,13 +116,12 @@ export function CreateTicket() {
         });
 
         if (!attachRes.ok) {
-           // We do not throw to roll back here per instructions, just show error but ticket is created.
-           // However, specification says: "In the event of a partial failure... notify the user"
-           // For MVP, we will just proceed and perhaps alert them later, or throw to show error.
            console.error("Failed to upload file:", file.name);
+           failed.push(file.name);
         }
       }
 
+      setFailedFiles(failed);
       setTicketNumber(ticket.ticketNumber);
       setState("submitted");
 
@@ -144,6 +145,16 @@ export function CreateTicket() {
         <div className="alert alert-success text-center">
           <h4 className="alert-heading">Ticket Created Successfully!</h4>
           <p>Your ticket number is <strong>{ticketNumber}</strong>.</p>
+          
+          {failedFiles.length > 0 && (
+            <div className="alert alert-warning mt-3 text-start">
+              <strong>Warning:</strong> The following attachments failed to upload:
+              <ul className="mb-0">
+                {failedFiles.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+              Please try uploading them again later from the Ticket Details page.
+            </div>
+          )}
           <button 
             className="btn btn-success mt-3" 
             onClick={() => {
@@ -156,6 +167,7 @@ export function CreateTicket() {
               setFiles([]);
               setSubmitError("");
               setTicketNumber("");
+              setFailedFiles([]);
               if (fileInputRef.current) {
                 fileInputRef.current.value = "";
               }

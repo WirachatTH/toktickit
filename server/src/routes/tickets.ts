@@ -58,21 +58,31 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid category, system, or requester." });
     }
 
-    // Generate ticket number (simple logic for MVP)
-    const count = await getPrisma().ticket.count();
-    const ticketNumber = `TICK-${1000 + count + 1}`;
+    // Verify priority
+    const validPriorities = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+    if (!validPriorities.includes(priority)) {
+      return res.status(400).json({ error: "Invalid priority." });
+    }
 
-    const newTicket = await getPrisma().ticket.create({
-      data: {
-        ticketNumber,
-        summary,
-        description,
-        categoryId: Number(categoryId),
-        systemId: Number(systemId),
-        priority,
-        requesterId: Number(requesterId),
-        status: "NEW"
-      }
+    // Use a transaction to safely assign ticketNumber based on the autoincremented ID
+    const newTicket = await getPrisma().$transaction(async (tx) => {
+      const tempId = Date.now().toString() + Math.random().toString();
+      const ticket = await tx.ticket.create({
+        data: {
+          ticketNumber: `TEMP-${tempId}`,
+          summary,
+          description,
+          categoryId: Number(categoryId),
+          systemId: Number(systemId),
+          priority,
+          requesterId: Number(requesterId),
+          status: "NEW"
+        }
+      });
+      return tx.ticket.update({
+        where: { id: ticket.id },
+        data: { ticketNumber: `TICK-${1000 + ticket.id}` }
+      });
     });
 
     res.status(201).json(newTicket);
