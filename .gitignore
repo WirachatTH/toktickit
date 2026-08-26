@@ -1,3 +1,8 @@
+# Private Doc
+Lab_02_labsheet.md
+plan.md
+issues.md
+test.md
 # dependencies
 node_modules/
 # env & secrets
@@ -9,6 +14,8 @@ dist/
 build/
 # prisma
 server/prisma/*.db
+# lab 2 attachment storage (real uploaded files must never be committed)
+server/uploads/
 # logs & OS
 *.log
 .DS_Store

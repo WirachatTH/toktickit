@@ -100,3 +100,51 @@ To verify the implementation of the IT request category list feature:
    docker-compose exec client npm test
    ```
    *Expected result: `App.test.tsx` passes with assertions for "Online", the seeded categories, and "Offline" error messages, verifying UI behavior through Vitest.*
+
+---
+
+## Lab 2 — Requester Ticketing MVP
+
+Lab 2 builds on the same Docker Compose stack. Engineering contract lives in
+`docs/lab-02/` (`specification.md`, `api-spec.md`, `ui-spec.md`, `tests.md`).
+
+> **Status:** Issue 1 (specification/test/UI/API docs) is drafted on
+> `feature/1-doc-prep`. No Lab 2 database models, endpoints, or screens exist yet —
+> this section is a scaffold and will be filled in with real verification steps as
+> each subsequent issue (`feature/2-data-model` onward) lands. Treat any command
+> below as "will work once that issue merges," not as currently true.
+
+### Applying the Lab 2 database migration and seed (once Issue 2 lands)
+```bash
+docker-compose exec server npx prisma migrate dev
+docker-compose exec server npm run prisma:seed
+```
+*Expected result: adds `RequesterUser`, `RelatedSystem`, `Ticket`, and `Attachment`
+tables; seed inserts ≥6 Related Systems, ≥4 active + ≥1 inactive Development
+Requesters, and keeps the 4 existing Categories unchanged. Safe to re-run.*
+
+### Running Lab 2 tests (once the corresponding issue lands)
+```bash
+# Backend (Vitest + Supertest) — server/tests/lab-02/
+docker-compose exec server npm test
+
+# Frontend (Vitest + Testing Library) — client/tests/lab-02/
+docker-compose exec client npm test
+
+# E2E (Playwright, added in Issue 9) — e2e/lab-02/
+docker-compose exec client npx playwright test ../e2e/lab-02/requester-ticket-flow.spec.ts
+```
+
+### Verifying the Requester ticketing flow (once implemented)
+1. Open [http://localhost:5173](http://localhost:5173) — you'll land on the
+   Development Requester Selection screen. Pick an active Requester and continue.
+2. Create a ticket from the Create Ticket screen, attach a JPG/PNG/WEBP/PDF under
+   5 MB, and submit — a backend-generated Ticket Number (`TCK-######`) is shown.
+3. Open My Tickets — the ticket you just created appears; use search/filters/sort/
+   pagination to confirm they work, then use "Change Requester" and confirm the
+   ticket disappears for a different Requester.
+4. Open the ticket's Detail screen, download the attachment, then soft-remove it
+   with a reason and confirm it's no longer downloadable but its metadata remains.
+
+Full traceability from each acceptance criterion to its automated test is in
+`docs/lab-02/tests.md`.
