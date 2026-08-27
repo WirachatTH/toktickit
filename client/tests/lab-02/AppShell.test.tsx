@@ -4,13 +4,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AppShell } from "../../src/components/AppShell.js";
+import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // Issue 3 — App shell navigation, Requester display, responsive mobile nav
 // (docs/lab-02/ui-spec.md §6.1, issues.md Issue 3 "To test": UI-18/STYLE-02).
 
 function renderShell(path: string, props: Partial<ComponentProps<typeof AppShell>> = {}) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
       <AppShell {...props}>
         <p>Page content</p>
       </AppShell>
@@ -82,6 +83,22 @@ describe("AppShell", () => {
     for (const element of focusOrder) {
       await user.tab();
       expect(element).toHaveFocus();
+    }
+  });
+
+  // Regression tripwire (review finding, message.txt): the mobile nav was
+  // once visible before the toggle was ever opened, because a Bootstrap
+  // "d-flex" utility class compiles to `display: flex !important`, which
+  // silently beat zen-green.css's `display: none` media-query rule — a bug
+  // jsdom's lack of real CSS could never catch. This can't assert the
+  // computed style (jsdom doesn't apply CSS), but it *can* assert the
+  // regression's literal cause never comes back: no Bootstrap layout
+  // utility class riding along on the element the media query controls.
+  it("never carries a Bootstrap !important layout utility class that would defeat the mobile media query", () => {
+    renderShell("/tickets");
+    const nav = screen.getByRole("navigation", { name: /primary/i });
+    for (const utility of ["d-flex", "d-inline-flex", "d-block", "d-inline"]) {
+      expect(nav).not.toHaveClass(utility);
     }
   });
 });

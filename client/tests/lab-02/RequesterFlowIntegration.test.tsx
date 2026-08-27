@@ -7,6 +7,7 @@ import { RequireRequester } from "../../src/components/RequireRequester.js";
 import { AppShell } from "../../src/components/AppShell.js";
 import { RequesterProvider, useRequester } from "../../src/context/RequesterContext.js";
 import { ROUTES } from "../../src/routes.js";
+import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // Issue 4 — integration coverage across RequesterContext + RequireRequester
 // + AppShell together, not each in isolation. RequesterSelector.test.tsx,
@@ -30,7 +31,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
 
 function renderApp() {
   return render(
-    <MemoryRouter initialEntries={[ROUTES.list]}>
+    <MemoryRouter future={ROUTER_FUTURE} initialEntries={[ROUTES.list]}>
       <RequesterProvider>
         <Routes>
           <Route path={ROUTES.select} element={<div>SELECTOR_SCREEN</div>} />

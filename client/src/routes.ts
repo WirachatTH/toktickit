@@ -6,4 +6,8 @@ export const ROUTES = {
   list: "/tickets",
   create: "/tickets/new",
   detail: (id: number | string) => `/tickets/${id}`,
+  // The <Route path> pattern for detail(), kept alongside it so the router
+  // definition never hardcodes "/tickets/:id" independently — the exact
+  // drift this file exists to prevent (review finding, message.txt).
+  detailPattern: "/tickets/:id",
 } as const;

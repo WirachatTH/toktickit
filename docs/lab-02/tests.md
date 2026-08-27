@@ -73,10 +73,12 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-12 | AC-08 | UI | Click soft-remove on an attachment | Requires entering a reason + explicit confirmation before it takes effect | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-13 | BR-36 | UI | View a removed attachment | Shown as metadata only, no download/preview control | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-14 | UI Spec §6.5 | UI | Ticket with 5 active attachments | "Add Attachment" disabled with a tooltip explaining why | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
-| API-35 | BR-06 | API | `GET /api/requesters` | Returns only `isActive=true` rows | `server/tests/lab-02/requesters.api.test.ts` | Pending |
-| UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. seed data | Inactive seeded Requester never appears as an option | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
+| API-35 | AC-14, BR-06 | API | `GET /api/requesters` | Returns only `isActive=true` rows; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pending |
+| API-36 | BR-06 | API | `GET /api/systems` against a genuinely inactive Related System (self-cleaning fixture, not just seed data) | Never included; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pending |
+| UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. a mocked active-Requester list | Dropdown renders exactly what the API returned | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
 | UI-16 | UI Spec §6.2 | UI | Selector with mocked empty/failure API responses | Distinct empty state and safe failure state rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
-| UI-17 | AC-02, BR-08 | UI | Navigate to My Tickets/Create Ticket/Detail with no Requester selected | Redirected to the Selector | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
+| UI-17 | AC-02, BR-08 | UI | Navigate to My Tickets/Create Ticket/Ticket Detail with no Requester selected, rendering the *real* route table (not a synthetic one) | Redirected to the Selector for all three routes; deleting `<RequireRequester>` from `App.tsx`'s routes fails this test (mutation-verified) | `client/tests/lab-02/AppRoutes.test.tsx` | Pending |
+| STYLE-3.7 | UI Spec §6.1 | UI Style | AppShell's mobile nav element carries no Bootstrap `!important` display utility class | No `d-flex`/`d-inline-flex`/`d-block`/`d-inline` class present — the exact regression that once defeated the mobile media query | `client/tests/lab-02/AppShell.test.tsx` | Pending |
 | STYLE-02 | UI Spec §3, §4 | UI Style | Busy/disabled button states across the shared component library | Busy shows spinner+disabled; disabled is inert and visually distinct | `client/tests/lab-02/AppShell.test.tsx` | Pending |
 | UI-18 | UI Spec §7 | Accessibility | Tab through Selector, Create Ticket, My Tickets, Ticket Detail | Every interactive control reachable with a visible focus indicator | `client/tests/lab-02/AppShell.test.tsx` | Pending |
 | E2E-01 | AC-01, AC-10 | E2E | Full journey: select Requester → create ticket w/ attachment → find in My Tickets → open Detail → download → soft-remove → switch Requester → confirm isolation | Every step succeeds in order on a clean seeded DB | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
@@ -87,7 +89,7 @@ document is the curated, graded planned-test table plus traceability required by
 | AC | Covered by |
 | :--- | :--- |
 | AC-01 | API-01, UI-03, E2E-01 |
-| AC-02 | UI-17 |
+| AC-02 | UI-17 (real route table, not synthetic) |
 | AC-03 | API-19, API-20, API-21, API-30, UI-11 |
 | AC-04 | API-02, API-03, UI-01 |
 | AC-05 | UI-04 |
@@ -99,7 +101,7 @@ document is the curated, graded planned-test table plus traceability required by
 | AC-11 | API-12 |
 | AC-12 | API-15 |
 | AC-13 | UI-07, UI-08 |
-| AC-14 | UI-15 |
+| AC-14 | API-35 (authoritative), API-36, UI-15 (renders mocked data) |
 | AC-15 | API-09, UI-02 |
 
 Every AC-## in `specification.md` §9 has at least one row above; none are
@@ -138,3 +140,11 @@ run's output.
   exploratory only for this MVP scale and are not part of the graded suite.
 - Cross-browser testing is limited to what Playwright's default Chromium project
   covers; no manual Safari/Firefox pass is planned for Lab 2.
+- An external peer review of PR #32 (Issue 4) found that API-35's original
+  form and UI-17 could both be deleted from the production code without
+  failing any test — a passing suite that wasn't actually exercising the
+  rule it claimed to. Both were rewritten against a mutation-tested
+  fixture (API-35/API-36) and the real route table (UI-17/`AppRoutes.test.tsx`)
+  rather than a synthetic one. Where it's cheap, later Lab 2 test files
+  should be spot-checked the same way (delete the guard/filter under test,
+  confirm the suite goes red) rather than assumed correct because it's green.

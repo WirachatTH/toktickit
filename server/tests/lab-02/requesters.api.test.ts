@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
@@ -56,5 +56,32 @@ describe("GET /api/systems", () => {
       expect(system).toMatchObject({ id: expect.any(Number), name: expect.any(String) });
       expect(system).not.toHaveProperty("isActive");
     }
+  });
+
+  // The seed only ever creates active Related Systems, so without this
+  // fixture nothing in the suite could ever observe the isActive filter
+  // doing anything — the test above would pass identically whether or not
+  // `where: { isActive: true }` were even present (confirmed by deleting
+  // it and re-running: 15/15 still green). This creates and cleans up its
+  // own inactive row so the filter has something real to be tested against.
+  describe("with a genuinely inactive Related System present", () => {
+    let inactiveId: number;
+
+    beforeAll(async () => {
+      const inactive = await prisma.relatedSystem.create({
+        data: { name: `Decommissioned Test System ${Date.now()}`, isActive: false },
+      });
+      inactiveId = inactive.id;
+    });
+
+    afterAll(async () => {
+      await prisma.relatedSystem.delete({ where: { id: inactiveId } });
+    });
+
+    it("never includes it", async () => {
+      const res = await request(app).get("/api/systems");
+      const ids = res.body.map((s: { id: number }) => s.id);
+      expect(ids).not.toContain(inactiveId);
+    });
   });
 });

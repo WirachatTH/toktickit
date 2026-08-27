@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { RequesterSelector } from "../../src/screens/RequesterSelector.js";
 import { RequesterProvider } from "../../src/context/RequesterContext.js";
 import * as api from "../../src/api.js";
+import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // Issue 4 — Development Requester Selection screen
 // (ui-spec.md §6.2, tests.md UI-15/UI-16/UI-17).
@@ -16,7 +17,7 @@ const ACTIVE_REQUESTERS = [
 
 function renderSelector() {
   return render(
-    <MemoryRouter initialEntries={["/select-requester"]}>
+    <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/select-requester"]}>
       <RequesterProvider>
         <Routes>
           <Route path="/select-requester" element={<RequesterSelector />} />
@@ -90,6 +91,19 @@ describe("RequesterSelector", () => {
     await userEvent.selectOptions(screen.getByRole("combobox"), "1");
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
   });
+
+  // A test was attempted here for handleContinue's internal `if (!chosen)
+  // return` guard, using fireEvent.click on the disabled Continue button to
+  // try to bypass it. Mutation-testing that attempt (removing the guard,
+  // re-running) showed the test still passed either way: jsdom, like a real
+  // browser, never dispatches a click on a disabled element at all, so the
+  // click handler was never reached regardless of what's inside it. That
+  // would have been exactly the kind of test that looks like coverage but
+  // isn't — removed rather than kept for a false sense of security. The
+  // guard is genuinely unreachable through any real or simulated
+  // interaction today; it stays in the source as cheap insurance against a
+  // future refactor that might not keep the button properly disabled, but
+  // nothing here claims to test it.
 
   it("persists the selection and navigates to My Tickets on Continue, fully by keyboard", async () => {
     vi.spyOn(api, "fetchActiveRequesters").mockResolvedValue(ACTIVE_REQUESTERS);

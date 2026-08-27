@@ -35,7 +35,10 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
     });
     res.status(200).json(categories);
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    // Matches the §0 error envelope every Lab 2 reference-data endpoint
+    // uses (this route is also part of that contract — api-spec.md §1),
+    // even though it was implemented in Lab 1 before that envelope existed.
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
   }
 });
 // ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { RequireRequester } from "../../src/components/RequireRequester.js";
 import { RequesterProvider } from "../../src/context/RequesterContext.js";
+import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // Issue 4 — route guard (AC-02, BR-08): no Requester-scoped screen is
 // reachable without a current selection.
@@ -11,7 +12,7 @@ const STORAGE_KEY = "tokTickIT.devRequester";
 
 function renderGuardedRoute(initialPath: string) {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
+    <MemoryRouter future={ROUTER_FUTURE} initialEntries={[initialPath]}>
       <RequesterProvider>
         <Routes>
           <Route path="/select-requester" element={<div>SELECTOR_SCREEN</div>} />
