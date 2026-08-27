@@ -35,7 +35,43 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
     });
     res.status(200).json(categories);
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    // Matches the §0 error envelope every Lab 2 reference-data endpoint
+    // uses (this route is also part of that contract — api-spec.md §1),
+    // even though it was implemented in Lab 1 before that envelope existed.
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
+  }
+});
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 4 — reference-data endpoints backing the Development
+// Requester Selector and (later) Create Ticket. See docs/lab-02/api-spec.md
+// §2-3. Neither route requires the X-Dev-Requester-Id header — a Requester
+// hasn't been chosen yet when the Selector loads these.
+// ---------------------------------------------------------------------------
+app.get("/api/systems", async (_req: Request, res: Response) => {
+  try {
+    const systems = await getPrisma().relatedSystem.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { id: "asc" },
+    });
+    res.status(200).json(systems);
+  } catch (error) {
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
+  }
+});
+
+app.get("/api/requesters", async (_req: Request, res: Response) => {
+  try {
+    const requesters = await getPrisma().requesterUser.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+    res.status(200).json(requesters);
+  } catch (error) {
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
   }
 });
 // ---------------------------------------------------------------------------

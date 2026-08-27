@@ -8,6 +8,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./tests/setup.ts",
-    include: ["tests/**/*.test.tsx"],
+    // Includes .test.ts too, not just .test.tsx — a non-JSX test file
+    // (e.g. testing a pure function) would otherwise be silently skipped
+    // rather than failed (review finding, message.txt).
+    include: ["tests/**/*.test.{ts,tsx}"],
   },
 });
