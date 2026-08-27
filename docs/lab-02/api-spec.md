@@ -19,6 +19,13 @@ selected Development Requester (spec §BR-07, Decision D-3). Missing or invalid
 file paths (BR-28). `code` is a stable machine-readable string the frontend may
 switch on (e.g. to highlight a specific field).
 
+For `VALIDATION_ERROR` specifically, the error object may also carry a `fields`
+map from field name to that field's own message, so the client can place each
+message next to its control instead of only showing the top-level `message`:
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "Some fields need attention before this ticket can be created.", "fields": { "summary": "Summary must be between 5 and 120 characters." } } }
+```
+
 **Common error codes.**
 | Code | Meaning |
 | :--- | :--- |
