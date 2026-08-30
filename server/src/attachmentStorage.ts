@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { extensionForMimeType } from "./validation/attachment.js";
@@ -13,7 +13,7 @@ export async function ensureUploadDir(): Promise<void> {
 }
 
 export function generateStoredFilename(mimeType: string): string {
-  return `${randomUUID()}${extensionForMimeType(mimeType)}`;
+  return `${crypto.randomUUID()}${extensionForMimeType(mimeType)}`;
 }
 
 export function storedFilePath(storedFilename: string): string {

@@ -246,7 +246,17 @@ doesn't belong to that Ticket, or Attachment doesn't exist).
 **Auth:** required.
 
 **Response `200`:** raw file bytes, `Content-Type` set to the stored `mimeType`,
-`Content-Disposition: attachment; filename="<originalFilename>"`.
+`Content-Disposition` carrying both an ASCII fallback and an RFC 5987 extended
+parameter so non-ASCII filenames (e.g. Thai) survive intact for clients that
+support it, while older clients still get a safe fallback:
+`Content-Disposition: attachment; filename="<asciiFallback>"; filename*=UTF-8''<percentEncoded>`.
+- `<asciiFallback>` is `<originalFilename>` with control characters (CR/LF)
+  stripped, non-ASCII bytes replaced with `_`, and `\`/`"` backslash-escaped
+  so it's a valid quoted-string.
+- `<percentEncoded>` is `<originalFilename>` (control characters stripped)
+  run through `encodeURIComponent`, with `' ( ) *` additionally
+  percent-encoded since RFC 5987's `attr-char` grammar excludes them even
+  though `encodeURIComponent` leaves them unescaped.
 
 **Errors:**
 | Status | Code | Cause |
