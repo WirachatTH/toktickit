@@ -282,19 +282,39 @@ const TICKET_NOT_FOUND = { error: { code: "NOT_FOUND", message: "Ticket not foun
 const ATTACHMENT_NOT_FOUND = { error: { code: "NOT_FOUND", message: "Attachment not found." } };
 
 class AttachmentLimitError extends Error {}
+class AlreadyRemovedError extends Error {}
+
+// Postgres's id columns are Int32. `Number.isFinite(9999999999)` is true —
+// it's a perfectly ordinary finite JS number, just outside Int32 range —
+// so that check alone lets an oversized id reach Prisma, which throws on
+// the conversion and falls into the generic catch as a 500. A malformed-
+// looking id (this one included) must be a safe 404 instead, the same as
+// a non-numeric one already is (tests.md API-21).
+function isValidId(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0 && value <= 2147483647;
+}
 
 async function findOwnedTicket(prisma: PrismaClient, ticketId: number, requesterId: number) {
-  if (!Number.isFinite(ticketId)) return null;
+  if (!isValidId(ticketId)) return null;
   return prisma.ticket.findFirst({ where: { id: ticketId, requesterId } });
 }
 
 app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
   upload.single("file")(req, res, async (uploadError: unknown) => {
     if (uploadError) {
-      if (uploadError instanceof multer.MulterError && uploadError.code === "LIMIT_FILE_SIZE") {
-        return res
-          .status(413)
-          .json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The attachment exceeds the 5 MB limit." } });
+      // Mirrors the create-ticket route's MulterError handling exactly —
+      // this had drifted to only handling LIMIT_FILE_SIZE, so a wrong field
+      // name or extra file (LIMIT_UNEXPECTED_FILE) fell through to the
+      // generic 500 instead of the 400 the other route already gives it.
+      if (uploadError instanceof multer.MulterError) {
+        if (uploadError.code === "LIMIT_FILE_SIZE") {
+          return res
+            .status(413)
+            .json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The attachment exceeds the 5 MB limit." } });
+        }
+        return res.status(400).json({
+          error: { code: "VALIDATION_ERROR", message: "The attachment could not be uploaded." },
+        });
       }
       return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
     }
@@ -386,7 +406,7 @@ app.get("/api/tickets/:ticketId/attachments/:attachmentId", async (req: Request,
     if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
     const attachmentId = Number(req.params.attachmentId);
-    if (!Number.isFinite(attachmentId)) return res.status(404).json(ATTACHMENT_NOT_FOUND);
+    if (!isValidId(attachmentId)) return res.status(404).json(ATTACHMENT_NOT_FOUND);
 
     const attachment = await prisma.attachment.findFirst({ where: { id: attachmentId, ticketId } });
     if (!attachment) return res.status(404).json(ATTACHMENT_NOT_FOUND);
@@ -412,7 +432,7 @@ app.get("/api/tickets/:ticketId/attachments/:attachmentId/download", async (req:
     if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
     const attachmentId = Number(req.params.attachmentId);
-    if (!Number.isFinite(attachmentId)) return res.status(404).json(ATTACHMENT_NOT_FOUND);
+    if (!isValidId(attachmentId)) return res.status(404).json(ATTACHMENT_NOT_FOUND);
 
     const attachment = await prisma.attachment.findFirst({ where: { id: attachmentId, ticketId } });
     // Removed and "not yours" are made indistinguishable on purpose
@@ -452,7 +472,7 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
     if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
     const attachmentId = Number(req.params.attachmentId);
-    if (!Number.isFinite(attachmentId)) return res.status(404).json(ATTACHMENT_NOT_FOUND);
+    if (!isValidId(attachmentId)) return res.status(404).json(ATTACHMENT_NOT_FOUND);
 
     const attachment = await prisma.attachment.findFirst({ where: { id: attachmentId, ticketId } });
     if (!attachment) return res.status(404).json(ATTACHMENT_NOT_FOUND);
@@ -464,23 +484,41 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
       });
     }
 
-    if (attachment.isRemoved) {
-      return res
-        .status(409)
-        .json({ error: { code: "CONFLICT", message: "This attachment has already been removed." } });
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        // Locks this Attachment row so two concurrent removal requests can't
+        // both read isRemoved=false and both "win" the update — that race
+        // let the second commit silently overwrite the first request's
+        // removedReason/removedAt. A quick manual test won't surface it:
+        // sequential traffic finishes the first request before the second
+        // one starts, so the window only opens under genuine concurrency.
+        const [locked] = await tx.$queryRaw<{ isRemoved: boolean }[]>`
+          SELECT "isRemoved" FROM "Attachment" WHERE id = ${attachment.id} FOR UPDATE
+        `;
+        if (!locked || locked.isRemoved) {
+          throw new AlreadyRemovedError();
+        }
+
+        return tx.attachment.update({
+          where: { id: attachment.id },
+          data: { isRemoved: true, removedAt: new Date(), removedReason: reason },
+        });
+      });
+
+      return res.status(200).json({
+        id: updated.id,
+        isRemoved: updated.isRemoved,
+        removedAt: updated.removedAt,
+        removedReason: updated.removedReason,
+      });
+    } catch (transactionError) {
+      if (transactionError instanceof AlreadyRemovedError) {
+        return res
+          .status(409)
+          .json({ error: { code: "CONFLICT", message: "This attachment has already been removed." } });
+      }
+      throw transactionError;
     }
-
-    const updated = await prisma.attachment.update({
-      where: { id: attachment.id },
-      data: { isRemoved: true, removedAt: new Date(), removedReason: reason },
-    });
-
-    return res.status(200).json({
-      id: updated.id,
-      isRemoved: updated.isRemoved,
-      removedAt: updated.removedAt,
-      removedReason: updated.removedReason,
-    });
   } catch (error) {
     return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
   }

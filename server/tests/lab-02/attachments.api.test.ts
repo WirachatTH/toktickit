@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
@@ -102,6 +103,48 @@ describe("POST /api/tickets/:id/attachments — adding to an existing ticket", (
     const after = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(after).toEqual(before);
     expect(await prisma.attachment.count({ where: { ticketId: ticket.id } })).toBe(0);
+  });
+
+  it("cleans up a file already written to disk when the DB insert fails afterward (BR-39 compensation, add path)", async () => {
+    // The active-count-limit path (tested elsewhere) throws before
+    // persistAttachment is ever called, so writtenPaths stays empty and
+    // cleanup there is a no-op — it can't prove compensation actually
+    // deletes anything. This forces a *later* failure: pin the generated
+    // storedFilename (normally a random UUID) to one that already belongs
+    // to another Attachment row (storedFilename is @unique), so fs.writeFile
+    // genuinely writes the new file to disk first and only the DB insert
+    // fails afterward — the same order persistAttachment always uses.
+    const ticket = await createOwnedTicket(requesterAId);
+    const blockerTicket = await createOwnedTicket(requesterAId);
+    const collidingUuid = "11111111-2222-3333-4444-555555555555";
+    const collidingStoredFilename = `${collidingUuid}.png`;
+
+    await prisma.attachment.create({
+      data: {
+        ticketId: blockerTicket.id,
+        originalFilename: "already-here.png",
+        storedFilename: collidingStoredFilename,
+        mimeType: "image/png",
+        sizeBytes: PNG_BASE.length,
+      },
+    });
+
+    const uuidSpy = vi
+      .spyOn(crypto, "randomUUID")
+      .mockReturnValue(collidingUuid as ReturnType<typeof crypto.randomUUID>);
+
+    const res = await request(app)
+      .post(`/api/tickets/${ticket.id}/attachments`)
+      .set(authHeader(requesterAId))
+      .attach("file", PNG_BASE, "orphan-candidate.png");
+    uuidSpy.mockRestore();
+
+    expect(res.status).toBe(500);
+    expect(await prisma.attachment.count({ where: { ticketId: ticket.id } })).toBe(0);
+
+    // If compensation had not run (or had failed silently), the file
+    // persistAttachment just wrote would still be sitting on disk here.
+    await expect(fs.access(storedFilePath(collidingStoredFilename))).rejects.toThrow();
   });
 
   it("rejects an oversized file without affecting the ticket", async () => {

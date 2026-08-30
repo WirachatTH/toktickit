@@ -55,16 +55,25 @@ export async function persistAttachment(
 // the upload request is even sent, but that's the *client* defending
 // itself — a non-browser client (curl, a raw HTTP request) can send an
 // unescaped quote straight through busboy's multipart parser. Control
-// characters (CR/LF — a header-injection vector) are stripped outright
-// rather than escaped, since there's no legitimate reason a filename needs
-// one.
+// characters (CR/LF — a header-injection vector) are stripped outright as
+// defense-in-depth, not as the only thing standing between this value and
+// the wire: Node's http layer already rejects a raw CR/LF in a header
+// value before it's ever written out. Stripping here just keeps the
+// filename the client actually sees clean too, and costs nothing since no
+// legitimate filename needs a control character.
 export function buildAttachmentContentDisposition(originalFilename: string): string {
   const noControlChars = originalFilename.replace(/[\x00-\x1F\x7F]/g, "");
   const asciiFallback = noControlChars
     .replace(/[^\x20-\x7E]/g, "_")
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"');
-  const encoded = encodeURIComponent(noControlChars);
+  // encodeURIComponent leaves `' ( ) *` unescaped since they're legal in a
+  // URI component, but RFC 5987's attr-char grammar excludes all four from
+  // filename* — percent-encode them by hand so the header stays conformant.
+  const encoded = encodeURIComponent(noControlChars).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
   return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
 }
 
