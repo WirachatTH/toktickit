@@ -39,19 +39,19 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-05 | AC-06, BR-30, BR-31 | UI | Select an oversized or disallowed-type file | Rejected client-side with a clear inline reason, never uploaded | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-06 | AC-07, BR-32 | UI | Attempt to select a 6th attachment | Rejected client-side before submission | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | STYLE-01 | UI Spec §3 | UI Style | Read-only fields (Ticket Number/Date/Requester) vs editable fields | Distinct `zg-field--readonly` styling applied | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
-| API-10 | AC-10, BR-12 | API | `GET /api/tickets` as Requester A vs Requester B | Each sees only their own Tickets | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-11 | BR-12 | API/Security | Attempt to widen scope via query manipulation | Server ignores it — always scoped to the header identity | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-12 | AC-11, BR-14 | API | Search matching a known Summary substring | Matching Ticket(s) returned, case-insensitive | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-13 | BR-15 | API | Category/Related System/Priority filters, individually and combined with search | Results narrow correctly in each case | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-14 | BR-16, BR-17 | API | Sort by each documented field, both directions; no sort specified | Correct order each time; default `createdAt desc` when unspecified | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-15 | AC-12, BR-18 | API | Pagination across page 1, a middle page, and the final partial page | Correct page size/slice and accurate `pagination` metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-16 | BR-19 | API | Invalid query params (`page=-1`, `page=abc`, unknown `sort`) | Clamped to safe defaults, never `400`/crash | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-17 | BR-14 | API/Security | Search string with SQL-meaningful characters (`' OR '1'='1`) | Treated as a literal term (parameterized query), no injection | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-18 | BR-18 | API | Client requests an oversized `pageSize` | Clamped to the documented maximum (50) | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| UI-07 | AC-13, BR-43 | UI | Requester with zero Tickets ever | Distinct empty state with Create Ticket CTA | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-08 | AC-13, BR-44 | UI | Search/filter matches zero of the Requester's existing Tickets | Distinct no-results state, Clear Filters offered | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-09 | AC-10, BR-09 | UI | Switch selected Requester A → B while on My Tickets | List reloads to B's Tickets; no stale A data | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| RESP-01 | UI Spec §6.4, §8 | Responsive | My Tickets at desktop/tablet/mobile widths | Table → reduced table → card view; no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| API-10 | AC-10, BR-12 | API | `GET /api/tickets` as Requester A vs Requester B | Each sees only their own Tickets | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-11 | BR-12 | API/Security | Attempt to widen scope via query manipulation | Server ignores it — always scoped to the header identity | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-12 | AC-11, BR-14 | API | Search matching a known Summary substring | Matching Ticket(s) returned, case-insensitive | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-13 | BR-15 | API | Category/Related System/Priority filters, individually and combined with search | Results narrow correctly in each case | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-14 | BR-16, BR-17 | API | Sort by each documented field, both directions; no sort specified | Correct order each time; default `createdAt desc` when unspecified | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-15 | AC-12, BR-18 | API | Pagination across page 1, a middle page, and the final partial page | Correct page size/slice and accurate `pagination` metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-16 | BR-19 | API | Invalid query params (`page=-1`, `page=abc`, unknown `sort`) | Clamped to safe defaults, never `400`/crash | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-17 | BR-14 | API/Security | Search string with SQL-meaningful characters (`' OR '1'='1`) | Treated as a literal term (parameterized query), no injection | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-18 | BR-18 | API | Client requests an oversized `pageSize` | Clamped to the documented maximum (50) | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| UI-07 | AC-13, BR-43 | UI | Requester with zero Tickets ever | Distinct empty state with Create Ticket CTA | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-08 | AC-13, BR-44 | UI | Search/filter matches zero of the Requester's existing Tickets | Distinct no-results state, Clear Filters offered | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-09 | AC-10, BR-09 | UI | Switch selected Requester A → B while on My Tickets | List reloads to B's Tickets; no stale A data | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| RESP-01 | UI Spec §6.4, §8 | Responsive | My Tickets at desktop/tablet/mobile widths | Table → reduced table → card view; no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | API-19 | AC-03, BR-45 | API | `GET /api/tickets/:id` as the owning Requester vs. a different Requester | Owner gets `200` + full data; non-owner gets `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
 | API-20 | BR-45 | API | `GET /api/tickets/:id` for a nonexistent ID | Safe `404`, no internal detail leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
 | API-21 | AC-03 | API/Security | `:id` supplied malformed (`"abc"`, injection-shaped string) | Safe `400`/`404`, no server error | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
