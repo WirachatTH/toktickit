@@ -75,8 +75,8 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-14 | UI Spec §6.5 | UI | Ticket with 5 active attachments | "Add Attachment" disabled with a tooltip explaining why | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | API-35 | AC-14, BR-06 | API | `GET /api/requesters` | Returns only `isActive=true` rows; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-36 | BR-06 | API | `GET /api/systems` against a genuinely inactive Related System (self-cleaning fixture, not just seed data) | Never included; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pass |
-| UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. a mocked active-Requester list | Dropdown renders exactly what the API returned | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
-| UI-16 | UI Spec §6.2 | UI | Selector with mocked empty/failure API responses | Distinct empty state and safe failure state rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
+| UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. a mocked active-Requester list | Dropdown renders exactly what the API returned | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
+| UI-16 | UI Spec §6.2 | UI | Selector with mocked empty/failure API responses | Distinct empty state and safe failure state rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-17 | AC-02, BR-08 | UI | Navigate to My Tickets/Create Ticket/Ticket Detail with no Requester selected, rendering the *real* route table (not a synthetic one) | Redirected to the Selector for all three routes; deleting `<RequireRequester>` from `App.tsx`'s routes fails this test (mutation-verified) | `client/tests/lab-02/AppRoutes.test.tsx` | Pass |
 | STYLE-3.7 | UI Spec §6.1 | UI Style | AppShell's mobile nav element carries no Bootstrap `!important` display utility class | No `d-flex`/`d-inline-flex`/`d-block`/`d-inline` class present — the exact regression that once defeated the mobile media query | `client/tests/lab-02/AppShell.test.tsx` | Pass |
 | STYLE-02 | UI Spec §3, §4 | UI Style | Busy/disabled button states across the shared component library | Busy shows spinner+disabled; disabled is inert and visually distinct | `client/tests/lab-02/components.test.tsx` | Pending |
@@ -129,10 +129,15 @@ docker-compose exec client npx playwright test ../e2e/lab-02/requester-ticket-fl
 
 ## 6. Final Results
 
-Filled in once the corresponding issue's PR merges into `lab2-staging`, and
-re-verified with a full run on `main` before submission (labsheet §14 Part 3).
-Placeholder until then — no row in §2 may be marked Pass without a linked test
-run's output.
+A row is marked Pass once its test(s) actually pass in a full local run —
+that's the "linked test run's output" requirement, not a stand-in for one.
+In practice that happens while finishing an issue's branch, before its PR
+opens, not gated on merge into `lab2-staging`: Issues 5 and 7 both flipped
+rows at that point, and Issue 6 (which held rows Pending until merge)
+was the outlier, not the rule. Re-verified again with a full run on `main`
+before submission (labsheet §14 Part 3). No row in §2 may be marked Pass
+without a verified run backing it, regardless of when in the branch's
+lifecycle that run happened.
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -148,3 +153,15 @@ run's output.
   rather than a synthetic one. Where it's cheap, later Lab 2 test files
   should be spot-checked the same way (delete the guard/filter under test,
   confirm the suite goes red) rather than assumed correct because it's green.
+- RESP-01's linked test (`MyTickets.test.tsx`) can only assert that the
+  desktop table and mobile card markup both exist in the DOM with correct
+  content — jsdom never applies CSS, so it cannot see which one a real
+  browser actually shows at a given width, and a peer review of PR #35
+  confirmed this by stripping every responsive class from the component
+  and watching the test suite stay green. The *behavior* itself is real
+  (confirmed by manually rendering the page inside fixed-width iframes at
+  desktop/tablet/mobile and screenshotting each —
+  `artifacts/lab-02/screenshots/my-tickets/{desktop,tablet,mobile}-list.png`),
+  but that verification is manual, not automated, and RESP-01's Pass status
+  rests on it rather than on the linked test alone. RESP-02 (Issue 9) is
+  the eventual automated, Playwright-based version of this same check.

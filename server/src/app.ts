@@ -304,6 +304,11 @@ function parsePage(raw: unknown): number {
 }
 
 function parsePageSize(raw: unknown): number {
+  // `?pageSize=` (present but empty) must default the same way an absent
+  // pageSize does. Number("") is 0, not NaN — a genuine JS gotcha — so
+  // without this explicit check it slipped past Number.isInteger and
+  // clamped to 1 instead of falling back to the documented default of 10.
+  if (raw === undefined || raw === "") return 10;
   const n = Number(raw);
   if (!Number.isInteger(n)) return 10;
   return Math.min(Math.max(n, 1), 50);
@@ -317,9 +322,15 @@ function parseOrder(raw: unknown): "asc" | "desc" {
   return raw === "asc" ? "asc" : "desc";
 }
 
+// Same class of bug as parsePage/authenticateRequester's id parsing, found
+// by a peer reviewer within minutes of probing this route: Number.isInteger
+// alone accepts a value like 9999999999 (an ordinary finite integer, just
+// outside Int32 range), which reaches Prisma and throws converting it,
+// surfacing as a 500 instead of the "filter silently ignored" behavior
+// every other invalid categoryId/relatedSystemId already gets.
 function parsePositiveId(raw: unknown): number | undefined {
   const n = Number(raw);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
+  return Number.isSafeInteger(n) && n > 0 && n <= 2147483647 ? n : undefined;
 }
 
 // Prisma's `contains`/`startsWith` compile to a Postgres LIKE, parameterized

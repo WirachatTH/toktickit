@@ -714,6 +714,50 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
       expect(res.status).toBe(200);
       expect(res.body.data.map((t: { ticketNumber: string }) => t.ticketNumber)).toEqual(["TCK-FIX-001"]);
     });
+
+    // A peer reviewer found these within minutes of probing: unlike
+    // categoryId=999999 (in-range, just nonexistent — 200 above),
+    // categoryId=9999999999 is outside Int32 range and reached Prisma raw,
+    // which throws converting it. parsePositiveId only checked
+    // Number.isInteger && n > 0 — the same gap parsePage and
+    // authenticateRequester's id parsing had already been hardened against
+    // elsewhere in this file, just never carried over here.
+    it("ignores (rather than 500s on) a categoryId far outside Int32 range", async () => {
+      // An INVALID id is ignored outright — the filter doesn't apply at
+      // all, same as the negative-categoryId case above — so this returns
+      // all 6 fixtures, not zero. That's different from a VALID but
+      // nonexistent id (categoryId=999999 above), which applies as a real
+      // filter and correctly matches nothing.
+      const res = await request(app)
+        .get("/api/tickets?categoryId=9999999999")
+        .set(authHeader(sortFixtureRequesterId));
+      expect(res.status).toBe(200);
+      expect(res.body.pagination.totalItems).toBe(6);
+    });
+
+    it("ignores (rather than 500s on) a relatedSystemId far outside Int32 range", async () => {
+      const res = await request(app)
+        .get("/api/tickets?relatedSystemId=9999999999")
+        .set(authHeader(sortFixtureRequesterId));
+      expect(res.status).toBe(200);
+      expect(res.body.pagination.totalItems).toBe(6);
+    });
+
+    it("ignores (rather than 500s on) a categoryId exactly one past the Int32 maximum", async () => {
+      const res = await request(app)
+        .get("/api/tickets?categoryId=2147483648")
+        .set(authHeader(sortFixtureRequesterId));
+      expect(res.status).toBe(200);
+      expect(res.body.pagination.totalItems).toBe(6);
+    });
+
+    it("still applies a categoryId at exactly the Int32 maximum as a normal (nonexistent) filter", async () => {
+      const res = await request(app)
+        .get("/api/tickets?categoryId=2147483647")
+        .set(authHeader(sortFixtureRequesterId));
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([]);
+    });
   });
 
   describe("Sort edge cases", () => {
@@ -754,6 +798,40 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
         "TCK-FIX-001",
       ]);
     });
+
+    // Every other sort test in this file deliberately uses all-distinct
+    // field values, which is clean for asserting order but structurally
+    // guarantees the id-desc tiebreak code path never runs — a peer
+    // reviewer removed the tiebreak entirely and the rest of the suite
+    // stayed green. This is the one fixture with a genuine tie: three
+    // tickets sharing the identical createdAt, so the primary sort key
+    // (default createdAt desc) can't distinguish them at all, and every
+    // bit of the resulting order comes from the id-desc tiebreak alone
+    // (BR-17).
+    it("breaks a tie on the sorted field by id descending, for a genuinely tied createdAt (BR-17)", async () => {
+      const tiedCreatedAt = new Date("2021-06-15T12:00:00.000Z");
+      const makeTied = (n: string) =>
+        prisma.ticket.create({
+          data: {
+            requesterId: edgeCaseRequesterId,
+            categoryId: categoryA.id,
+            relatedSystemId: systemA.id,
+            ticketNumber: `TCK-EDGE-TIE${n}`,
+            summary: `Tiebreak fixture ${n}`,
+            description: "Shares an identical createdAt with its siblings to exercise the id-desc tiebreak.",
+            createdAt: tiedCreatedAt,
+          },
+        });
+      const tie1 = await makeTied("1");
+      const tie2 = await makeTied("2");
+      const tie3 = await makeTied("3");
+
+      const res = await request(app)
+        .get(`/api/tickets?search=${encodeURIComponent("Tiebreak fixture")}`)
+        .set(authHeader(edgeCaseRequesterId));
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((t: { id: number }) => t.id)).toEqual([tie3.id, tie2.id, tie1.id]);
+    });
   });
 
   describe("Pagination edge cases", () => {
@@ -774,6 +852,17 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
       const res = await request(app).get("/api/tickets?page=0").set(authHeader(paginationRequesterId));
       expect(res.status).toBe(200);
       expect(res.body.pagination.page).toBe(1);
+    });
+
+    // Number("") is 0, not NaN — a real JS gotcha. An absent pageSize
+    // already defaulted to 10 correctly (Number(undefined) is NaN); a
+    // present-but-empty one slipped past that same check and clamped to 1
+    // instead, which a peer reviewer caught.
+    it("treats an empty pageSize value (?pageSize=) the same as an absent one — defaults to 10", async () => {
+      const res = await request(app).get("/api/tickets?pageSize=").set(authHeader(paginationRequesterId));
+      expect(res.status).toBe(200);
+      expect(res.body.pagination.pageSize).toBe(10);
+      expect(res.body.data).toHaveLength(10);
     });
   });
 });
