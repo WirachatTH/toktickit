@@ -3,7 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, Prisma } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { formatTicketNumber } from "./ticketNumber.js";
 import { validateTicketFields } from "./validation/ticket.js";
@@ -265,6 +265,172 @@ app.post("/api/tickets", (req: Request, res: Response) => {
       return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
     }
   });
+});
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 7 — GET /api/tickets. See docs/lab-02/api-spec.md §5 and
+// specification.md BR-12, BR-14-19, Decision D-5: this is a list endpoint,
+// so an invalid/out-of-range query parameter is clamped to the nearest safe
+// default rather than ever producing a 400 — only a missing/invalid
+// requester identity does.
+// ---------------------------------------------------------------------------
+
+type TicketSortField = "createdAt" | "updatedAt" | "ticketNumber" | "summary" | "requestedPriority";
+const SORTABLE_FIELDS: readonly TicketSortField[] = [
+  "createdAt",
+  "updatedAt",
+  "ticketNumber",
+  "summary",
+  "requestedPriority",
+];
+const PRIORITY_VALUES = new Set(["LOW", "MEDIUM", "HIGH"]);
+
+// A page number this high is already meaningless (nobody pages through a
+// million pages of tickets), but the real reason for the cap is safety, not
+// UX: without it, a "valid-looking" huge page (e.g. from a stale/hand-edited
+// URL) survives Number.isInteger — it's an ordinary finite integer, just an
+// enormous one — and `(page - 1) * pageSize` then overflows Number's safe
+// integer range before it ever reaches Prisma, which throws converting it
+// to a query parameter. That surfaced as a real 500 (found by probing the
+// running server with an absurd page value), directly violating BR-19's
+// "a list endpoint always returns a best-effort valid page, never an error."
+const MAX_PAGE = 1_000_000;
+
+function parsePage(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < 1) return 1;
+  return Math.min(n, MAX_PAGE);
+}
+
+function parsePageSize(raw: unknown): number {
+  // `?pageSize=` (present but empty) must default the same way an absent
+  // pageSize does. Number("") is 0, not NaN — a genuine JS gotcha — so
+  // without this explicit check it slipped past Number.isInteger and
+  // clamped to 1 instead of falling back to the documented default of 10.
+  if (raw === undefined || raw === "") return 10;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) return 10;
+  return Math.min(Math.max(n, 1), 50);
+}
+
+function parseSortField(raw: unknown): TicketSortField {
+  return typeof raw === "string" && (SORTABLE_FIELDS as string[]).includes(raw) ? (raw as TicketSortField) : "createdAt";
+}
+
+function parseOrder(raw: unknown): "asc" | "desc" {
+  return raw === "asc" ? "asc" : "desc";
+}
+
+// Same class of bug as parsePage/authenticateRequester's id parsing, found
+// by a peer reviewer within minutes of probing this route: Number.isInteger
+// alone accepts a value like 9999999999 (an ordinary finite integer, just
+// outside Int32 range), which reaches Prisma and throws converting it,
+// surfacing as a 500 instead of the "filter silently ignored" behavior
+// every other invalid categoryId/relatedSystemId already gets.
+function parsePositiveId(raw: unknown): number | undefined {
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n > 0 && n <= 2147483647 ? n : undefined;
+}
+
+// Prisma's `contains`/`startsWith` compile to a Postgres LIKE, parameterized
+// against SQL injection but NOT against LIKE's own wildcard syntax — `%`
+// and `_` inside the parameter value are still live wildcards to Postgres,
+// and backslash is the default LIKE escape character. Found by probing a
+// literal search: a ticket summary containing "50%" also (wrongly) matched
+// "50 items delivered" once "50%" was searched, because the unescaped "%"
+// matched anything after "50". BR-14 promises a literal substring match, so
+// a Requester's own `%`/`_`/`\` must be neutralized before it reaches LIKE.
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+app.get("/api/tickets", async (req: Request, res: Response) => {
+  const prisma = getPrisma();
+  try {
+    const auth = await authenticateRequester(prisma, req);
+    if (!auth) {
+      return res
+        .status(401)
+        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
+    }
+
+    const page = parsePage(req.query.page);
+    const pageSize = parsePageSize(req.query.pageSize);
+    const sortField = parseSortField(req.query.sort);
+    const order = parseOrder(req.query.order);
+
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const categoryId = parsePositiveId(req.query.categoryId);
+    const relatedSystemId = parsePositiveId(req.query.relatedSystemId);
+    const requestedPriority =
+      typeof req.query.requestedPriority === "string" && PRIORITY_VALUES.has(req.query.requestedPriority)
+        ? (req.query.requestedPriority as Prisma.TicketWhereInput["requestedPriority"])
+        : undefined;
+
+    // BR-12 — always scoped to the caller's own identity; no query parameter
+    // can widen this (API-11). Prisma's fluent filters are parameterized by
+    // construction, so a SQL-meaningful search string (API-17) is safe too.
+    const where: Prisma.TicketWhereInput = {
+      requesterId: auth.requesterId,
+      ...(search
+        ? {
+            OR: [
+              { ticketNumber: { startsWith: escapeLikePattern(search), mode: "insensitive" } },
+              { summary: { contains: escapeLikePattern(search), mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(categoryId !== undefined ? { categoryId } : {}),
+      ...(relatedSystemId !== undefined ? { relatedSystemId } : {}),
+      ...(requestedPriority !== undefined ? { requestedPriority } : {}),
+    };
+
+    // BR-17 — id desc is a stable secondary tiebreaker so equal-value rows
+    // (e.g. same createdAt) don't reorder unpredictably between pages.
+    const orderBy: Prisma.TicketOrderByWithRelationInput[] = [
+      { [sortField]: order } as Prisma.TicketOrderByWithRelationInput,
+      { id: "desc" },
+    ];
+
+    const [tickets, totalItems] = await Promise.all([
+      prisma.ticket.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          category: { select: { name: true } },
+          relatedSystem: { select: { name: true } },
+          _count: { select: { attachments: { where: { isRemoved: false } } } },
+        },
+      }),
+      prisma.ticket.count({ where }),
+    ]);
+
+    return res.status(200).json({
+      data: tickets.map((t) => ({
+        id: t.id,
+        ticketNumber: t.ticketNumber,
+        summary: t.summary,
+        categoryName: t.category.name,
+        relatedSystemName: t.relatedSystem.name,
+        requestedPriority: t.requestedPriority,
+        currentStatus: t.currentStatus,
+        attachmentCount: t._count.attachments,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      })),
+      pagination: {
+        page,
+        pageSize,
+        totalItems,
+        totalPages: Math.ceil(totalItems / pageSize),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
+  }
 });
 // ---------------------------------------------------------------------------
 

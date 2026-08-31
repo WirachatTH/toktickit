@@ -6,6 +6,7 @@ import { AppShell } from "./components/AppShell.js";
 import SystemStatus from "./screens/SystemStatus.js";
 import { RequesterSelector } from "./screens/RequesterSelector.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
+import { MyTickets } from "./screens/MyTickets.js";
 import { ROUTES } from "./routes.js";
 
 // The actual route table the app ships, extracted out of App.tsx so tests
@@ -38,7 +39,7 @@ export function AppRoutes() {
         element={
           <RequireRequester>
             <ShellLayout>
-              <ComingSoon label="My Tickets" />
+              <MyTickets />
             </ShellLayout>
           </RequireRequester>
         }

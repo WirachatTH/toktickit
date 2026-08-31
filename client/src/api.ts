@@ -157,6 +157,69 @@ export async function createTicket(requesterId: number, input: NewTicketInput): 
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 7 — My Tickets list (api-spec.md §5, BR-12, BR-14-19). The
+// server clamps invalid/out-of-range query params itself (Decision D-5), so
+// this layer just forwards whatever the UI has and never pre-validates —
+// duplicating that clamping logic here would only risk it drifting out of
+// sync with the server's actual rules.
+// ---------------------------------------------------------------------------
+
+export type TicketSortField = "createdAt" | "updatedAt" | "ticketNumber" | "summary" | "requestedPriority";
+export type SortOrder = "asc" | "desc";
+
+export interface TicketListItem {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  categoryName: string;
+  relatedSystemName: string;
+  requestedPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  attachmentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface TicketListResponse {
+  data: TicketListItem[];
+  pagination: PaginationMeta;
+}
+
+export interface TicketListParams {
+  search?: string;
+  categoryId?: number;
+  relatedSystemId?: number;
+  requestedPriority?: RequestedPriority;
+  sort?: TicketSortField;
+  order?: SortOrder;
+  page?: number;
+}
+
+export async function fetchTickets(requesterId: number, params: TicketListParams = {}): Promise<TicketListResponse> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.categoryId) query.set("categoryId", String(params.categoryId));
+  if (params.relatedSystemId) query.set("relatedSystemId", String(params.relatedSystemId));
+  if (params.requestedPriority) query.set("requestedPriority", params.requestedPriority);
+  if (params.sort) query.set("sort", params.sort);
+  if (params.order) query.set("order", params.order);
+  if (params.page) query.set("page", String(params.page));
+
+  const res = await fetch(`${API_URL}/api/tickets?${query.toString()}`, {
+    headers: requesterHeaders(requesterId),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
 export async function checkSystem(): Promise<SystemStatus> {
   const healthRes = await fetch(`${API_URL}/api/health`);
   if (!healthRes.ok) {

@@ -39,19 +39,19 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-05 | AC-06, BR-30, BR-31 | UI | Select an oversized or disallowed-type file | Rejected client-side with a clear inline reason, never uploaded | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-06 | AC-07, BR-32 | UI | Attempt to select a 6th attachment | Rejected client-side before submission | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | STYLE-01 | UI Spec §3 | UI Style | Read-only fields (Ticket Number/Date/Requester) vs editable fields | Distinct `zg-field--readonly` styling applied | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
-| API-10 | AC-10, BR-12 | API | `GET /api/tickets` as Requester A vs Requester B | Each sees only their own Tickets | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-11 | BR-12 | API/Security | Attempt to widen scope via query manipulation | Server ignores it — always scoped to the header identity | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-12 | AC-11, BR-14 | API | Search matching a known Summary substring | Matching Ticket(s) returned, case-insensitive | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-13 | BR-15 | API | Category/Related System/Priority filters, individually and combined with search | Results narrow correctly in each case | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-14 | BR-16, BR-17 | API | Sort by each documented field, both directions; no sort specified | Correct order each time; default `createdAt desc` when unspecified | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-15 | AC-12, BR-18 | API | Pagination across page 1, a middle page, and the final partial page | Correct page size/slice and accurate `pagination` metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-16 | BR-19 | API | Invalid query params (`page=-1`, `page=abc`, unknown `sort`) | Clamped to safe defaults, never `400`/crash | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-17 | BR-14 | API/Security | Search string with SQL-meaningful characters (`' OR '1'='1`) | Treated as a literal term (parameterized query), no injection | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-18 | BR-18 | API | Client requests an oversized `pageSize` | Clamped to the documented maximum (50) | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| UI-07 | AC-13, BR-43 | UI | Requester with zero Tickets ever | Distinct empty state with Create Ticket CTA | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-08 | AC-13, BR-44 | UI | Search/filter matches zero of the Requester's existing Tickets | Distinct no-results state, Clear Filters offered | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-09 | AC-10, BR-09 | UI | Switch selected Requester A → B while on My Tickets | List reloads to B's Tickets; no stale A data | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| RESP-01 | UI Spec §6.4, §8 | Responsive | My Tickets at desktop/tablet/mobile widths | Table → reduced table → card view; no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| API-10 | AC-10, BR-12 | API | `GET /api/tickets` as Requester A vs Requester B | Each sees only their own Tickets | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-11 | BR-12 | API/Security | Attempt to widen scope via query manipulation | Server ignores it — always scoped to the header identity | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-12 | AC-11, BR-14 | API | Search matching a known Summary substring | Matching Ticket(s) returned, case-insensitive | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-13 | BR-15 | API | Category/Related System/Priority filters, individually and combined with search | Results narrow correctly in each case | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-14 | BR-16, BR-17 | API | Sort by each documented field, both directions; no sort specified | Correct order each time; default `createdAt desc` when unspecified | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-15 | AC-12, BR-18 | API | Pagination across page 1, a middle page, and the final partial page | Correct page size/slice and accurate `pagination` metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-16 | BR-19 | API | Invalid query params (`page=-1`, `page=abc`, unknown `sort`) | Clamped to safe defaults, never `400`/crash | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-17 | BR-14 | API/Security | Search string with SQL-meaningful characters (`' OR '1'='1`) | Treated as a literal term (parameterized query), no injection | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-18 | BR-18 | API | Client requests an oversized `pageSize` | Clamped to the documented maximum (50) | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| UI-07 | AC-13, BR-43 | UI | Requester with zero Tickets ever | Distinct empty state with Create Ticket CTA | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-08 | AC-13, BR-44 | UI | Search/filter matches zero of the Requester's existing Tickets | Distinct no-results state, Clear Filters offered | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-09 | AC-10, BR-09 | UI | Switch selected Requester A → B while on My Tickets | List reloads to B's Tickets; no stale A data | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| RESP-01 | UI Spec §6.4, §8 | Responsive | My Tickets at desktop/tablet/mobile widths | Table → reduced table → card view; no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | API-19 | AC-03, BR-45 | API | `GET /api/tickets/:id` as the owning Requester vs. a different Requester | Owner gets `200` + full data; non-owner gets `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
 | API-20 | BR-45 | API | `GET /api/tickets/:id` for a nonexistent ID | Safe `404`, no internal detail leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
 | API-21 | AC-03 | API/Security | `:id` supplied malformed (`"abc"`, injection-shaped string) | Safe `400`/`404`, no server error | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
@@ -75,8 +75,8 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-14 | UI Spec §6.5 | UI | Ticket with 5 active attachments | "Add Attachment" disabled with a tooltip explaining why | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | API-35 | AC-14, BR-06 | API | `GET /api/requesters` | Returns only `isActive=true` rows; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-36 | BR-06 | API | `GET /api/systems` against a genuinely inactive Related System (self-cleaning fixture, not just seed data) | Never included; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pass |
-| UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. a mocked active-Requester list | Dropdown renders exactly what the API returned | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
-| UI-16 | UI Spec §6.2 | UI | Selector with mocked empty/failure API responses | Distinct empty state and safe failure state rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
+| UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. a mocked active-Requester list | Dropdown renders exactly what the API returned | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
+| UI-16 | UI Spec §6.2 | UI | Selector with mocked empty/failure API responses | Distinct empty state and safe failure state rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-17 | AC-02, BR-08 | UI | Navigate to My Tickets/Create Ticket/Ticket Detail with no Requester selected, rendering the *real* route table (not a synthetic one) | Redirected to the Selector for all three routes; deleting `<RequireRequester>` from `App.tsx`'s routes fails this test (mutation-verified) | `client/tests/lab-02/AppRoutes.test.tsx` | Pass |
 | STYLE-3.7 | UI Spec §6.1 | UI Style | AppShell's mobile nav element carries no Bootstrap `!important` display utility class | No `d-flex`/`d-inline-flex`/`d-block`/`d-inline` class present — the exact regression that once defeated the mobile media query | `client/tests/lab-02/AppShell.test.tsx` | Pass |
 | STYLE-02 | UI Spec §3, §4 | UI Style | Busy/disabled button states across the shared component library | Busy shows spinner+disabled; disabled is inert and visually distinct | `client/tests/lab-02/components.test.tsx` | Pending |
@@ -129,10 +129,15 @@ docker-compose exec client npx playwright test ../e2e/lab-02/requester-ticket-fl
 
 ## 6. Final Results
 
-Filled in once the corresponding issue's PR merges into `lab2-staging`, and
-re-verified with a full run on `main` before submission (labsheet §14 Part 3).
-Placeholder until then — no row in §2 may be marked Pass without a linked test
-run's output.
+A row is marked Pass once its test(s) actually pass in a full local run —
+that's the "linked test run's output" requirement, not a stand-in for one.
+In practice that happens while finishing an issue's branch, before its PR
+opens, not gated on merge into `lab2-staging`: Issues 5 and 7 both flipped
+rows at that point, and Issue 6 (which held rows Pending until merge)
+was the outlier, not the rule. Re-verified again with a full run on `main`
+before submission (labsheet §14 Part 3). No row in §2 may be marked Pass
+without a verified run backing it, regardless of when in the branch's
+lifecycle that run happened.
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -148,3 +153,15 @@ run's output.
   rather than a synthetic one. Where it's cheap, later Lab 2 test files
   should be spot-checked the same way (delete the guard/filter under test,
   confirm the suite goes red) rather than assumed correct because it's green.
+- RESP-01's linked test (`MyTickets.test.tsx`) can only assert that the
+  desktop table and mobile card markup both exist in the DOM with correct
+  content — jsdom never applies CSS, so it cannot see which one a real
+  browser actually shows at a given width, and a peer review of PR #35
+  confirmed this by stripping every responsive class from the component
+  and watching the test suite stay green. The *behavior* itself is real
+  (confirmed by manually rendering the page inside fixed-width iframes at
+  desktop/tablet/mobile and screenshotting each —
+  `artifacts/lab-02/screenshots/my-tickets/{desktop,tablet,mobile}-list.png`),
+  but that verification is manual, not automated, and RESP-01's Pass status
+  rests on it rather than on the linked test alone. RESP-02 (Issue 9) is
+  the eventual automated, Playwright-based version of this same check.

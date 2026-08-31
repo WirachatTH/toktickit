@@ -9,8 +9,9 @@ export async function authenticateRequester(
   req: Request
 ): Promise<{ requesterId: number } | null> {
   const header = req.header("X-Dev-Requester-Id");
+  if (!header) return null;
   const requesterId = Number(header);
-  if (!header || !Number.isFinite(requesterId)) return null;
+  if (!Number.isSafeInteger(requesterId) || requesterId <= 0 || requesterId > 2147483647) return null;
 
   const requester = await prisma.requesterUser.findUnique({ where: { id: requesterId } });
   if (!requester || !requester.isActive) return null;
