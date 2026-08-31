@@ -292,6 +292,31 @@ textarea.zg-field {
   .zg-shell-nav.zg-shell-nav--open {
     display: flex;
   }
+
+  /* ui-spec.md §8 — Mobile <768px: "buttons full-width and ≥44px tall
+     (touch target)". Never implemented anywhere; found by measuring actual
+     rendered button height on Ticket Detail (38px) while checking Issue 8's
+     responsive layout — every screen has had this gap since Button.tsx was
+     first built. Height applies to every button unconditionally (a taller
+     touch target never breaks a layout). Full-width only applies to
+     `.zg-actions-stack` — a handful of primary action rows (Submit/Cancel,
+     Continue, the remove-confirmation modal) opted in explicitly below,
+     not every button everywhere: pagination Prev/Next and the mobile nav's
+     own buttons are deliberately compact per their own ui-spec sections
+     (§6.4's "Prev/Next + Page X of Y", §6.1's nav), and forcing every
+     `.btn` full-width would break those. */
+  .btn {
+    min-height: 44px;
+  }
+
+  .zg-actions-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .zg-actions-stack .btn {
+    width: 100%;
+  }
 }
 
 @media (min-width: 768px) {
@@ -380,4 +405,67 @@ textarea.zg-field {
 .zg-pagination__count {
   color: var(--zg-text-muted);
   margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------
+   Ticket Detail (ui-spec.md §6.5)
+   --------------------------------------------------------------------- */
+
+.zg-card {
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  background: var(--zg-surface);
+  padding: 1.25rem;
+}
+
+.zg-attachment-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.zg-attachment-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.zg-attachment-removed {
+  opacity: 0.65;
+}
+
+.zg-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 43, 34, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.zg-modal {
+  background: var(--zg-surface);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Kept in the layout (unlike `hidden`/display:none) so it stays a normal,
+   interactive part of the page — just visually invisible. Used for the
+   real <input type="file"> a styled button triggers indirectly. */
+.zg-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

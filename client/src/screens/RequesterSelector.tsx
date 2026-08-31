@@ -94,9 +94,11 @@ export function RequesterSelector() {
             ))}
           </Select>
 
-          <Button variant="primary" disabled={!selectedId} onClick={handleContinue}>
-            Continue
-          </Button>
+          <div className="zg-actions-stack">
+            <Button variant="primary" disabled={!selectedId} onClick={handleContinue}>
+              Continue
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -691,4 +691,74 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
 });
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 8 — GET /api/tickets/:id. See docs/lab-02/api-spec.md §6 and
+// specification.md BR-45: a Ticket not owned by the current Requester is
+// indistinguishable from a nonexistent one (404, Decision D-2) — the same
+// ownership rule the Issue 6 attachment routes above already enforce.
+// ---------------------------------------------------------------------------
+app.get("/api/tickets/:id", async (req: Request, res: Response) => {
+  const prisma = getPrisma();
+  try {
+    const auth = await authenticateRequester(prisma, req);
+    if (!auth) {
+      return res
+        .status(401)
+        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
+    }
+
+    const ticketId = Number(req.params.id);
+    if (!isValidId(ticketId)) return res.status(404).json(TICKET_NOT_FOUND);
+
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: ticketId, requesterId: auth.requesterId },
+      include: {
+        requester: { select: { id: true, name: true, email: true } },
+        category: { select: { id: true, name: true } },
+        relatedSystem: { select: { id: true, name: true } },
+        // id asc is a stable secondary tiebreaker, same reasoning as the
+        // Issue 7 ticket list's own tiebreak (BR-17): two attachments
+        // landing on the same uploadedAt millisecond would otherwise have
+        // no defined relative order. Kept even though a mutation test
+        // couldn't prove it changes anything at this table's scale — for
+        // freshly-inserted rows, id-asc and Postgres's own incidental scan
+        // order are indistinguishable, since ids are assigned in the same
+        // order rows are inserted. Correct on the merits regardless: an
+        // ORDER BY with no fully-determining key has no defined tie order
+        // at all per the SQL standard, whatever a given query happens to
+        // return today.
+        attachments: { orderBy: [{ uploadedAt: "asc" }, { id: "asc" }] },
+      },
+    });
+    if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
+
+    return res.status(200).json({
+      id: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      requester: ticket.requester,
+      category: ticket.category,
+      relatedSystem: ticket.relatedSystem,
+      summary: ticket.summary,
+      description: ticket.description,
+      requestedPriority: ticket.requestedPriority,
+      currentStatus: ticket.currentStatus,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      attachments: ticket.attachments.map((a) => ({
+        id: a.id,
+        originalFilename: a.originalFilename,
+        mimeType: a.mimeType,
+        sizeBytes: a.sizeBytes,
+        uploadedAt: a.uploadedAt,
+        isRemoved: a.isRemoved,
+        removedAt: a.removedAt,
+        removedReason: a.removedReason,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
+  }
+});
+// ---------------------------------------------------------------------------
+
 export default app;

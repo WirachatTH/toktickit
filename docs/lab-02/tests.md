@@ -52,11 +52,11 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-08 | AC-13, BR-44 | UI | Search/filter matches zero of the Requester's existing Tickets | Distinct no-results state, Clear Filters offered | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-09 | AC-10, BR-09 | UI | Switch selected Requester A → B while on My Tickets | List reloads to B's Tickets; no stale A data | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | RESP-01 | UI Spec §6.4, §8 | Responsive | My Tickets at desktop/tablet/mobile widths | Table → reduced table → card view; no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
-| API-19 | AC-03, BR-45 | API | `GET /api/tickets/:id` as the owning Requester vs. a different Requester | Owner gets `200` + full data; non-owner gets `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
-| API-20 | BR-45 | API | `GET /api/tickets/:id` for a nonexistent ID | Safe `404`, no internal detail leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
-| API-21 | AC-03 | API/Security | `:id` supplied malformed (`"abc"`, injection-shaped string) | Safe `400`/`404`, no server error | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
-| UI-10 | BR-46 | UI | Render Ticket Detail for any Ticket | No comment box, internal note field, or status-change control present | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
-| UI-11 | AC-03 | UI | Deep-link directly to a Ticket Detail URL not owned by the current Requester | Safe not-found state, no data rendered | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
+| API-19 | AC-03, BR-45 | API | `GET /api/tickets/:id` as the owning Requester vs. a different Requester | Owner gets `200` + full data; non-owner gets `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pass |
+| API-20 | BR-45 | API | `GET /api/tickets/:id` for a nonexistent ID | Safe `404`, no internal detail leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pass |
+| API-21 | AC-03 | API/Security | `:id` supplied malformed (`"abc"`, injection-shaped string) | Safe `400`/`404`, no server error | `server/tests/lab-02/ticket-detail.api.test.ts` | Pass |
+| UI-10 | BR-46 | UI | Render Ticket Detail for any Ticket | No comment box, internal note field, or status-change control present | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pass |
+| UI-11 | AC-03 | UI | Deep-link directly to a Ticket Detail URL not owned by the current Requester | Safe not-found state, no data rendered | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pass |
 | API-22 | BR-30 | API | Upload one file of each allowed type (JPG/JPEG/PNG/WEBP/PDF) at ticket creation | `201`, metadata returned for each | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-23 | BR-31 | API | File at exactly 5 MB vs. 5 MB + 1 byte, at ticket creation | Exactly-5MB accepted, +1 byte rejected `413` | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-24 | AC-06, BR-30 | API | Disallowed type, including a spoofed extension, at ticket creation | `415`, rejected by real content inspection not filename | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
@@ -70,9 +70,9 @@ document is the curated, graded planned-test table plus traceability required by
 | API-32 | BR-33 | API/Security | Filename with path-traversal characters (`../../etc/passwd`), at ticket creation | Stored safely under a generated safe filename; filesystem unaffected outside the upload directory | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-33 | BR-38 | API | Simulated disk failure after the Ticket row is committed, during creation | Whole creation rolls back — no orphaned Ticket/Attachment/file | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-34 | BR-39 | API | Attachment added later via Ticket Detail's add-attachment endpoint fails | Only that upload fails; Ticket itself is unaffected | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| UI-12 | AC-08 | UI | Click soft-remove on an attachment | Requires entering a reason + explicit confirmation before it takes effect | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
-| UI-13 | BR-36 | UI | View a removed attachment | Shown as metadata only, no download/preview control | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
-| UI-14 | UI Spec §6.5 | UI | Ticket with 5 active attachments | "Add Attachment" disabled with a tooltip explaining why | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
+| UI-12 | AC-08 | UI | Click soft-remove on an attachment | Requires entering a reason + explicit confirmation before it takes effect | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
+| UI-13 | BR-36 | UI | View a removed attachment | Shown as metadata only, no download/preview control | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
+| UI-14 | UI Spec §6.5 | UI | Ticket with 5 active attachments | "Add Attachment" disabled with a tooltip explaining why | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
 | API-35 | AC-14, BR-06 | API | `GET /api/requesters` | Returns only `isActive=true` rows; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-36 | BR-06 | API | `GET /api/systems` against a genuinely inactive Related System (self-cleaning fixture, not just seed data) | Never included; deleting the filter fails this test (mutation-verified) | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | UI-15 | AC-14, BR-06 | UI | Selector dropdown vs. a mocked active-Requester list | Dropdown renders exactly what the API returned | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
@@ -165,3 +165,15 @@ lifecycle that run happened.
   but that verification is manual, not automated, and RESP-01's Pass status
   rests on it rather than on the linked test alone. RESP-02 (Issue 9) is
   the eventual automated, Playwright-based version of this same check.
+- Both the ticket list's `id desc` tiebreak (Issue 7, BR-17) and Ticket
+  Detail's `id asc` attachment-ordering tiebreak (Issue 8) share the same
+  structural limitation: for freshly-inserted rows, id order and insertion
+  order are the same thing, so no black-box test built from ordinary
+  creates can ever prove the tiebreak clause itself is what's producing a
+  given result — removing it and re-running still passes, confirmed by
+  mutation-testing both. Both are kept anyway on the merits (an `ORDER BY`
+  with no fully-determining key has no defined tie order per the SQL
+  standard, whatever one query happens to return today), and both tests
+  are kept too, so a future change to the ordering still gets checked
+  against something, even though neither test can currently distinguish
+  "correct" from "coincidentally correct."
