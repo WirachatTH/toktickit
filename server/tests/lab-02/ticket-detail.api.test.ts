@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
+import fs from "node:fs/promises";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { storedFilePath } from "../../src/attachmentStorage.js";
 
 // Issue 8 — Requester Ticket Detail (docs/lab-02/specification.md BR-45,
 // Decision D-2; api-spec.md §6). A Ticket not owned by the current
@@ -35,7 +37,23 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Deleting the Ticket rows cascades the Attachment rows in the DB, but
+  // the real files the "includes both active and removed Attachments" test
+  // uploads through the actual route are only ever written to disk, never
+  // deleted by that cascade — same pattern attachments.api.test.ts already
+  // uses. Collect storedFilenames before the rows disappear.
+  const tickets = await prisma.ticket.findMany({
+    where: { ticketNumber: { startsWith: "TCK-DETAIL-" } },
+    select: { id: true },
+  });
+  const attachments = await prisma.attachment.findMany({
+    where: { ticketId: { in: tickets.map((t) => t.id) } },
+    select: { storedFilename: true },
+  });
+
   await prisma.ticket.deleteMany({ where: { ticketNumber: { startsWith: "TCK-DETAIL-" } } });
+
+  await Promise.all(attachments.map((a) => fs.unlink(storedFilePath(a.storedFilename)).catch(() => {})));
 });
 
 async function createOwnedTicket(overrides: Partial<{ requesterId: number; summary: string }> = {}) {
