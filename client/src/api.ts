@@ -220,6 +220,96 @@ export async function fetchTickets(requesterId: number, params: TicketListParams
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 8 — Requester Ticket Detail (api-spec.md §6, BR-45). Reuses
+// the Issue 6 attachment endpoints (§7-10) for add/download/soft-remove —
+// this screen is a second consumer of that same API, not a new one.
+// ---------------------------------------------------------------------------
+
+export interface TicketDetailAttachment {
+  id: number;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  isRemoved: boolean;
+  removedAt: string | null;
+  removedReason: string | null;
+}
+
+export interface TicketDetail {
+  id: number;
+  ticketNumber: string;
+  requester: { id: number; name: string; email: string };
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string };
+  summary: string;
+  description: string;
+  requestedPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  attachments: TicketDetailAttachment[];
+}
+
+export async function fetchTicket(requesterId: number, ticketId: number): Promise<TicketDetail> {
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}`, { headers: requesterHeaders(requesterId) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function addAttachmentToTicket(
+  requesterId: number,
+  ticketId: number,
+  file: File
+): Promise<TicketDetailAttachment> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    headers: requesterHeaders(requesterId),
+    body: formData,
+  });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export interface RemovedAttachment {
+  id: number;
+  isRemoved: boolean;
+  removedAt: string;
+  removedReason: string;
+}
+
+export async function removeAttachment(
+  requesterId: number,
+  ticketId: number,
+  attachmentId: number,
+  reason: string
+): Promise<RemovedAttachment> {
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/remove`, {
+    method: "PATCH",
+    headers: { ...requesterHeaders(requesterId), "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+// Returns the raw bytes rather than parsing the server's Content-Disposition
+// header back out — the caller already has the attachment's original
+// filename from fetchTicket()'s response, and that header isn't readable
+// from browser JS on a cross-origin response anyway unless the server opts
+// in via Access-Control-Expose-Headers, which it doesn't.
+export async function downloadAttachment(requesterId: number, ticketId: number, attachmentId: number): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
+    headers: requesterHeaders(requesterId),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return res.blob();
+}
+
 export async function checkSystem(): Promise<SystemStatus> {
   const healthRes = await fetch(`${API_URL}/api/health`);
   if (!healthRes.ok) {

@@ -188,7 +188,7 @@ export function CreateTicket() {
             successfully.
           </p>
           <p className="mb-3">Requester: {requester?.name}</p>
-          <div className="d-flex gap-2 justify-content-center">
+          <div className="d-flex gap-2 justify-content-center zg-actions-stack">
             <Button variant="primary" onClick={() => navigate(ROUTES.detail(createdTicket.id))}>
               View Ticket
             </Button>
@@ -357,7 +357,7 @@ export function CreateTicket() {
         )}
       </div>
 
-      <div className="d-flex gap-2">
+      <div className="d-flex gap-2 zg-actions-stack">
         <Button type="submit" variant="primary" busy={submitting} busyLabel="Submitting…">
           Submit Ticket
         </Button>

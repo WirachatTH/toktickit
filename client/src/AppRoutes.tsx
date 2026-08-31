@@ -7,18 +7,13 @@ import SystemStatus from "./screens/SystemStatus.js";
 import { RequesterSelector } from "./screens/RequesterSelector.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
+import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { ROUTES } from "./routes.js";
 
 // The actual route table the app ships, extracted out of App.tsx so tests
 // can render it directly inside a MemoryRouter instead of only ever testing
 // synthetic route tables the test files build themselves (review finding,
 // message.txt Blocking 1 — see client/tests/lab-02/AppRoutes.test.tsx).
-
-// Temporary placeholder for a screen a later issue implements. Replaced,
-// not built out here — Issue 4's scope is the Selector, routing, and guard.
-function ComingSoon({ label }: { label: string }) {
-  return <p>{label} — coming in a later issue.</p>;
-}
 
 function ShellLayout({ children }: { children: ReactNode }) {
   const { requester, changeRequester } = useRequester();
@@ -59,7 +54,7 @@ export function AppRoutes() {
         element={
           <RequireRequester>
             <ShellLayout>
-              <ComingSoon label="Ticket Detail" />
+              <RequesterTicketDetail />
             </ShellLayout>
           </RequireRequester>
         }
