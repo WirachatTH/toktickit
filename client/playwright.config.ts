@@ -1,10 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // Issue 9 — e2e/lab-02 lives at the repo root, a sibling of client/ and
-// server/ (docs/lab-02/tests.md §5's command is
-// `docker-compose exec client npx playwright test ../e2e/lab-02/...`,
-// run from /app — see docker-compose.yml's /e2e mount for why that
-// relative path resolves the same way in and out of Docker).
+// server/, not inside either, so testDir below needs docker-compose.yml's
+// /e2e mount to reach it from /app regardless of how the suite is
+// invoked (docs/lab-02/tests.md §5's command is a bare
+// `docker-compose exec client npx playwright test` — a path argument
+// is matched as a regex against paths *relative to* testDir, so passing
+// one written relative to the repo root, like `../e2e/lab-02/...`,
+// matches nothing and finds zero tests).
 export default defineConfig({
   testDir: "../e2e/lab-02",
   // Real tickets/attachments the journey test creates through the actual

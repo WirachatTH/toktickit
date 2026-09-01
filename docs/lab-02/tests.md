@@ -183,7 +183,7 @@ docker-compose exec server npm test
 docker-compose exec client npm test
 
 # E2E (Playwright — added in Issue 9)
-docker-compose exec client npx playwright test ../e2e/lab-02/requester-ticket-flow.spec.ts
+docker-compose exec client npx playwright test
 ```
 
 ## 6. Final Results

@@ -53,6 +53,13 @@ services:
       # bind-mounted here too since the client container otherwise has no
       # path to it.
       - ./server/uploads:/server-uploads
+      # Peer review on PR #37 (AC-3 blocker): the spec resolves its
+      # screenshot paths as ../../artifacts/... from /e2e/lab-02, which
+      # only lands on the host repo's artifacts/ if /artifacts is mounted
+      # the same way /e2e is — without this, every e2e-*.png the journey
+      # test captures was being written to the container's own writable
+      # layer and discarded when it exited, never reaching the repo.
+      - ./artifacts:/artifacts
     environment:
       - CHOKIDAR_USEPOLLING=true
       # Issue 9 E2E globalTeardown connects directly to Postgres (via the
