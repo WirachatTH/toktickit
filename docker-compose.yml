@@ -44,8 +44,8 @@ services:
       - client_node_modules:/app/node_modules
       # Issue 9 — e2e/ lives at the repo root, a sibling of client/ and
       # server/, not inside either. Mounted at /e2e (a sibling of /app, the
-      # client mount) so `npx playwright test ../e2e/...` run from /app
-      # resolves the same way the docs/lab-02/tests.md command expects.
+      # client mount) so testDir: "../e2e/lab-02" in playwright.config.ts
+      # resolves from /app regardless of how the suite is invoked.
       - ./e2e:/e2e
       # Issue 9 E2E globalTeardown deletes attachment files the journey
       # test uploaded through the real app — the same server/uploads the

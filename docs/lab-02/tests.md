@@ -61,15 +61,15 @@ document is the curated, graded planned-test table plus traceability required by
 | API-23 | BR-31 | API | File at exactly 5 MB vs. 5 MB + 1 byte, at ticket creation | Exactly-5MB accepted, +1 byte rejected `413` | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-24 | AC-06, BR-30 | API | Disallowed type, including a spoofed extension, at ticket creation | `415`, rejected by real content inspection not filename | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-25 | AC-07, BR-32 | API | 6th attachment submitted with a new Ticket | `400`, rejected before creation | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
-| API-26 | BR-32 | API | 5 concurrent add-to-existing uploads on a Ticket with 0 active attachments | Exactly 5 succeed even under a race | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-27 | AC-08, BR-34 | API | Soft-remove without a reason vs. with a valid reason | Without: `400`; with: `200`, `isRemoved=true`, reason stored | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-28 | AC-09, BR-37 | API | Download a soft-removed Attachment | `404`, no bytes returned | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-29 | BR-36 | API | Metadata retrieval for a removed Attachment | Filename/size/date/reason still visible | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-30 | AC-03 | API/Security | Download/remove an Attachment belonging to another Requester's Ticket | `404` for every operation, not just read | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-31 | BR-34 | API | Soft-remove an already-removed Attachment | `409 CONFLICT`, idempotent — no double removal record | `server/tests/lab-02/attachments.api.test.ts` | Pending |
+| API-26 | BR-32 | API | 5 concurrent add-to-existing uploads on a Ticket with 0 active attachments | Exactly 5 succeed even under a race | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-27 | AC-08, BR-34 | API | Soft-remove without a reason vs. with a valid reason | Without: `400`; with: `200`, `isRemoved=true`, reason stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-28 | AC-09, BR-37 | API | Download a soft-removed Attachment | `404`, no bytes returned | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-29 | BR-36 | API | Metadata retrieval for a removed Attachment | Filename/size/date/reason still visible | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-30 | AC-03 | API/Security | Download/remove an Attachment belonging to another Requester's Ticket | `404` for every operation, not just read | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-31 | BR-34 | API | Soft-remove an already-removed Attachment | `409 CONFLICT`, idempotent — no double removal record | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-32 | BR-33 | API/Security | Filename with path-traversal characters (`../../etc/passwd`), at ticket creation | Stored safely under a generated safe filename; filesystem unaffected outside the upload directory | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-33 | BR-38 | API | Simulated disk failure after the Ticket row is committed, during creation | Whole creation rolls back — no orphaned Ticket/Attachment/file | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
-| API-34 | BR-39 | API | Attachment added later via Ticket Detail's add-attachment endpoint fails | Only that upload fails; Ticket itself is unaffected | `server/tests/lab-02/attachments.api.test.ts` | Pending |
+| API-34 | BR-39 | API | Attachment added later via Ticket Detail's add-attachment endpoint fails | Only that upload fails; Ticket itself is unaffected | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | UI-12 | AC-08 | UI | Click soft-remove on an attachment | Requires entering a reason + explicit confirmation before it takes effect | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
 | UI-13 | BR-36 | UI | View a removed attachment | Shown as metadata only, no download/preview control | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
 | UI-14 | UI Spec §6.5 | UI | Ticket with 5 active attachments | "Add Attachment" disabled with a tooltip explaining why | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |

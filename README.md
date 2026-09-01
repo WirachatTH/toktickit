@@ -108,13 +108,12 @@ To verify the implementation of the IT request category list feature:
 Lab 2 builds on the same Docker Compose stack. Engineering contract lives in
 `docs/lab-02/` (`specification.md`, `api-spec.md`, `ui-spec.md`, `tests.md`).
 
-> **Status:** Issue 1 (specification/test/UI/API docs) is drafted on
-> `feature/1-doc-prep`. No Lab 2 database models, endpoints, or screens exist yet —
-> this section is a scaffold and will be filled in with real verification steps as
-> each subsequent issue (`feature/2-data-model` onward) lands. Treat any command
-> below as "will work once that issue merges," not as currently true.
+> **Status:** All nine Lab 2 issues (spec/data model/design system/requester
+> selector/create ticket/attachment lifecycle/my tickets/ticket detail/responsive
+> & E2E QA) are implemented and merged into `lab2-staging`. Every command below is
+> currently true, not aspirational.
 
-### Applying the Lab 2 database migration and seed (once Issue 2 lands)
+### Applying the Lab 2 database migration and seed
 ```bash
 docker-compose exec server npx prisma migrate dev
 docker-compose exec server npm run prisma:seed
@@ -123,7 +122,7 @@ docker-compose exec server npm run prisma:seed
 tables; seed inserts ≥6 Related Systems, ≥4 active + ≥1 inactive Development
 Requesters, and keeps the 4 existing Categories unchanged. Safe to re-run.*
 
-### Running Lab 2 tests (once the corresponding issue lands)
+### Running Lab 2 tests
 ```bash
 # Backend (Vitest + Supertest) — server/tests/lab-02/
 docker-compose exec server npm test
@@ -131,11 +130,11 @@ docker-compose exec server npm test
 # Frontend (Vitest + Testing Library) — client/tests/lab-02/
 docker-compose exec client npm test
 
-# E2E (Playwright, added in Issue 9) — e2e/lab-02/
-docker-compose exec client npx playwright test ../e2e/lab-02/requester-ticket-flow.spec.ts
+# E2E (Playwright — e2e/lab-02/), all three viewport projects
+docker-compose exec client npx playwright test
 ```
 
-### Verifying the Requester ticketing flow (once implemented)
+### Verifying the Requester ticketing flow
 1. Open [http://localhost:5173](http://localhost:5173) — you'll land on the
    Development Requester Selection screen. Pick an active Requester and continue.
 2. Create a ticket from the Create Ticket screen, attach a JPG/PNG/WEBP/PDF under

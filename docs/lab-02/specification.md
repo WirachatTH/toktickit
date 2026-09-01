@@ -249,17 +249,17 @@ Every route above except the three reference-data `GET`s requires the
 ## 10. Definition of Done
 
 **Part 1 — Product completion**
-- [ ] All planned tests in `docs/lab-02/tests.md` pass from the documented commands, on the final `main` branch.
-- [ ] Every AC-## above has at least one passing, traceable automated test.
-- [ ] No planned test is skipped, disabled, or commented out.
-- [ ] Every implemented screen and endpoint matches this specification, `api-spec.md`, and `ui-spec.md` — any deviation is reflected back into these docs, not left undocumented.
-- [ ] README setup/run/test instructions are current and were verified on a clean checkout.
+- [ ] All planned tests in `docs/lab-02/tests.md` pass from the documented commands, on the final `main` branch. *(Pending Issue 10's release — currently verified green on `lab2-staging`, not yet `main`.)*
+- [x] Every AC-## above has at least one passing, traceable automated test.
+- [x] No planned test is skipped, disabled, or commented out.
+- [x] Every implemented screen and endpoint matches this specification, `api-spec.md`, and `ui-spec.md` — any deviation is reflected back into these docs, not left undocumented.
+- [x] README setup/run/test instructions are current and were verified on a clean checkout.
 
 **Part 2 — Course delivery**
-- [ ] All Lab 2 work happened on feature branches merged via peer-reviewed PRs into `lab2-staging`, then one release PR into `main`.
-- [ ] Peer review comments and responses are recorded in `docs/lab-02/reviewer.md`.
-- [ ] `docs/lab-02/specification.md`, `tests.md`, `ui-spec.md`, `api-spec.md`, `reviewer.md`, `ai-use.md` all exist and are current.
-- [ ] The GitHub Project board shows every Lab 2 Issue in Done.
+- [ ] All Lab 2 work happened on feature branches merged via peer-reviewed PRs into `lab2-staging`, then one release PR into `main`. *(Feature branches/PRs done; the `lab2-staging → main` release PR is Issue 10's own remaining step.)*
+- [x] Peer review comments and responses are recorded in `docs/lab-02/reviewer.md`.
+- [x] `docs/lab-02/specification.md`, `tests.md`, `ui-spec.md`, `api-spec.md`, `reviewer.md`, `ai-use.md` all exist and are current.
+- [ ] The GitHub Project board shows every Lab 2 Issue in Done. *(Issues 1–9 are Done; Issue 10 itself is still Started.)*
 - [ ] The required PDF evidence (Answer Part 1–9) is assembled and submitted.
 
 ## 11. Assumptions and Decisions

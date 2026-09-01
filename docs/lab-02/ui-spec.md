@@ -113,6 +113,11 @@ labsheet forbids using the warning color as ordinary decoration.
 - Fully keyboard operable: `<select>` and Continue reachable via Tab, `Enter`
   submits when Continue has focus.
 
+Screenshots: `artifacts/lab-02/screenshots/select-requester/desktop-{initial,loading,selected,empty,failure,shell-selected}.png`
+(`shell-selected` shows the post-select app shell — current Requester name and
+Change Requester action). Not broken down by breakpoint — labsheet §14 Part 5
+folds this screen's evidence into Part 6 at 0 points on its own.
+
 ### 6.3 Create Ticket (`/tickets/new`)
 Desktop (≥992px): two-column grid, max-width 960px centered.
 - Top band (full width): read-only Ticket Number ("Generated after submission"),
