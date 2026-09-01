@@ -2,6 +2,23 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# Issue 9 — Playwright for the E2E suite (e2e/lab-02). Playwright's own
+# downloaded Chromium build is linked against glibc and does not run on
+# Alpine's musl libc, so this installs Alpine's own Chromium package
+# instead and points Playwright at it (see playwright.config.ts's
+# `executablePath`), skipping Playwright's browser download entirely.
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Install dependencies first (for better caching)
 COPY package.json package-lock.json* ./
 RUN npm install

@@ -79,10 +79,10 @@ document is the curated, graded planned-test table plus traceability required by
 | UI-16 | UI Spec §6.2 | UI | Selector with mocked empty/failure API responses | Distinct empty state and safe failure state rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-17 | AC-02, BR-08 | UI | Navigate to My Tickets/Create Ticket/Ticket Detail with no Requester selected, rendering the *real* route table (not a synthetic one) | Redirected to the Selector for all three routes; deleting `<RequireRequester>` from `App.tsx`'s routes fails this test (mutation-verified) | `client/tests/lab-02/AppRoutes.test.tsx` | Pass |
 | STYLE-3.7 | UI Spec §6.1 | UI Style | AppShell's mobile nav element carries no Bootstrap `!important` display utility class | No `d-flex`/`d-inline-flex`/`d-block`/`d-inline` class present — the exact regression that once defeated the mobile media query | `client/tests/lab-02/AppShell.test.tsx` | Pass |
-| STYLE-02 | UI Spec §3, §4 | UI Style | Busy/disabled button states across the shared component library | Busy shows spinner+disabled; disabled is inert and visually distinct | `client/tests/lab-02/components.test.tsx` | Pending |
+| STYLE-02 | UI Spec §3, §4 | UI Style | Busy/disabled button states across the shared component library | Busy shows spinner+disabled; disabled is inert and visually distinct | `client/tests/lab-02/components.test.tsx` | Pass |
 | UI-18 | UI Spec §7 | Accessibility | Tab through Selector, Create Ticket, My Tickets, Ticket Detail | Every interactive control reachable with a visible focus indicator | `client/tests/lab-02/AppShell.test.tsx` | Pending |
-| E2E-01 | AC-01, AC-10 | E2E | Full journey: select Requester → create ticket w/ attachment → find in My Tickets → open Detail → download → soft-remove → switch Requester → confirm isolation | Every step succeeds in order on a clean seeded DB | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
-| RESP-02 | UI Spec §8, §9 | Responsive | Create Ticket, My Tickets, Ticket Detail screenshot capture | Desktop/tablet/mobile screenshots show no clipping/overlap/horizontal scroll | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
+| E2E-01 | AC-01, AC-10 | E2E | Full journey: select Requester → create ticket w/ attachment → find in My Tickets → open Detail → download → soft-remove → switch Requester → confirm isolation | Every step succeeds in order on a clean seeded DB | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pass |
+| RESP-02 | UI Spec §8, §9 | Responsive | Create Ticket, My Tickets, Ticket Detail screenshot capture | Desktop/tablet/mobile screenshots show no clipping/overlap/horizontal scroll | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -110,9 +110,68 @@ appropriate test evidence."
 
 ## 4. Responsive and Visual Checklist
 
-Executed and recorded once Issue 9 (`feature/9-responsive-e2e-qa`) lands — see the
-checklist template already defined in `ui-spec.md` §9. Screenshot evidence path:
-`artifacts/lab-02/screenshots/{create-ticket,my-tickets,ticket-detail}/`.
+Executed against `ui-spec.md` §9's checklist template, as part of implementing
+Issue 9. Screenshot evidence path:
+`artifacts/lab-02/screenshots/{create-ticket,my-tickets,ticket-detail}/`, plus
+the E2E spec's own per-breakpoint captures (`e2e-*.png` in each folder),
+produced by `E2E-01`/`RESP-02`'s three project runs (desktop/tablet/mobile;
+`docker compose exec client npx playwright test`, 3 passed).
+
+- [x] **Zen Green tokens used consistently** — `grep`-checked every component
+  `.tsx`/`.ts` file for ad hoc hex colors outside `zen-green.css`: zero hits.
+- [x] **Editable vs read-only fields visually distinct** — confirmed on Create
+  Ticket at mobile width: Ticket Number/Date/Requester render with the tan
+  `--zg-readonly-bg` fill against the editable fields' plain white.
+- [x] **Validation messages sit directly below their field** — confirmed live
+  on Create Ticket (mobile): submitting empty shows both the top-level
+  summary banner *and* a message directly under each invalid field
+  (`Category is required.`, `Related System is required.`), not the banner
+  alone.
+- [ ] **Button hierarchy matches §4 everywhere** — **found a real
+  discrepancy, not fixed yet.** `ui-spec.md` §4's own table gives "View
+  Ticket" as the **tertiary** example, but §6.3's screen-specific text says
+  Create Ticket's success panel is "'View Ticket' primary + 'Create Another'
+  tertiary" — the two parts of the spec disagree with each other on this
+  button. The actual implementation (`CreateTicket.tsx`) matches neither
+  exactly: `View Ticket` is primary (agrees with §6.3, not §4) and
+  `Create Another` is **secondary** (matches neither passage, both of which
+  call for tertiary). Left as a flagged, unresolved finding — picking a
+  fix means picking which spec passage is authoritative, which isn't
+  this issue's call to make unilaterally.
+- [x] **No clipping/overlap/unintended horizontal scroll, all three
+  screens** — `scrollWidth === clientWidth` confirmed at 375px for My
+  Tickets, Ticket Detail, and (newly checked this issue) Create Ticket;
+  Create Ticket's Submit/Cancel correctly render full-width stacked with
+  Submit on top at mobile, matching §6.3 exactly.
+- [x] **Badge color/label pairs identical across all three screens** — true
+  by construction: My Tickets and Ticket Detail both import and render the
+  one shared `Badge` component (`components/Badge.tsx`) rather than each
+  rolling its own; Create Ticket's success panel doesn't render a badge at
+  all (not required by its own §6.3 spec), so there's nothing there to
+  diverge.
+- [x] **Filters, pagination, attachment controls, and empty/no-results
+  states remain usable at every viewport** — already established
+  per-issue: My Tickets' mobile filter panel and Prev/Next pagination
+  (Issue 7 screenshots), Ticket Detail's mobile Add/Download/Remove
+  controls (Issue 8 screenshots, this issue's touch-target fix).
+- [ ] **Focus indicator visible when tabbing through all three screens** —
+  **could not be verified in this session.** The CSS rule itself
+  (`.zg-field:focus-visible { outline: 2px solid var(--zg-secondary); ... }`
+  in `zen-green.css`, matching ui-spec.md §7 exactly, and used consistently
+  elsewhere — ticket rows/cards have their own equivalent rule) looks
+  correct, but `:focus-visible` never activates in the claude-in-chrome
+  automation environment used for this audit: `document.hasFocus()`
+  reports `false` for the tab regardless of which element has DOM focus,
+  since the tool doesn't give the tab real OS-level window focus. This is
+  a tooling limitation, not a demonstrated app defect — but it also means
+  this item is unverified, not confirmed passing. Needs a human to
+  actually tab through in a normal browser session.
+
+Every icon-only control has an accessible label/tooltip: vacuously true —
+audited every button across all three screens and found none that are
+icon-only. Every control (including "← Back to My Tickets" and "✓ Ticket
+created") pairs its decorative character with full visible text, matching
+§4's own "text-only buttons are preferred everywhere space allows."
 
 ## 5. Test Commands
 
@@ -124,7 +183,7 @@ docker-compose exec server npm test
 docker-compose exec client npm test
 
 # E2E (Playwright — added in Issue 9)
-docker-compose exec client npx playwright test ../e2e/lab-02/requester-ticket-flow.spec.ts
+docker-compose exec client npx playwright test
 ```
 
 ## 6. Final Results
@@ -165,15 +224,70 @@ lifecycle that run happened.
   but that verification is manual, not automated, and RESP-01's Pass status
   rests on it rather than on the linked test alone. RESP-02 (Issue 9) is
   the eventual automated, Playwright-based version of this same check.
-- Both the ticket list's `id desc` tiebreak (Issue 7, BR-17) and Ticket
-  Detail's `id asc` attachment-ordering tiebreak (Issue 8) share the same
-  structural limitation: for freshly-inserted rows, id order and insertion
-  order are the same thing, so no black-box test built from ordinary
-  creates can ever prove the tiebreak clause itself is what's producing a
-  given result — removing it and re-running still passes, confirmed by
-  mutation-testing both. Both are kept anyway on the merits (an `ORDER BY`
-  with no fully-determining key has no defined tie order per the SQL
-  standard, whatever one query happens to return today), and both tests
-  are kept too, so a future change to the ordering still gets checked
-  against something, even though neither test can currently distinguish
-  "correct" from "coincidentally correct."
+- Ticket Detail's `id asc` attachment-ordering tiebreak (Issue 8) has a real
+  limitation its own test can't get around: for freshly-inserted rows, id
+  order and insertion order are the same thing, so a black-box test built
+  from ordinary creates can't prove the tiebreak clause itself is what's
+  producing the result — removing `{ id: "asc" }` and re-running the suite
+  still passes (mutation-tested; confirmed). Kept anyway on the merits (an
+  `ORDER BY` with no fully-determining key has no defined tie order per the
+  SQL standard, whatever one query happens to return today).
+  This is *not* a general property of ordering tiebreaks, and an earlier
+  version of this note wrongly claimed the ticket list's `id desc` tiebreak
+  (Issue 7, BR-17) shared the same limitation "confirmed by mutation-testing
+  both" — that second mutation test was never actually run at the time; the
+  claim was extrapolated from Issue 8's result rather than checked. It
+  doesn't hold: that test asserts **descending** id order against a
+  three-way tie, while Postgres's incidental scan order for untouched rows
+  is ascending (insertion order) — so removing `{ id: "desc" }` flips the
+  observed order away from what the test expects, and the suite genuinely
+  catches it (verified directly: reverting the clause fails that one test,
+  145/146). The distinguishing factor is direction, not tiebreaks in
+  general: a tiebreak asserting the *same* direction as insertion order is
+  the untestable case; asserting the opposite direction is a real test.
+- The mobile touch-target fix (Issue 8: `min-height: 44px` on every button,
+  `.zg-actions-stack` for full-width primary-action rows, both scoped
+  inside `@media (max-width: 767.98px)`) is another CSS claim no automated
+  test can reach — jsdom never computes a real box height, so nothing in
+  `AttachmentSection.test.tsx` or elsewhere references `44` or
+  `zg-actions-stack`. Same resolution as RESP-01: manual evidence, not an
+  automated one. `artifacts/lab-02/screenshots/ticket-detail/mobile-view.png`
+  and `mobile-remove-confirm.png` show the fix rendered at 375px (Download/
+  Remove sized up, the removal modal's Cancel/Remove Attachment stacked
+  full-width); measured via `getBoundingClientRect()` at capture time, every
+  button was exactly 44px tall, and the modal's stacked buttons were 277px
+  wide each — the container's full width. `CreateTicket.tsx` and
+  `RequesterSelector.tsx` also gained `.zg-actions-stack` in the same
+  change, so their **already-committed** mobile screenshots
+  (`artifacts/lab-02/screenshots/create-ticket/`) now predate the fix and
+  no longer reflect those two screens' current mobile button layout —
+  flagged, not silently re-captured, since re-shooting Issue 5's evidence
+  under Issue 8's PR would rewrite another issue's already-reviewed record
+  without that issue's own review cycle.
+- The E2E-01 journey spec's first real run against the `mobile` project
+  surfaced three real bugs in the *spec itself*, not the app: `AppShell`
+  collapses nav links behind a "Menu" toggle below 768px, so a bare nav
+  click timed out; and `MyTickets.tsx` renders both a desktop `<table>` and
+  mobile `<div data-testid="my-tickets-cards">` simultaneously by design
+  (RESP-01), so an unscoped `.first()`/`.getByText()` locator resolved to
+  the hidden desktop element rather than the visible mobile one, twice
+  (the search input and the ticket row). All three were fixed in the spec
+  (`clickNavControl`, `searchInput`, `ticketRowLocator` helpers in
+  `e2e/lab-02/requester-ticket-flow.spec.ts`), then the full 3-project run
+  was repeated to confirm: 3 passed.
+- The same first run also surfaced a real gap: E2E-01 creates a genuine
+  ticket and uploads a genuine attachment through the actual app each time
+  it runs, and had no teardown, so every local run permanently added rows
+  to the shared dev database and files to `server/uploads/` — the same
+  class of bug PR #36's review caught and fixed in
+  `ticket-detail.api.test.ts`'s `afterAll`, just in a new file this
+  session hadn't added cleanup to yet. There's no app route to delete a
+  ticket through (requesters can only soft-remove an attachment, BR-36),
+  so `e2e/lab-02/globalTeardown.ts` connects directly to the same Postgres
+  instance instead (`pg`, wired via `playwright.config.ts`'s
+  `globalTeardown`) and deletes by the summary this spec always writes,
+  once after all three projects finish. Verified two ways: 8 tickets and
+  8 files that had accumulated across this session's earlier debugging
+  runs were confirmed and removed by hand first, then a fresh 3-project
+  run was executed and independently queried afterward (not just trusting
+  the teardown's own log line) — 0 tickets, 0 files remained.
