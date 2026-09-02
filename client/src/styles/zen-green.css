@@ -1,0 +1,471 @@
+/* Zen Green Theme tokens and shared component classes.
+   See docs/lab-02/ui-spec.md for the full specification these implement. */
+
+:root {
+  --zg-primary: #006B3C;
+  --zg-secondary: #0B7A46;
+  --zg-pale: #EAF6EF;
+  --zg-bg: #F5F7F6;
+  --zg-surface: #FFFFFF;
+  --zg-border: #D8E3DD;
+  --zg-text: #1B2B22;
+  --zg-text-muted: #5B6B62;
+  --zg-readonly-bg: #EFEDE4;
+  --zg-readonly-border: #DDD8C8;
+  --zg-error-text: #8A1F11;
+  --zg-error-border: #C0392B;
+  --zg-error-bg: #FBEAE2;
+  --zg-warning-bg: #FFF4DE;
+  --zg-warning-text: #8A5A00;
+  --zg-success-text: #0B7A46;
+}
+
+body {
+  background: var(--zg-bg);
+  color: var(--zg-text);
+}
+
+/* ---------------------------------------------------------------------
+   Fields (ui-spec.md §3)
+   --------------------------------------------------------------------- */
+
+.zg-field {
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0 0.75rem;
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: 0.375rem;
+  color: var(--zg-text);
+  font-size: 1rem;
+}
+
+textarea.zg-field {
+  height: auto;
+  min-height: 160px;
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+}
+
+.zg-field:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 1px;
+}
+
+.zg-field--readonly,
+.zg-field--readonly:focus-visible {
+  background: var(--zg-readonly-bg);
+  border-color: var(--zg-readonly-border);
+  color: var(--zg-text);
+  cursor: default;
+  outline: none;
+}
+
+.zg-field.is-invalid {
+  border-color: var(--zg-error-border);
+}
+
+.zg-field:disabled {
+  background: var(--zg-readonly-bg);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zg-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.25rem;
+  color: var(--zg-text);
+}
+
+.zg-required {
+  color: var(--zg-error-text);
+  margin-left: 0.125rem;
+}
+
+.zg-field-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--zg-error-text);
+}
+
+/* ---------------------------------------------------------------------
+   Buttons (ui-spec.md §4)
+   --------------------------------------------------------------------- */
+
+.zg-btn-primary {
+  background: var(--zg-primary);
+  border-color: var(--zg-primary);
+  color: #fff;
+}
+.zg-btn-primary:hover:not(:disabled) {
+  background: #00552f;
+  border-color: #00552f;
+  color: #fff;
+}
+
+.zg-btn-secondary {
+  background: #fff;
+  border: 1px solid var(--zg-secondary);
+  color: var(--zg-secondary);
+}
+.zg-btn-secondary:hover:not(:disabled) {
+  background: var(--zg-pale);
+  color: var(--zg-secondary);
+}
+
+.zg-btn-tertiary {
+  background: transparent;
+  border: none;
+  color: var(--zg-secondary);
+  text-decoration: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+.zg-btn-tertiary:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.zg-btn-destructive {
+  background: var(--zg-error-border);
+  border-color: var(--zg-error-border);
+  color: #fff;
+}
+.zg-btn-destructive:hover:not(:disabled) {
+  background: var(--zg-error-text);
+  border-color: var(--zg-error-text);
+  color: #fff;
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zg-btn--busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zg-spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: zg-spin 0.6s linear infinite;
+}
+
+@keyframes zg-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------------------------------------------------------------
+   Badges (ui-spec.md §5)
+   --------------------------------------------------------------------- */
+
+.zg-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.zg-badge--priority-low { background: #EAF6EF; color: #0B7A46; }
+.zg-badge--priority-medium { background: #E8EEF7; color: #2A4D7A; }
+.zg-badge--priority-high { background: #FBEAE2; color: #B23A24; }
+.zg-badge--status-new { background: #EAF6EF; color: #0B7A46; }
+/* Fallback for a value outside the known set (e.g. malformed API data) —
+   visibly distinct rather than an unstyled/blank badge. */
+.zg-badge--unknown { background: #E5E5E5; color: #4A4A4A; }
+
+/* ---------------------------------------------------------------------
+   Loading / empty / error states
+   --------------------------------------------------------------------- */
+
+.zg-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--zg-text-muted);
+  padding: 1rem 0;
+}
+
+.zg-empty-state,
+.zg-error-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  background: var(--zg-surface);
+}
+
+.zg-empty-state {
+  color: var(--zg-text-muted);
+}
+
+.zg-error-state {
+  background: var(--zg-error-bg);
+  border-color: var(--zg-error-border);
+  color: var(--zg-error-text);
+}
+
+/* ---------------------------------------------------------------------
+   App shell (ui-spec.md §6.1)
+   --------------------------------------------------------------------- */
+
+.zg-shell-header {
+  background: var(--zg-primary);
+  color: #fff;
+}
+
+.zg-shell-brand {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-decoration: none;
+}
+
+.zg-nav-link {
+  color: #fff;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.zg-nav-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.zg-nav-link--active {
+  border-bottom-color: #fff;
+  font-weight: 700;
+}
+
+.zg-shell-requester,
+/* Higher specificity than .zg-btn-tertiary alone, so the header's dark
+   background always wins regardless of stylesheet declaration order —
+   the plain .zg-btn-tertiary color assumes a light surface and would be
+   near-invisible on --zg-primary otherwise. */
+.zg-shell-nav .zg-btn-tertiary.zg-shell-requester {
+  color: #fff;
+}
+
+.zg-shell-nav .zg-btn-tertiary.zg-shell-requester:hover:not(:disabled) {
+  color: #fff;
+}
+
+.zg-shell-toggle {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+}
+
+.zg-shell-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+@media (max-width: 767.98px) {
+  /* No !important here on purpose — see the className comment in
+     AppShell.tsx for why this must not be fought by a Bootstrap utility
+     class living on the same element. */
+  .zg-shell-nav {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .zg-shell-nav.zg-shell-nav--open {
+    display: flex;
+  }
+
+  /* ui-spec.md §8 — Mobile <768px: "buttons full-width and ≥44px tall
+     (touch target)". Never implemented anywhere; found by measuring actual
+     rendered button height on Ticket Detail (38px) while checking Issue 8's
+     responsive layout — every screen has had this gap since Button.tsx was
+     first built. Height applies to every button unconditionally (a taller
+     touch target never breaks a layout). Full-width only applies to
+     `.zg-actions-stack` — a handful of primary action rows (Submit/Cancel,
+     Continue, the remove-confirmation modal) opted in explicitly below,
+     not every button everywhere: pagination Prev/Next and the mobile nav's
+     own buttons are deliberately compact per their own ui-spec sections
+     (§6.4's "Prev/Next + Page X of Y", §6.1's nav), and forcing every
+     `.btn` full-width would break those. */
+  .btn {
+    min-height: 44px;
+  }
+
+  .zg-actions-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .zg-actions-stack .btn {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .zg-shell-toggle {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   My Tickets (ui-spec.md §6.4)
+   --------------------------------------------------------------------- */
+
+.zg-mobile-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  background: var(--zg-surface);
+  margin-bottom: 0.5rem;
+}
+
+.zg-ticket-table {
+  background: var(--zg-surface);
+}
+
+.zg-ticket-table thead th {
+  color: var(--zg-text-muted);
+  font-weight: 600;
+  border-bottom-color: var(--zg-border);
+}
+
+.zg-ticket-row {
+  cursor: pointer;
+}
+
+.zg-ticket-row:hover {
+  background: var(--zg-pale);
+}
+
+.zg-ticket-row:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: -2px;
+}
+
+.zg-ticket-card {
+  cursor: pointer;
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  background: var(--zg-surface);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.zg-ticket-card:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
+}
+
+.zg-ticket-card__summary {
+  color: var(--zg-text);
+  margin: 0.35rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zg-ticket-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: var(--zg-text-muted);
+  font-size: 0.875rem;
+}
+
+.zg-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.zg-pagination__count {
+  color: var(--zg-text-muted);
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------
+   Ticket Detail (ui-spec.md §6.5)
+   --------------------------------------------------------------------- */
+
+.zg-card {
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  background: var(--zg-surface);
+  padding: 1.25rem;
+}
+
+.zg-attachment-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.zg-attachment-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.zg-attachment-removed {
+  opacity: 0.65;
+}
+
+.zg-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 43, 34, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.zg-modal {
+  background: var(--zg-surface);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Kept in the layout (unlike `hidden`/display:none) so it stays a normal,
+   interactive part of the page — just visually invisible. Used for the
+   real <input type="file"> a styled button triggers indirectly. */
+.zg-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

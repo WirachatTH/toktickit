@@ -1,5 +1,15 @@
+# Private Doc
+Lab_02_labsheet.md
+plan.md
+issues.md
+test.md
 # dependencies
 node_modules/
+# e2e/node_modules is a symlink to /app/node_modules created inside the
+# client container at startup (docker-compose.yml), never a real directory
+# — the trailing-slash pattern above only matches real directories, not
+# symlinks, so it needs its own explicit rule.
+e2e/node_modules
 # env & secrets
 .env
 *.env
@@ -9,6 +19,12 @@ dist/
 build/
 # prisma
 server/prisma/*.db
+# lab 2 attachment storage (real uploaded files must never be committed)
+server/uploads/
+# Playwright (Issue 9)
+client/test-results/
+client/playwright-report/
+client/playwright/.cache/
 # logs & OS
 *.log
 .DS_Store
