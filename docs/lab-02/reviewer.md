@@ -18,7 +18,7 @@
 | #35 | feature/7-my-tickets | Changes requested (2 of 4 ACs failing; a query param 500'd) → Approve — all four ACs pass, both blockers fixed and test-protected. | "I have fixed the problems you've found. Let me know if there's still anything missing!" |
 | #36 | feature/8-ticket-detail | Approve, with four follow-ups (deferred onto the Issue 9 branch by agreement). | "Thank you mak mak krub." |
 | #37 | feature/9-responsive-e2e-qa | Changes requested (AC-3 blocker: E2E screenshots generated correctly but written to an unmounted path, plus a broken documented command) → Approve — verified by rebuilding the stack from scratch and confirming all 18 screenshots land on the host. | "Got it. I will fix it asap!" |
-| — | lab2-staging → main (release) | Pending — release PR not yet opened. | — |
+| [#38](https://github.com/WirachatTH/toktickit/pull/38) | lab2-staging → main (release) | Approved — cold-build regression reproduced independently, deliverable recheck verified line by line. | — |
 
 ## Pull Requests I reviewed for my partner
 *(Partner's repo: Menelaus122/TokTickITV2)*
