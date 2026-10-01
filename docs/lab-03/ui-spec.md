@@ -110,6 +110,8 @@ Replaces Lab 2's Development Requester display (FR-09, FR-10).
 - Active link: Lab 2's white underline plus `aria-current="page"`.
 - Below 768px: the existing hamburger menu holds the links, the user block, and both
   actions.
+- Lab 1's System Status page at `/` stays public and unchanged — it calls only the
+  public `/api/health` and `/api/categories` (D-18).
 - A signed-out visitor to any protected route goes to `/login`; after login they
   return to that route if their role may open it, otherwise to their home screen.
 - A role opening a route it may not use lands on its home screen with a dismissible
@@ -201,11 +203,17 @@ Changes:
 ### 6.1 Toolbar
 Search ("Search ticket number, summary, or requester"), then filters: **Status**
 (Active — default, All, then each status), **IT Priority**, **Category**, **Owner**
-(Anyone, Unassigned, Me, then each assignable user), a **Requester says resolved**
-checkbox, a **Sort** select (Priority — default, Newest, Oldest, Recently updated,
-Ticket number, Status), and **Clear filters** (tertiary). Filter changes reload page
-1; search is debounced 300ms. The filter state is kept in the URL query so the
-browser Back button and a refresh restore it.
+(Anyone, Unassigned, Me, then each user from `GET /api/staff/assignable-users`,
+which both IT Staff and Administrators may read — BR-21; an Administrator sees no
+"Me" option, since they cannot claim), a **Requester says resolved** checkbox, a
+**Sort** select, and **Clear filters** (tertiary). Each Sort option is exactly one
+`sort` + `order` pair, so the URL rebuilt from `appliedQuery` gives the same order on
+every page (BR-64): Priority — default (`itPriority`/`desc`), Newest
+(`createdAt`/`desc`), Oldest (`createdAt`/`asc`), Recently updated
+(`updatedAt`/`desc`), Ticket number (`ticketNumber`/`asc`), Status (`status`/`asc`).
+Filter changes reload page 1; search is debounced 300ms. The filter state is kept in
+the URL query, rebuilt from the response's `appliedQuery`, so the browser Back
+button and a refresh restore it.
 
 ### 6.2 Columns
 Seven columns, chosen so the queue stays readable at 992px (AC-27):
@@ -269,8 +277,10 @@ status badge, IT Priority badge, appears-resolved pill if flagged.
 
 ### 7.3 Ticket controls panel (IT Staff)
 - **Owner**: select of assignable users (*Unassigned* allowed only for `NEW`/`OPEN`)
-  plus **Assign to me** (secondary) when the caller is not the owner. Saving sends
-  `expectedOwnerId`.
+  plus **Assign to me** (secondary) when the caller is not the owner.
+- Every save from this panel sends the owner and status the screen is showing
+  (`expectedOwnerId`, `expectedStatus`), so a change made meanwhile by someone else
+  is refused rather than overwritten (BR-31, BR-43) and the screen reloads (§7.5).
 - **IT Priority**: select + **Save**; shows "Requested: X" beneath for reference.
 - **Status**: current badge, a select listing only `permittedTransitions`, and
   **Update status**. Choosing `RESOLVED`, `CLOSED`, `CANCELLED`, or `REOPENED`

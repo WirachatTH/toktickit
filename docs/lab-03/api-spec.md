@@ -1,6 +1,8 @@
 # Lab 3 API Contract — TokTickIT Users, Roles, IT Staff Ticketing & Administration
 
-Base URL: `${VITE_API_URL}` (client) / `http://localhost:3000` (default dev). Bodies
+Base URL: the browser calls same-origin `/api/...`, which the Vite dev server
+proxies to the API (D-11; `API_PROXY_TARGET`, default `http://localhost:3000`, and
+`http://server:3000` in Docker). Server tests call the Express app directly. Bodies
 are JSON unless noted (ticket creation and attachment upload stay
 `multipart/form-data`; attachment download returns the raw file). Rule references
 (`BR-##`, `AC-##`, `D-##`) point to `docs/lab-03/specification.md`.
@@ -23,9 +25,13 @@ The token is 32 random bytes, base64url-encoded. The server stores only
 one indexed lookup on that column joined to `User`. An expired or unknown token is
 treated as no session (`401`).
 
-The client sends every request with `credentials: "include"`. The server runs
-`cors({ origin: CLIENT_ORIGINS, credentials: true })`, where `CLIENT_ORIGINS` is a
-comma-separated allow-list (default `http://localhost:5173`).
+Because every browser request goes through the same-origin `/api` proxy, the
+session cookie is first-party in local development and in the Docker E2E setup
+alike (D-11). The client still sends `credentials: "include"`. The server keeps
+`cors({ origin: CLIENT_ORIGINS, credentials: true })` for anyone calling it
+directly; `CLIENT_ORIGINS` is a comma-separated allow-list, default
+`http://localhost:5173,http://localhost:5174` (the dev server and the Playwright
+instance).
 
 **Removed from Lab 2:** the `X-Dev-Requester-Id` header and `GET /api/requesters`
 (FR-13). A request that still sends `X-Dev-Requester-Id` is not an error; the
@@ -34,9 +40,11 @@ header is ignored (AC-12).
 ### 0.2 Cross-origin guard
 Any `POST`, `PATCH`, `PUT`, or `DELETE` whose `Origin` header is present and not in
 `CLIENT_ORIGINS` is refused with `403 FORBIDDEN_ORIGIN` before session lookup or any
-handler runs (BR-26). Requests without an `Origin` header (server-to-server tools,
-Supertest) are not affected; browsers always send `Origin` on cross-origin
-state-changing requests, including `multipart/form-data` form posts.
+handler runs (BR-26). The Vite proxy forwards the page's own `Origin`, which is
+on the list. `Origin: null` (sent by sandboxed frames) is not on the list and is
+refused. Requests without an `Origin` header (server-to-server tools, Supertest,
+Playwright's API client) are not affected; browsers always send `Origin` on
+cross-origin state-changing requests, including `multipart/form-data` form posts.
 
 ### 0.3 Guard order
 Every protected request passes these checks in order and stops at the first failure
@@ -49,6 +57,12 @@ Every protected request passes these checks in order and stops at the first fail
 5. ticket exists, and for Requesters is owned by the caller → `404 NOT_FOUND`
 6. request body / parameters valid → `400 VALIDATION_ERROR`
 7. business rules (transition, conflicts, safety rules) → `409 …`
+
+Every operation that changes a ticket or adds to it locks the ticket row before
+step 7 and holds it until it commits (BR-80); assigning an owner and changing a
+user's role or activation also lock the user row, always ticket first, then user
+(BR-81). Concurrent requests on one ticket are therefore checked one after the
+other, never against a stale read.
 
 ### 0.4 Error envelope (unchanged from Lab 2)
 ```json
@@ -75,7 +89,7 @@ Lab 2 codes keep their meaning; Lab 3 adds the rest.
 | `TICKET_CLOSED` | 409 | the operation is not allowed on a `CLOSED` or `CANCELLED` ticket (BR-37, BR-52, BR-70) |
 | `INVALID_TRANSITION` | 409 | target status not permitted from the current one, or equal to it (BR-41) |
 | `OWNER_REQUIRED` | 409 | transition or unassignment would leave a ticket that needs an owner without one (BR-36, BR-42) |
-| `STALE_STATE` | 409 | `expectedStatus` / `expectedOwnerId` no longer matches the ticket (BR-31, BR-43) |
+| `STALE_STATE` | 409 | `expectedStatus` or `expectedOwnerId` no longer matches the ticket (BR-31, BR-43) |
 | `ALREADY_MARKED` | 409 | "Problem Appears Resolved" is already recorded, or not allowed in the current status (BR-47) |
 | `EMAIL_TAKEN` | 409 | another user has this email, compared case-insensitively (BR-54) |
 | `SELF_CHANGE_FORBIDDEN` | 409 | an Administrator tried to deactivate themselves, change their own role, or set their own initial password (BR-56, BR-57) |
@@ -83,7 +97,7 @@ Lab 2 codes keep their meaning; Lab 3 adds the rest.
 | `OWNS_OPEN_TICKETS` | 409 | role change to `REQUESTER` for a user who owns non-terminal tickets (BR-60) |
 | `PAYLOAD_TOO_LARGE` | 413 | Lab 2: attachment over 5 MB |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Lab 2: attachment type not allowed |
-| `TOO_MANY_ATTEMPTS` | 429 | login throttled for this email (BR-14); `Retry-After` header gives seconds |
+| `TOO_MANY_ATTEMPTS` | 429 | login throttled for this email + client IP, or for this IP overall (BR-14); `Retry-After` header gives seconds |
 | `INTERNAL_ERROR` | 500 | unexpected failure; message is always "Something went wrong. Please try again." |
 
 ### 0.6 Shared shapes
@@ -109,6 +123,7 @@ No response anywhere contains `passwordHash`, a session token, or a token hash.
 ### 1.1 `POST /api/auth/login`
 **Auth:** public. **Body:** `{ "email": "string", "password": "string" }`
 
+The client IP is `req.ip`, with `trust proxy` limited to `TRUST_PROXY` (D-12).
 Processing (BR-09 to BR-15): email trimmed and lowercased → throttle check → user
 lookup (a dummy hash is verified when the email is unknown) → password verified →
 only then activation state checked → session created, `lastLoginAt` set, cookie set.
@@ -122,7 +137,7 @@ A user with `mustChangePassword: true` still receives a session; it can only rea
 | `400` | `VALIDATION_ERROR` | email or password missing |
 | `401` | `INVALID_CREDENTIALS` | unknown email, wrong password, or no password set (identical response) |
 | `403` | `ACCOUNT_INACTIVE` | correct password, inactive account |
-| `429` | `TOO_MANY_ATTEMPTS` | 5 failures for this email in the last 15 minutes (counted the same for unknown emails) |
+| `429` | `TOO_MANY_ATTEMPTS` | 5 failures for this email from this IP, or 20 failures from this IP across all emails, in the last 15 minutes (counted the same for unknown emails) |
 
 ### 1.2 `GET /api/auth/me`
 **Auth:** any session, including one that must change its password.
@@ -153,11 +168,10 @@ look like being signed out.
 
 ## 2. Reference data
 
-`GET /api/categories` and `GET /api/systems` keep their Lab 2 response shapes and
-now require a session (any role, D-18). **Errors:** `401 UNAUTHENTICATED`,
-`403 PASSWORD_CHANGE_REQUIRED`.
-
-`GET /api/health` stays public.
+`GET /api/categories`, `GET /api/systems`, and `GET /api/health` keep their Lab 1
+and Lab 2 response shapes and stay **public** — no session needed (D-18). Lab 1's
+public System Status page and `server/tests/lab-01/categories.test.ts` depend on
+this. They return only non-sensitive lookup data.
 
 ---
 
@@ -282,14 +296,21 @@ No `PUT`, `PATCH`, or `DELETE` exists for comments or notes (BR-51, AC-23).
 | `owner` | `any`, `unassigned`, `me`, or a user id | `any` | |
 | `appearsResolved` | `true` | — | only tickets the Requester has flagged |
 | `sort` | `itPriority`, `createdAt`, `updatedAt`, `ticketNumber`, `status` | `itPriority` | |
-| `order` | `asc`, `desc` | `desc` | applies only when `sort` is given; see default ordering below |
+| `order` | `asc`, `desc` | `desc` | see the ordering table below |
 | `page` | integer ≥ 1 | `1` | |
 | `pageSize` | integer 1–50 | `10` | |
 
-Default ordering (no `sort` given): `itPriority` desc, then `createdAt` asc, then
-`id` asc (BR-63). With an explicit `sort`, the order is that field in `order`
-(default `desc`), then `id` in the same direction (BR-64). Status sorts by the
-lifecycle order of BR-38; priority by `LOW < MEDIUM < HIGH`.
+Each `sort` has one fixed full key (BR-64), so a given `sort` + `order` always
+means the same order — including the default, which is `sort=itPriority&order=desc`:
+
+| `sort` | Full ordering |
+| :--- | :--- |
+| `itPriority` | `itPriority` in `order`, then `createdAt` asc, then `id` asc |
+| `createdAt`, `updatedAt`, `ticketNumber`, `status` | that field in `order`, then `id` in the same direction |
+
+Rebuilding a URL from `appliedQuery` therefore reproduces the same order on every
+page. Status sorts by the lifecycle order of BR-38; priority by
+`LOW < MEDIUM < HIGH`.
 
 **Invalid values** — unknown enum, non-numeric id, out-of-range page or page size —
 are replaced by their defaults (page size clamped to 1–50), never `400` (BR-66,
@@ -344,11 +365,13 @@ mutation regardless (BR-27). Comments and notes are fetched from §4.
 **Errors:** `401`, `403` (Requester), `404 NOT_FOUND`.
 
 ### 5.3 `GET /api/staff/assignable-users`
-**Role:** IT Staff. **Response `200`:** `{ "data": [<Person reference>, …] }` —
-active `IT_STAFF` and `ADMINISTRATOR` users, ordered by name.
+**Roles:** IT Staff, Administrator (read-only, to fill the queue's Owner filter —
+BR-21). Requester → `403`. **Response `200`:** `{ "data": [<Person reference>, …] }`
+— active `IT_STAFF` and `ADMINISTRATOR` users, ordered by name.
 
 ### 5.4 `PATCH /api/staff/tickets/:id/owner`
-**Role:** IT Staff. **Body:** `{ "ownerId": 7 | null, "expectedOwnerId": 5 | null }`
+**Role:** IT Staff. **Body:** `{ "ownerId": 7 | null, "expectedOwnerId": 5 | null, "expectedStatus": "NEW" }`
+— all three fields required (`ownerId` and `expectedOwnerId` may be `null`).
 
 - Claim = `ownerId` is the caller, `expectedOwnerId: null`.
 - `ownerId: null` unassigns; allowed only while status is `NEW` or `OPEN` (BR-36).
@@ -359,23 +382,31 @@ active `IT_STAFF` and `ADMINISTRATOR` users, ordered by name.
 
 | Status | Code | Cause |
 | :--- | :--- | :--- |
-| `400` | `VALIDATION_ERROR` | `fields.ownerId`: user missing, inactive, or not IT Staff / Administrator (BR-29) |
+| `400` | `VALIDATION_ERROR` | a field missing or of the wrong type; `fields.ownerId`: user missing, inactive, or not IT Staff / Administrator (BR-29) |
 | `403` | `FORBIDDEN` | Requester or Administrator |
 | `404` | `NOT_FOUND` | ticket missing |
-| `409` | `STALE_STATE` | current owner ≠ `expectedOwnerId` (BR-31) |
-| `409` | `OWNER_REQUIRED` | unassigning a ticket past `OPEN` |
+| `409` | `STALE_STATE` | current owner ≠ `expectedOwnerId`, or current status ≠ `expectedStatus` (BR-31) |
 | `409` | `TICKET_CLOSED` | ticket is `CLOSED` or `CANCELLED` |
+| `409` | `OWNER_REQUIRED` | unassigning a ticket past `OPEN` (BR-36) |
+
+Check order, after the §0.3 guards (BR-22: validation before business rules):
+body shape → lock ticket row, then the proposed owner's user row (BR-80, BR-81) →
+`fields.ownerId` eligibility → `STALE_STATE` → `TICKET_CLOSED` → `OWNER_REQUIRED`.
 
 ### 5.5 `PATCH /api/staff/tickets/:id/it-priority`
-**Role:** IT Staff. **Body:** `{ "itPriority": "HIGH" }`. `requestedPriority` in the
-body is ignored and never changes (BR-33). Setting the current value is a no-op
-`200`. **Response `200`:** the §5.2 payload.
-**Errors:** `400 VALIDATION_ERROR` (not a priority value), `403`, `404`,
-`409 TICKET_CLOSED`.
+**Role:** IT Staff. **Body:** `{ "itPriority": "HIGH", "expectedStatus": "IN_PROGRESS" }`,
+both required. `requestedPriority` in the body is ignored and never changes
+(BR-33). Setting the current value is a no-op `200`. **Response `200`:** the §5.2
+payload.
+**Errors:** `400 VALIDATION_ERROR` (not a priority value, missing field), `403`,
+`404`, `409 STALE_STATE` (status ≠ `expectedStatus`, BR-43), `409 TICKET_CLOSED`.
+Check order: body shape → lock ticket row (BR-80) → `STALE_STATE` → `TICKET_CLOSED`.
 
 ### 5.6 `PATCH /api/staff/tickets/:id/status`
 **Role:** IT Staff.
-**Body:** `{ "status": "RESOLVED", "expectedStatus": "IN_PROGRESS", "resolutionSummary": "…", "reason": "…" }`
+**Body:** `{ "status": "RESOLVED", "expectedStatus": "IN_PROGRESS", "expectedOwnerId": 7, "resolutionSummary": "…", "reason": "…" }`
+— `status`, `expectedStatus`, and `expectedOwnerId` (may be `null`) are required;
+the text field depends on the target.
 
 | Target | Extra field | Rule |
 | :--- | :--- | :--- |
@@ -388,15 +419,19 @@ body is ignored and never changes (BR-33). Setting the current value is a no-op
 
 | Status | Code | Cause |
 | :--- | :--- | :--- |
-| `400` | `VALIDATION_ERROR` | unknown status value, missing/invalid `expectedStatus`, required text missing or out of range |
+| `400` | `VALIDATION_ERROR` | unknown status value; missing or invalid `expectedStatus` / `expectedOwnerId`; the text field the target requires missing or out of range |
 | `403` | `FORBIDDEN` | Requester or Administrator |
 | `404` | `NOT_FOUND` | ticket missing |
-| `409` | `STALE_STATE` | current status ≠ `expectedStatus` (BR-43) |
+| `409` | `STALE_STATE` | current status ≠ `expectedStatus`, or current owner ≠ `expectedOwnerId` (BR-43) |
 | `409` | `INVALID_TRANSITION` | target not in the BR-41 row, or equal to the current status |
 | `409` | `OWNER_REQUIRED` | target is not `CANCELLED` and the ticket has no owner (BR-42) |
 
-Check order inside the handler: `STALE_STATE` → `INVALID_TRANSITION` →
-`OWNER_REQUIRED` → field validation of the reason/summary.
+Check order, after the §0.3 guards. Everything that can be judged from the body
+alone is validation and comes first, so it is always `400` before any `409`
+(BR-22): body shape, including the text field the *requested* target needs → lock
+ticket row (BR-80) → `STALE_STATE` → `INVALID_TRANSITION` → `OWNER_REQUIRED`. A
+missing `expectedStatus` is therefore `400`, and a 3-character resolution summary
+is `400` even when the transition itself would also have been refused.
 
 ---
 
@@ -458,8 +493,8 @@ No user-delete endpoint exists (BR-59).
 | `POST` | `/api/auth/logout` | optional | any |
 | `GET` | `/api/auth/me` | yes | any, incl. must-change |
 | `POST` | `/api/auth/change-password` | yes | any, incl. must-change |
-| `GET` | `/api/categories` | yes | any |
-| `GET` | `/api/systems` | yes | any |
+| `GET` | `/api/categories` | no | public |
+| `GET` | `/api/systems` | no | public |
 | `POST` | `/api/tickets` | yes | Requester |
 | `GET` | `/api/tickets` | yes | Requester |
 | `GET` | `/api/tickets/:id` | yes | Requester (own) |
@@ -474,7 +509,7 @@ No user-delete endpoint exists (BR-59).
 | `POST` | `/api/tickets/:id/internal-notes` | yes | IT Staff |
 | `GET` | `/api/staff/tickets` | yes | IT Staff, Administrator |
 | `GET` | `/api/staff/tickets/:id` | yes | IT Staff, Administrator |
-| `GET` | `/api/staff/assignable-users` | yes | IT Staff |
+| `GET` | `/api/staff/assignable-users` | yes | IT Staff, Administrator |
 | `PATCH` | `/api/staff/tickets/:id/owner` | yes | IT Staff |
 | `PATCH` | `/api/staff/tickets/:id/it-priority` | yes | IT Staff |
 | `PATCH` | `/api/staff/tickets/:id/status` | yes | IT Staff |

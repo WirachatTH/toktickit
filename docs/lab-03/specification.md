@@ -99,7 +99,7 @@ resolve or close it.
 ### 4.2 Authorization and application shell
 | ID | Requirement |
 | :--- | :--- |
-| FR-07 | Every API endpoint except health check and login requires an authenticated session. |
+| FR-07 | Every API endpoint except health check, login, logout, and the public reference data (D-18) requires an authenticated session. |
 | FR-08 | Every protected endpoint enforces the authorization matrix (BR-20) on the server, independent of what the UI shows. |
 | FR-09 | The application shell shows the signed-in user's name and role badge, a Change Password action, and a Log Out action, replacing Lab 2's Development Requester display. |
 | FR-10 | The application shell shows only the navigation destinations the user's role may open, and each role lands on its own home screen after login. |
@@ -184,10 +184,10 @@ resolve or close it.
 | :--- | :--- |
 | BR-12 | An unknown email and a wrong password produce the same `401` response and message, and take comparable time (a dummy hash is verified for unknown emails). |
 | BR-13 | The password is verified before activation state is checked: only a caller who supplied the correct password for an inactive account is told the account is inactive (`403`). |
-| BR-14 | After 5 failed logins for the same email within 15 minutes, further attempts for that email are refused with `429` until the oldest failure leaves the window; a successful login clears the count. The throttle applies identically to emails that do not exist. |
+| BR-14 | Failed logins are throttled per email **and client IP** together: after 5 failures for the same email from the same IP within 15 minutes, further attempts for that pair are refused with `429` until the oldest failure leaves the window, and a successful login clears that pair's count. Separately, one IP is refused after 20 failures within 15 minutes across all emails. Both apply identically to emails that do not exist. Keying by the pair means a stranger guessing an Administrator's email cannot lock the real Administrator out from another address (D-12). |
 | BR-15 | A successful login creates a server-side session holding only the SHA-256 hash of a random 32-byte token; the raw token travels only in the session cookie. |
 | BR-16 | The session cookie is `HttpOnly`, `SameSite=Strict`, scoped to `/api`, and `Secure` outside local development; it is never readable by client-side JavaScript. |
-| BR-17 | A session expires 8 hours after it is created; an expired session is treated exactly like no session and is deleted when next presented. |
+| BR-17 | A session expires 8 hours after it is created; an expired session is treated exactly like no session and is deleted when next presented. A successful login also deletes that user's other expired sessions, so abandoned rows do not accumulate. |
 | BR-18 | Logout deletes the session on the server and clears the cookie; the old cookie can never be used again. Logout without a session still succeeds. |
 | BR-19 | Changing one's own password ends every other session of that user; the session that made the change stays signed in. |
 
@@ -199,7 +199,7 @@ resolve or close it.
 | Operation | Requester | IT Staff | Administrator |
 | :--- | :--- | :--- | :--- |
 | Log in, log out, read own profile, change own password | ✓ | ✓ | ✓ |
-| Read Categories and Related Systems | ✓ | ✓ | ✓ |
+| Read Categories and Related Systems (public, no session needed — D-18) | ✓ | ✓ | ✓ |
 | Create a ticket | ✓ | — | — |
 | List own tickets, open own Requester Ticket Detail | own | — | — |
 | Add or soft-remove an attachment | own ticket | — | — |
@@ -210,7 +210,7 @@ resolve or close it.
 | Read Internal Notes | — | any ticket | any ticket |
 | Post an Internal Note | — | any ticket | — |
 | Read the IT Staff Ticket Queue and IT Staff Ticket Detail | — | ✓ | ✓ (read-only) |
-| List assignable owners | — | ✓ | — |
+| List assignable owners (fills the queue's Owner filter and the owner select) | — | ✓ | ✓ |
 | Claim, assign, reassign, or unassign a ticket | — | ✓ | — |
 | Change IT Priority | — | ✓ | — |
 | Change a ticket's status | — | ✓ | — |
@@ -219,7 +219,7 @@ resolve or close it.
 
 | ID | Rule |
 | :--- | :--- |
-| BR-21 | Administrators do not inherit IT Staff ticket operations: they may view tickets, comments, notes, and attachments read-only, and may be chosen as a ticket's owner, but they cannot change any ticket or post on it (D-06). |
+| BR-21 | Administrators do not inherit IT Staff ticket operations: they may view tickets, comments, notes, attachments, and the assignable-owner list read-only, and may be chosen as a ticket's owner, but they cannot change any ticket or post on it (D-06). |
 | BR-22 | Guards run in a fixed order: cross-origin check → session → mandatory password change → role → ticket existence and ownership → input validation → business rules. A caller therefore learns "sign in" before "not allowed", and "not allowed" before anything about the resource. |
 | BR-23 | Missing or expired session → `401`. Authenticated but role not permitted → `403`, with no resource data in the body. Must change password first → `403` with its own error code. |
 | BR-24 | A Requester asking for a ticket, attachment, or comment thread on a ticket they do not own receives `404`, identical to a ticket that does not exist (carried forward from Lab 2 BR-13). |
@@ -233,7 +233,7 @@ resolve or close it.
 | BR-28 | A ticket has zero or one owner. New tickets arrive unassigned. |
 | BR-29 | An owner must be an active IT Staff member or Administrator **at the moment of assignment**. If an owner is later deactivated, the ticket keeps them as owner and they are shown as inactive until IT Staff reassign it. |
 | BR-30 | Any IT Staff member may claim (assign to self) an unassigned ticket, or assign, reassign, or unassign any ticket; ownership does not restrict who may act on a ticket, only who is accountable for it. |
-| BR-31 | Every ownership change states the owner the caller expects the ticket to have now; if the actual owner differs (someone else changed it first), the change is refused with `409` and nothing is modified. |
+| BR-31 | Every ownership change states **both** the owner and the status the caller expects the ticket to have now (`expectedOwnerId`, `expectedStatus`); if either differs (someone else changed the ticket first), the change is refused with `409` and nothing is modified. Checking both stops a claim from reopening a ticket that was just cancelled, and an unassignment from leaving a ticket that just moved past `OPEN` without an owner. |
 | BR-32 | Assigning an owner to a `NEW` ticket also moves it to `OPEN` in the same transaction. |
 | BR-33 | Requested Priority is the Requester's value from ticket creation and can never be changed by any role. |
 | BR-34 | IT Priority is set equal to Requested Priority when a ticket is created (or backfilled, BR-77) and afterwards can be changed only by IT Staff. Both values are stored and shown to IT Staff; Requesters see only Requested Priority (D-09). |
@@ -263,7 +263,7 @@ resolve or close it.
 | ID | Rule |
 | :--- | :--- |
 | BR-42 | Every transition except one to `CANCELLED` requires the ticket to have an owner; a ticket that should never have been opened can be cancelled straight from `NEW`. |
-| BR-43 | Every status change states the status the caller expects the ticket to have now; if it differs, the change is refused with `409` and nothing is modified. |
+| BR-43 | Every status change states **both** the status and the owner the caller expects (`expectedStatus`, `expectedOwnerId`), and every IT Priority change states the expected status; if any differs, the change is refused with `409` and nothing is modified. |
 | BR-44 | A transition to `RESOLVED` requires a resolution summary of 10–2000 characters (trimmed), stored on the ticket and visible to the Requester. A transition to `REOPENED` clears it. |
 | BR-45 | A transition to `CANCELLED` or `REOPENED` requires a reason of 10–1000 characters (trimmed), which is posted as a Public Comment by the acting user in the same transaction, so the Requester always learns why. |
 | BR-46 | The UI asks for explicit confirmation before `RESOLVED`, `CLOSED`, `CANCELLED`, and `REOPENED`. |
@@ -288,15 +288,15 @@ resolve or close it.
 | BR-57 | An Administrator cannot deactivate their own account or change their own role. |
 | BR-58 | The system always keeps at least one active Administrator: any deactivation or role change that would leave zero is refused with `409`. The count is checked inside the same transaction as the change, with the active Administrator rows locked, because with BR-57 in place the only way to reach zero is two Administrators acting on each other at the same moment. |
 | BR-59 | Deactivating a user ends all their sessions immediately; changing a user's role also ends their sessions so the new permissions apply at once. Deactivation never deletes data, and no user-delete endpoint exists. |
-| BR-60 | A user who owns tickets that are not `CLOSED` or `CANCELLED` cannot have their role changed to `REQUESTER` until those tickets are reassigned (409); deactivation is still allowed (BR-29). |
+| BR-60 | A user who owns tickets that are not `CLOSED` or `CANCELLED` cannot have their role changed to `REQUESTER` until those tickets are reassigned (409); deactivation is still allowed (BR-29). The check and the role change hold the user-row lock of BR-81, so an assignment to that user cannot slip in between them. |
 
 ### 5.9 Queue behaviour
 | ID | Rule |
 | :--- | :--- |
 | BR-61 | Queue search is trimmed and case-insensitive, matching Ticket Number by prefix, Summary by substring, or Requester name by substring; empty search means no search (Lab 2 BR-14). |
 | BR-62 | Queue filters are: status (`ACTIVE` = every status except `CLOSED` and `CANCELLED`, the default; `ALL`; or one specific status), IT Priority, Category, owner (`any` default, `unassigned`, `me`, or a user id), and "appears resolved" (on/off). Filters combine with each other and with search using AND. |
-| BR-63 | Sort fields are `itPriority`, `createdAt`, `updatedAt`, `ticketNumber`, and `status`, ascending or descending. Default order is IT Priority descending, then oldest `createdAt` first — the most urgent work, and within one priority the ticket that has waited longest. |
-| BR-64 | Every sort has `id` as a final tiebreaker in the same direction, so pagination never repeats or skips a row (Lab 2 BR-17). |
+| BR-63 | Sort fields are `itPriority`, `createdAt`, `updatedAt`, `ticketNumber`, and `status`, ascending or descending. The default is `sort=itPriority&order=desc` — the most urgent work first. |
+| BR-64 | Each sort's full key is fixed, so the same `sort` and `order` always produce the same order and pagination never repeats or skips a row (Lab 2 BR-17): `itPriority` (either direction) is followed by `createdAt` ascending and then `id` ascending — within one priority, the ticket that has waited longest comes first; every other field is followed by `id` in the same direction. The default order is therefore exactly what `appliedQuery` echoes. |
 | BR-65 | Pagination defaults to page 1 of 10; page size is 1–50 (Lab 2 BR-18). |
 | BR-66 | Invalid or unknown query values are replaced by their defaults rather than rejected (Lab 2 BR-19 and Lab 2 D-5), and the response echoes the query actually applied so the UI can show it. |
 | BR-67 | A page beyond the last page returns an empty list with correct pagination metadata. |
@@ -304,8 +304,8 @@ resolve or close it.
 ### 5.10 Requester regression and terminal tickets
 | ID | Rule |
 | :--- | :--- |
-| BR-68 | Every Lab 2 Requester rule (Lab 2 BR-01 to BR-46 except those about the selector) keeps its meaning, with "the selected Requester" read as "the signed-in Requester". |
-| BR-69 | Lab 2 behaviour tests keep their assertions; they change only how they authenticate (session instead of `X-Dev-Requester-Id`). Tests that existed only to check the selector are retired. |
+| BR-68 | Every Lab 2 Requester rule (Lab 2 BR-01 to BR-46) keeps its meaning, with "the selected Requester" read as "the signed-in Requester", **except** the rules Lab 3 deliberately supersedes: Lab 2 BR-03 and BR-06 to BR-10 (the selector and its header, replaced by FR-01 to FR-04 and BR-03), Lab 2 BR-41 (selector visibility, replaced by BR-01), Lab 2 BR-46 (no comment box on Ticket Detail, replaced by FR-14 to FR-16), and Lab 2 BR-47 and BR-48 (no credentials on the Requester model, replaced by §7). |
+| BR-69 | Lab 1 and Lab 2 behaviour tests keep their assertions and change only how they authenticate (session instead of `X-Dev-Requester-Id`), with two exceptions: a test that asserts a rule BR-68 lists as superseded is rewritten to assert the Lab 3 rule that replaces it, and a test that existed only to check the selector is retired. Every rewritten or retired test is named in the PR that changes it. |
 | BR-70 | A Requester cannot add or soft-remove attachments on a `CLOSED` or `CANCELLED` ticket (`409`); existing attachments remain downloadable. |
 | BR-71 | The Requester Ticket Detail shows the owner's name or "Not yet assigned", but never IT Priority, Internal Notes, or any IT Staff control. |
 
@@ -320,6 +320,12 @@ resolve or close it.
 | BR-77 | `Ticket.itPriority` is backfilled from `Ticket.requestedPriority` for every existing ticket before the column becomes required. |
 | BR-78 | The seed is idempotent and additive: it creates missing reference data, accounts, and seed tickets, and assigns the documented local-development password only to documented accounts that have no password yet. It never overwrites an existing password, role, or activation state. |
 | BR-79 | Seeded credentials are for local development only and documented in `README.md`. No automated test depends on a seeded account's changeable state: server tests create their own users, and E2E signs in as a seeded Administrator only to create the per-run users it then works with (D-19). |
+
+### 5.12 Concurrency
+| ID | Rule |
+| :--- | :--- |
+| BR-80 | Every operation that changes a ticket or adds to it — ownership, IT Priority, status, Public Comment, Internal Note, "Problem Appears Resolved", and attachment add or soft-remove — locks that ticket's row (`SELECT … FOR UPDATE`) inside its transaction before checking any status-dependent rule (BR-31, BR-37, BR-42, BR-43, BR-47, BR-52, BR-70) and holds the lock until it commits. Two concurrent changes to one ticket therefore run one after the other, and the second is checked against the result of the first. |
+| BR-81 | Assigning an owner, and changing a user's role or activation, lock the target user's row inside the same transaction before checking BR-29, BR-58, or BR-60. Locks are always taken ticket first, then user, so the two paths cannot deadlock. A user can therefore never end up as a `REQUESTER` or inactive at the moment they were made the owner of an open ticket. |
 
 ## 6. UI Specification Summary
 
@@ -415,13 +421,20 @@ One migration, `lab3_users_roles_workflow`, generated with
 `npx prisma migrate dev --create-only` after the schema is edited, then hand-edited
 and reviewed as SQL before it is applied:
 
-1. `ALTER TABLE "RequesterUser" RENAME TO "User";` and rename its primary-key,
-   unique, and index names to the names Prisma expects for `User`.
+1. `ALTER TABLE "RequesterUser" RENAME TO "User";`, then rename its primary key
+   (`User_pkey`), unique email index (`User_email_key`), and id sequence
+   (`User_id_seq`) to the names Prisma generates for `User`, and drop Lab 2's
+   `RequesterUser_isActive_idx`, which the Lab 3 schema replaces with
+   `User(role, isActive)`.
 2. `ALTER TYPE "RequestedPriority" RENAME TO "Priority";`
 3. Create the `Role` enum; add `passwordHash` (nullable), `role` (default
    `REQUESTER`), `mustChangePassword` (default `true`), `lastLoginAt` (nullable),
-   and `updatedAt` (default `now()`) to `User`. Every new column is nullable or has
-   a default, because the table already holds rows.
+   and `updatedAt` to `User`. Every new column is nullable or has a default,
+   because the table already holds rows. `updatedAt` is added with `DEFAULT now()`
+   to fill the existing rows and the default is then dropped
+   (`ALTER COLUMN "updatedAt" DROP DEFAULT`), because Prisma's `@updatedAt`
+   columns carry no database default (compare Lab 2's `Ticket."updatedAt"`) and
+   leaving it would show up as drift in step 8.
 4. `UPDATE "User" SET "email" = lower(trim("email"));`
 5. Add the seven new `TicketStatus` values with `ALTER TYPE … ADD VALUE`. None of
    them is used later in the same migration, so PostgreSQL's restriction on using a
@@ -431,9 +444,12 @@ and reviewed as SQL before it is applied:
    `UPDATE "Ticket" SET "itPriority" = "requestedPriority";` and
    `ALTER COLUMN "itPriority" SET NOT NULL`.
 7. Create `Session`, `PublicComment`, `InternalNote` and the §7.3 indexes.
-8. Verify: `npx prisma migrate diff --from-migrations prisma/migrations
-   --to-schema-datamodel prisma/schema.prisma` reports no difference, and the
-   migration tests (MIG-01 to MIG-07) pass against a database that held Lab 2 data.
+8. Verify on a throwaway schema (never the shared development database): apply
+   every migration in order, then
+   `npx prisma migrate diff --from-url "<throwaway schema url>" --to-schema-datamodel prisma/schema.prisma --exit-code`
+   must report no difference (MIG-05), and the migration tests (MIG-01 to MIG-04),
+   which seed a throwaway schema with Lab 2-shaped data before applying this
+   migration, must pass.
 
 Rollback is restoring the pre-migration database backup taken before applying it
 (local lab). Every statement is a rename, an addition, or a backfill, so no Lab 2 row
@@ -461,9 +477,17 @@ documented state after a demo is `npx prisma migrate reset`.
 | :--- | :--- | :--- |
 | `cookie-parser` (+ `@types/cookie-parser`) | server | read the session cookie |
 
-`cors` is reconfigured with `credentials: true` and an explicit client-origin list
-(`CLIENT_ORIGINS`, default `http://localhost:5173`). Password hashing and token
-generation use Node's built-in `crypto` (D-03). No new client dependency.
+Password hashing and token generation use Node's built-in `crypto` (D-03). The
+`/api` proxy is Vite's built-in `server.proxy` (D-11), so there is no new client
+dependency. New configuration:
+
+| Variable | Where | Default | Purpose |
+| :--- | :--- | :--- | :--- |
+| `CLIENT_ORIGINS` | server | `http://localhost:5173,http://localhost:5174` | `Origin` allow-list (BR-26) and the `cors` origin list, which keeps `credentials: true` for anyone calling the API directly |
+| `TRUST_PROXY` | server | `loopback` | which proxy's `X-Forwarded-For` Express trusts for the login throttle (D-12); set to the Docker network inside Compose |
+| `API_PROXY_TARGET` | client (Vite) | `http://localhost:3000` | where the dev server sends `/api`; `http://server:3000` in Docker Compose and in the Playwright web server |
+
+`VITE_API_URL` is retired: the client always calls same-origin `/api/...` URLs.
 
 ## 8. API Contract
 
@@ -477,7 +501,7 @@ routes:
 | Log out | `POST /api/auth/logout` | any (session optional) |
 | Current user | `GET /api/auth/me` | any, including must-change |
 | Change own password | `POST /api/auth/change-password` | any, including must-change |
-| Categories / Related Systems | `GET /api/categories`, `GET /api/systems` | any authenticated |
+| Categories / Related Systems | `GET /api/categories`, `GET /api/systems` | public (D-18) |
 | Create, list, open own tickets | `POST /api/tickets`, `GET /api/tickets`, `GET /api/tickets/:id` | Requester |
 | Attachments (upload, soft-remove) | `POST /api/tickets/:id/attachments`, `PATCH /api/tickets/:ticketId/attachments/:attachmentId/remove` | Requester (own) |
 | Attachments (metadata, download) | `GET /api/tickets/:ticketId/attachments/:attachmentId[/download]` | Requester (own), IT Staff, Administrator |
@@ -486,7 +510,7 @@ routes:
 | Problem Appears Resolved | `POST /api/tickets/:id/appears-resolved` | Requester (own) |
 | Ticket Queue | `GET /api/staff/tickets` | IT Staff, Administrator |
 | IT Staff Ticket Detail | `GET /api/staff/tickets/:id` | IT Staff, Administrator |
-| Assignable owners | `GET /api/staff/assignable-users` | IT Staff |
+| Assignable owners | `GET /api/staff/assignable-users` | IT Staff, Administrator |
 | Ownership | `PATCH /api/staff/tickets/:id/owner` | IT Staff |
 | IT Priority | `PATCH /api/staff/tickets/:id/it-priority` | IT Staff |
 | Status | `PATCH /api/staff/tickets/:id/status` | IT Staff |
@@ -527,7 +551,7 @@ pagination shape are unchanged from Lab 2.
 | ID | Criterion |
 | :--- | :--- |
 | AC-17 | Given a signed-in Requester, when they create a ticket, list and search their tickets, open its detail, and add, download, and soft-remove attachments, then every Lab 2 behaviour still holds, the ticket's Requester is the signed-in user, and no selector exists anywhere in the app. |
-| AC-18 | Given the migrated Lab 2 test suites, when they run against the Lab 3 build, then they pass with only their authentication setup changed. |
+| AC-18 | Given the Lab 1 and Lab 2 test suites (server, client, and the Lab 2 E2E journey), when they run against the Lab 3 build, then they pass with only their authentication setup changed, except tests of superseded Lab 2 rules, which are rewritten to the Lab 3 rule that replaces them (BR-69). |
 | AC-19 | Given a Requester's own ticket, when they post a Public Comment, then it appears in their thread and in IT Staff Ticket Detail with author name, role, and time. |
 | AC-20 | Given a Requester's own open ticket, when they mark "Problem Appears Resolved", then the signal is recorded and visible to IT Staff, the status does not change, and no Requester request can set any status. |
 
@@ -586,7 +610,8 @@ pagination shape are unchanged from Lab 2.
 - [ ] The migration has been applied to a database holding Lab 2 data and the
       migration tests prove nothing was lost.
 - [ ] All Lab 1 and Lab 2 behaviour tests pass with only their authentication setup
-      changed; no reference to the Development Requester selector remains.
+      changed, apart from the rewritten and retired tests BR-69 allows, each named in
+      its PR; no reference to the Development Requester selector remains.
 - [ ] Every implemented screen and endpoint matches this specification,
       `api-spec.md`, and `ui-spec.md`; any deviation is written back into these docs.
 - [ ] No secret (session secret, real password, token) is committed or exposed to
@@ -611,13 +636,15 @@ pagination shape are unchanged from Lab 2.
 | :--- | :--- | :--- |
 | D-09 | Requesters see Requested Priority but not IT Priority. | IT Priority is IT's triage judgement relative to all other work; showing a Requester that their request was lowered invites dispute without helping them. |
 | D-10 | Session lifetime is a fixed 8 hours with no sliding renewal. | A working day; a fixed window is simpler to reason about and to test (by shifting the stored expiry) than idle timeouts. |
-| D-11 | CSRF protection is `SameSite=Strict` plus the `Origin` check (BR-26), without a CSRF token. | The client (`localhost:5173`) and API (`localhost:3000`) are same-site, so `Strict` costs nothing, and the browser never attaches the cookie to a request started from another site. The content type is not relied on, because attachment upload is `multipart/form-data`, which a cross-site form can send. |
-| D-12 | Login throttling is in-memory and resets when the server restarts. | Sufficient for a single-instance local lab and needs no new table; recorded as a known limitation in `tests.md` §7. |
+| D-11 | The browser only ever talks to one origin: the client calls relative `/api/...` URLs, and the Vite dev server proxies `/api` to the API (`API_PROXY_TARGET`, default `http://localhost:3000`; `http://server:3000` inside Docker, for both the `:5173` dev server and the `:5174` instance Playwright uses). CSRF protection is then `SameSite=Strict` plus the `Origin` check (BR-26), without a CSRF token. | Without the proxy, the Docker E2E topology (page on `localhost:5174`, API on `server:3000`) is cross-site, so a `SameSite=Strict` cookie would never be sent and E2E could not sign in. Through the proxy the cookie is first-party in every environment. The proxy forwards the page's `Origin`, so `CLIENT_ORIGINS` defaults to both dev origins, `http://localhost:5173,http://localhost:5174`. The content type is not relied on, because attachment upload is `multipart/form-data`, which a cross-site form can send. |
+| D-12 | Login throttling (BR-14) is in-memory, keyed by email + client IP with a per-IP ceiling, holds at most 10,000 keys (expired keys are dropped first, then the oldest), and resets when the server restarts. The client IP is Express's `req.ip` with `trust proxy` limited to the Vite proxy (`TRUST_PROXY`, default `loopback`), which forwards `X-Forwarded-For`. | Keying by email alone would let anyone lock a known Administrator out indefinitely; an unbounded map would grow without limit under a flood of random emails. In-memory storage is sufficient for a single-instance local lab and needs no new table; the restart reset is recorded in `tests.md` §7. |
 | D-13 | Password rules are length plus one letter and one digit (BR-07); the mockup's upper/lower/special-character rules are not adopted. | Length dominates password strength; composition rules beyond this push people toward predictable substitutions. The labsheet leaves the rules to us. |
 | D-14 | A ticket's owner must be able to work it, so `CLOSED` is terminal and a Requester whose problem returns after closure opens a new ticket; `REOPENED` is reachable only from `RESOLVED`. | Keeps the lifecycle small and auditable; a resolved-but-not-closed ticket is the window for "it came back". |
 | D-15 | Ticket Number stays `TCK-######` (Lab 2 BR-01), not the mockup's `TKT-2025-001234`. | Changing it would rewrite every existing ticket's reference and break Lab 2 tests for no functional gain. |
 | D-16 | Mockup elements outside Lab 3 scope are not built: the Administrator "Send password reset email" option (the Administrator types an initial password instead, BR-55), the "Forgot your password?" link (replaced by "Contact your IT administrator" text), the "Service Actions" tab (Actions Taken is Lab 4), and user-list pagination (§8.5 says not required). | Labsheet §4.2 and §8.5 exclude them explicitly; the mockups are visual direction, not scope. |
 | D-17 | The mockup's "Pending" status does not exist; the closest required status is `WAITING_FOR_REQUESTER`. The product name stays "TokTickIT". | Labsheet §4.5 fixes the eight statuses; the mockup's spelling of the product name differs from the repository's. |
-| D-18 | Reference-data endpoints (`/api/categories`, `/api/systems`) now require a session (any role). | Labsheet §3: protect every API. Nothing in Lab 3 needs them before login. |
+| D-18 | Reference-data endpoints (`/api/categories`, `/api/systems`) and `/api/health` stay public, as in Labs 1 and 2. Every other endpoint requires a session. | They return only the public lookup lists every user sees on the Create Ticket form, and Lab 1's public System Status page (`/`) and its test call `GET /api/categories` without a session. Protecting them would break Lab 1 for no security gain. |
 | D-19 | An E2E test that needs a fresh user creates one through the Administrator API with a unique email per run, instead of relying on a seeded account's state. | Keeps E2E runs repeatable without the seed having to reset passwords (BR-78). |
 | D-20 | Test files live under `server/tests/lab-03/`, `client/tests/lab-03/`, and `e2e/lab-03/`. | Labsheet §10 writes `lab03` in its example table but §12 writes `lab-03`; §12 matches Lab 2's existing convention. |
+| D-21 | A user whose role is changed away from `REQUESTER` keeps every ticket they submitted as its Requester of record, but can no longer open those tickets through Requester screens; IT Staff still see them in the queue. | The labsheet allows exactly one role per user, so a person cannot be both. Moving their submitted tickets would rewrite history, and the case is rare enough to document rather than build for. |
+| D-22 | Tests that change shared state in ways the seed does not undo — the migration and seed tests (MIG-01 to MIG-08) and the last-Administrator race (API-70) — run against a throwaway PostgreSQL schema created and dropped by the test itself. Every other server test creates its own users and tickets with a unique prefix and deletes them afterwards, and never modifies a seeded row. | All server tests share one development database with no per-test isolation (`server/vitest.config.ts`); the seed never overwrites changed data (BR-78), so a test that altered a seeded account would break the README credentials for every later run. |

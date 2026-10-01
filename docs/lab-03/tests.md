@@ -21,6 +21,13 @@ deleting the guard and watching the test go red, and jsdom-only responsive check
 the Playwright viewport projects (§2.12). Lab 2's own suites stay in place and are migrated to
 session authentication (REG-08) rather than rewritten.
 
+**Test isolation (D-22).** All server tests share one development database with no per-test
+sandbox (`server/vitest.config.ts` runs files sequentially). Each test therefore creates its own
+users and tickets under a unique prefix and deletes them afterwards, and never modifies a seeded
+row. Tests whose effects the seed would not undo — the migration and seed tests (MIG-01 to MIG-09)
+and the last-Administrator race (API-70) — create a throwaway PostgreSQL schema, run there, and
+drop it, so the README credentials keep working after any number of `npm test` runs.
+
 File paths follow labsheet §12 (`server/tests/lab-03/`, `client/tests/lab-03/`, `e2e/lab-03/`,
 D-20), with additional files where the minimum list has no home for an area (unit modules, the
 Requester regression suite, migration and seed). The "Final" column reads Planned until the issue
@@ -32,17 +39,17 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UNIT-01 | BR-06 | Unit | Hash a password, verify it with the right and a wrong password; hash the same password twice | Right → true, wrong → false; stored as `scrypt$N$r$p$salt$hash`; the two hashes differ (per-user salt) | `server/tests/lab-03/password.test.ts` | Planned |
+| UNIT-01 | BR-06 | Unit | Hash a password, verify it with the right and a wrong password; hash the same password twice; verify against an empty hash | Right → true, wrong → false, empty hash → false; stored as `scrypt$N$r$p$salt$hash`; the two hashes differ (per-user salt) | `server/tests/lab-03/password.test.ts` | Planned |
 | UNIT-02 | AC-07, BR-07 | Unit | Password policy boundaries: 9/10/128/129 characters, no digit, no letter, equal to own email in another letter case | 10 and 128 accepted; 9, 129, no-digit, no-letter, and email-equal rejected with the matching rule message | `server/tests/lab-03/password.test.ts` | Planned |
 | UNIT-03 | AC-07, BR-08 | Unit | New password identical to the current one | Rejected with the "different from your current password" rule | `server/tests/lab-03/password.test.ts` | Planned |
 | UNIT-04 | BR-15 | Unit | Session token generation and storage | Token is 32 random bytes base64url; stored value is its SHA-256 hex and never equals the raw token | `server/tests/lab-03/session.test.ts` | Planned |
 | UNIT-05 | AC-08, BR-17 | Unit | Session validity at `expiresAt - 1ms`, `expiresAt`, and later | Valid only before `expiresAt` | `server/tests/lab-03/session.test.ts` | Planned |
-| UNIT-06 | AC-05, BR-14 | Unit | Login throttle: 5 failures in 15 min, sliding window, reset on success, unknown email | 6th attempt blocked with seconds-until-free; freed when the oldest failure ages out; success clears; unknown emails counted identically | `server/tests/lab-03/login-throttle.test.ts` | Planned |
+| UNIT-06 | AC-05, BR-14 | Unit | Login throttle store: 5 failures for one email + IP, a different IP for the same email, 20 failures from one IP across many emails, sliding window, success reset, 10,000-key cap | 6th attempt for the pair blocked while another IP is not; the IP ceiling blocks at 21; keys free as failures age out; success clears only its pair; at the cap, expired keys are evicted first, then the oldest | `server/tests/lab-03/login-throttle.test.ts` | Planned |
 | UNIT-07 | AC-31, BR-41 | Unit | Transition table: every (from, to) pair of the 8×8 status grid | Exactly the BR-41 pairs are permitted; same-status and terminal sources never are | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-08 | AC-31, BR-42 | Unit | Owner requirement per target status | Only `CANCELLED` is permitted without an owner | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-09 | AC-31, BR-44, BR-45 | Unit | Required text per target and its bounds (summary 10–2000, reason 10–1000, trimmed) | `RESOLVED` needs a summary, `CANCELLED`/`REOPENED` a reason; boundary values accepted, one past rejected | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-10 | AC-26, BR-62, BR-65, BR-66 | Unit | Queue query normalisation: unknown enums, non-numeric ids, page ≤0, page size 0/51 | Each replaced by its default or clamped; result object equals the echoed `appliedQuery` | `server/tests/lab-03/queue-query.test.ts` | Planned |
-| UNIT-11 | AC-25, BR-63, BR-64 | Unit | Queue ordering builder: default and every explicit sort | Default = itPriority desc, createdAt asc, id asc; explicit sort = field then id in the same direction | `server/tests/lab-03/queue-query.test.ts` | Planned |
+| UNIT-11 | AC-25, BR-63, BR-64 | Unit | Queue ordering builder for the default and every `sort`/`order` pair | `itPriority` (either direction) → then `createdAt` asc, `id` asc; every other field → then `id` in the same direction; no `sort` builds exactly the same order as `sort=itPriority&order=desc` | `server/tests/lab-03/queue-query.test.ts` | Planned |
 
 ### 2.2 API — authentication
 
@@ -53,12 +60,12 @@ that owns the row runs it green.
 | API-03 | AC-03, BR-12 | API | Wrong password vs. unknown email | Byte-identical `401 INVALID_CREDENTIALS` bodies; no `Set-Cookie`; no session row | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-04 | AC-03, BR-10 | API | Login to a migrated account with no password hash | Same `401 INVALID_CREDENTIALS` as a wrong password | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-05 | AC-04, BR-13 | API | Inactive account with correct password, then with a wrong password | Correct → `403 ACCOUNT_INACTIVE`, no session; wrong → generic `401` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-06 | AC-05, BR-14 | API | 5 failed logins then the correct password; same sequence for an unknown email | 6th request `429 TOO_MANY_ATTEMPTS` with `Retry-After`, even with the right password; identical for the unknown email | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-06 | AC-05, BR-14 | API | 5 failed logins for one email from one IP, then the correct password from that IP; same sequence for an unknown email | 6th request `429 TOO_MANY_ATTEMPTS` with `Retry-After`, even with the right password; identical for the unknown email | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-07 | AC-05, BR-14 | API | 4 failures, a success, then 4 more failures | No throttling — the success cleared the count | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-08 | BR-09 | API | Login with the email in mixed case and surrounded by spaces | Succeeds | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-09 | AC-06, BR-18 | API | Logout, then reuse the old cookie; logout with no session | `204`; session row gone; old cookie → `401` on `/me`; logout without a session still `204` | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-10 | AC-08, BR-17 | API | Request with a session whose `expiresAt` is in the past | `401 UNAUTHENTICATED`; the expired row is deleted | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-11 | AC-02, BR-02 | API | Must-change session calls `/me`, change-password, logout, then tickets, categories, and the staff queue | First three allowed; every other route `403 PASSWORD_CHANGE_REQUIRED` | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-11 | AC-02, BR-02 | API | Must-change session: first `GET /api/tickets`, a comment post, and the staff queue; then `/me`; then change-password; then `GET /api/tickets` again; logout last | Blocked routes `403 PASSWORD_CHANGE_REQUIRED` (checked while the flag is still set); `/me` `200`; change-password `200` clears the flag; the route then `200`; logout `204` | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-12 | AC-02 | API | Change password from a must-change session, then call a normal route | Flag cleared; normal route succeeds with the same session | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-13 | AC-07, BR-07, BR-08 | API | Change password with each policy violation and with the current password | `400 VALIDATION_ERROR` on `fields.newPassword`; hash unchanged | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-14 | AC-07 | API | Change password with a wrong current password | `400` on `fields.currentPassword` (not `401`); session still valid | `server/tests/lab-03/auth.api.test.ts` | Planned |
@@ -72,10 +79,10 @@ that owns the row runs it green.
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | SEC-01 | AC-10, FR-07 | Security | Every protected route (table-driven from api-spec §7) with no session | `401 UNAUTHENTICATED`; body has no resource data | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-02 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is not granted | `403 FORBIDDEN`; body has no resource data | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-03 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is granted | Never `401`/`403` — proves the matrix is not over-restrictive | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| SEC-03 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is granted (including Administrator on assignable users) | Never `401`/`403` — proves the matrix is not over-restrictive | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-04 | AC-14, BR-25 | Security | Requester `GET` and `POST` Internal Notes on an own ticket, another Requester's ticket, and a missing id | All three `403`, identical bodies, no note content or count | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-05 | AC-13, BR-24 | Security | Requester requests another Requester's ticket, attachment metadata, download, and comments | `404`, identical to a ticket id that does not exist | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-06 | AC-16, BR-26 | Security | `POST`, `PATCH`, and a multipart upload with a foreign `Origin`; same requests with the client origin; a `GET` with a foreign origin | Foreign state-changing → `403 FORBIDDEN_ORIGIN` and nothing changed; allowed origin and the `GET` succeed | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| SEC-06 | AC-16, BR-26, D-11 | Security | `POST`, `PATCH`, and a multipart upload with a foreign `Origin` and with `Origin: null`; the same requests with each default client origin (`:5173`, `:5174`); a `GET` with a foreign origin | Foreign and `null` → `403 FORBIDDEN_ORIGIN`, nothing changed; both default origins and the `GET` succeed | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-07 | BR-22, BR-23 | Security | Guard order: no session + wrong role; must-change + wrong role | `401` wins over `403`; `PASSWORD_CHANGE_REQUIRED` wins over `FORBIDDEN` | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-08 | AC-33, BR-21 | Security | Administrator calls owner, IT Priority, status, post-comment, and post-note | Every one `403 FORBIDDEN`; ticket unchanged | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-09 | BR-06, BR-15 | Security | Scan every JSON response produced by the suite | No `passwordHash`, `tokenHash`, or session token anywhere | `server/tests/lab-03/authorization.api.test.ts` | Planned |
@@ -92,13 +99,16 @@ that owns the row runs it green.
 | REG-04 | AC-17, BR-34 | Regression | Database row of a newly created ticket, and the create response | `itPriority = requestedPriority`, no owner, `NEW`; response has no `itPriority` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-05 | BR-71 | Regression | `GET /api/tickets/:id` payload | Has `owner`, `resolutionSummary`, `requesterResolvedAt`; no `itPriority`, no note fields | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-06 | BR-70 | Regression | Add and soft-remove attachments on `CLOSED` and `CANCELLED` tickets; download an existing one | `409 TICKET_CLOSED`; download still `200` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
-| REG-07 | D-18 | Regression | Categories and Related Systems with no session and as each role | No session `401`; every role `200` with the Lab 2 shape | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
-| REG-08 | AC-18, BR-69 | Regression | Lab 2 server suites run with a session-based helper in place of `X-Dev-Requester-Id` | All pass with unchanged assertions; selector-only tests (`requesters.api.test.ts`) retired | `server/tests/lab-02/*.test.ts` | Planned |
+| REG-07 | D-18 | Regression | Categories, Related Systems, and health with no session and as each role | `200` with the Lab 1/Lab 2 shapes in every case — they stay public | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
+| REG-08 | AC-18, BR-69 | Regression | Lab 2 server suites run with a session-based helper in place of `X-Dev-Requester-Id` | All pass with unchanged assertions; the selector-only `requesters.api.test.ts` is retired and named in the PR | `server/tests/lab-02/*.test.ts` | Planned |
 | REG-09 | AC-17, BR-20 | Regression | IT Staff and Administrator call `POST /api/tickets` and `GET /api/tickets` | `403 FORBIDDEN` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-10 | AC-20, BR-47 | Regression | Mark an own `IN_PROGRESS` ticket "appears resolved" with and without a comment | `200`; `requesterResolvedAt` set; status unchanged; comment stored as a Public Comment by the Requester | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-11 | AC-20, BR-47 | Regression | Mark again; mark on `RESOLVED`, `CLOSED`, `CANCELLED` | `409 ALREADY_MARKED`; nothing changes | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-12 | AC-20, BR-05 | Regression | Requester calls the staff status route; sends `status`/`currentStatus` in every Requester body | Status route `403`; the fields are ignored; status never changes | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-13 | AC-13 | Regression | Mark another Requester's ticket | `404` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
+| REG-14 | AC-18, BR-68, BR-69 | Regression | Lab 2 `RequesterTicketDetail.test.tsx` BR-46 test, rewritten for Lab 3 | Asserts the Lab 3 rule instead: a comment box is present, while internal notes, IT Priority, Actions Taken, and any status control stay absent | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
+| REG-15 | AC-18, D-18 | Regression | Lab 1 suites and the public System Status page with no session | `health.test.ts`, `categories.test.ts`, and `App.test.tsx` pass unchanged; "Check System" reports Online | `server/tests/lab-01/*.test.ts` | Planned |
+| REG-16 | AC-18, BR-69 | Regression | Lab 2 client suites and the Lab 2 E2E journey after the selector is removed | They sign in instead of choosing a Requester and otherwise keep their assertions; selector-only tests (`RequesterSelector`, `RequireRequester`) are retired and named in the PR | `client/tests/lab-02/*.test.tsx` | Planned |
 
 ### 2.5 API — Public Comments and Internal Notes
 
@@ -141,7 +151,7 @@ that owns the row runs it green.
 | API-42 | AC-33, BR-21 | API | Same request as an Administrator | Same ticket data; `permittedTransitions` empty; every capability false | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-43 | AC-32, FR-29 | API | IT Staff and Administrator download an active and a removed attachment on another user's ticket | Active `200`; removed `404` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-44 | AC-28, BR-30, BR-32 | API | Claim an unassigned `NEW` ticket | Owner is the caller and status `OPEN`, committed together | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
-| API-45 | AC-28, BR-31 | API | Claim with a stale `expectedOwnerId`; two claims sent in parallel | Stale → `409 STALE_STATE`, unchanged; parallel → exactly one succeeds | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-45 | AC-28, BR-31 | API | Claim with a stale `expectedOwnerId`, then with a stale `expectedStatus`; two claims sent in parallel | Each stale request `409 STALE_STATE`, unchanged; parallel → exactly one succeeds | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-46 | AC-29, BR-29 | API | Assign to an active IT Staff member and to an active Administrator | Both `200` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-47 | AC-29, BR-29 | API | Assign to an inactive user, a Requester, a missing id | `400` on `fields.ownerId`; owner unchanged | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-48 | BR-36 | API | Unassign an `OPEN` and an `IN_PROGRESS` ticket | `OPEN` → `200`, owner cleared, status stays `OPEN`; `IN_PROGRESS` → `409 OWNER_REQUIRED` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
@@ -155,12 +165,20 @@ that owns the row runs it green.
 | API-56 | AC-31, BR-44 | API | `RESOLVED` with no, short, long, and valid summary; then `REOPENED` | Invalid `400`; valid stored and visible to the Requester; `REOPENED` clears it | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-57 | AC-31, BR-45 | API | `CANCELLED` and `REOPENED` with and without a reason | Without → `400`, unchanged; with → status changes and the reason is a Public Comment by the actor, in one transaction | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-58 | BR-48 | API | Any transition on a flagged ticket | `requesterResolvedAt` cleared | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
-| API-59 | FR-26, BR-29 | API | `GET /api/staff/assignable-users` | Only active IT Staff and Administrators, by name | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-59 | FR-26, BR-21, BR-29 | API | `GET /api/staff/assignable-users` as IT Staff, Administrator, and Requester | IT Staff and Administrator `200`: only active IT Staff and Administrators, by name; Requester `403` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 
 ### 2.8 API — Administrator user management
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| API-73 | AC-05, BR-14, D-12 | API | 5 failures for an Administrator's email from one IP, then the correct password from another IP; then 20 failures from one IP across different emails | The other IP signs in normally (no targeted lockout); the 21st failure from the single IP is `429` | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-80 | BR-17 | API | User with two expired sessions logs in | Both expired rows are deleted; the new session works | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-79 | AC-26, BR-64 | API | Request page 1 with no parameters, rebuild the URL from its `appliedQuery`, request pages 1–3 with that URL | Identical page 1, and pages 1–3 match the default-order pages with no repeats or gaps | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
+| API-74 | AC-28, BR-31, BR-80 | API | Race: claim a `NEW` ticket (`expectedStatus: NEW`) while another request cancels it | Never a `CANCELLED` ticket that is `OPEN` or owned; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-75 | AC-31, BR-43, BR-80 | API | Race: unassign an `OPEN` ticket while another request moves it to `IN_PROGRESS` | Never an ownerless `IN_PROGRESS` ticket; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-76 | BR-52, BR-47, BR-70, BR-80 | API | Race: post a Public Comment, mark appears resolved, and add an attachment while another request closes or cancels the ticket | No comment, signal, or attachment is ever added to a ticket that was already terminal when it committed | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-78 | AC-31, BR-22 | API | Status route: missing `expectedStatus`; missing `expectedOwnerId`; a 3-character resolution summary on a transition that is also forbidden | Each `400 VALIDATION_ERROR`, never `409` — validation runs before business rules | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-81 | BR-31, BR-43 | API | Owner and IT Priority routes with a missing expected field, then with a stale `expectedStatus` | Missing → `400`; stale → `409 STALE_STATE`; ticket unchanged | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-60 | AC-34, FR-31 | API | `GET /api/admin/users` | Name, email, role, status for every user, by name; no password material | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-61 | AC-34, FR-32 | API | Search by name and by email (mixed case); role filter; unknown role value | Correct subsets; unknown role ignored | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-62 | AC-35, BR-55 | API | Create a user of each role, then log in as each | `201`, `mustChangePassword: true`; login works and is forced to change | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
@@ -171,23 +189,24 @@ that owns the row runs it green.
 | API-67 | BR-59 | API | Change a signed-in user's role | Their sessions end; after re-login the new role's permissions apply | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-68 | AC-38, BR-56 | API | Set a new initial password for a signed-in user | Sessions end; next login works with the new password and is forced to change | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-69 | AC-39, BR-57 | API | Administrator deactivates self, changes own role, sets own initial password | Each `409 SELF_CHANGE_FORBIDDEN`; nothing changed | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
-| API-70 | AC-40, BR-58 | API | Two active Administrators deactivate (and, separately, demote) each other in parallel | Exactly one succeeds, the other `409 LAST_ADMINISTRATOR`; at least one active Administrator remains | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
+| API-70 | AC-40, BR-58, D-22 | API | In a throwaway schema with exactly two active Administrators: they deactivate (and, separately, demote) each other in parallel | Exactly one succeeds, the other `409 LAST_ADMINISTRATOR`; one active Administrator remains; seeded accounts never involved | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-71 | BR-60 | API | Demote an IT Staff member who owns an open ticket; reassign, then demote; deactivate instead | `409 OWNS_OPEN_TICKETS`, then `200`; deactivation allowed | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
+| API-77 | BR-60, BR-81 | API | Race: demote an IT Staff member to `REQUESTER` while another request assigns them an open ticket | Never a `REQUESTER` owning an open ticket: one succeeds, the other is refused (`409 OWNS_OPEN_TICKETS` or `400` on `fields.ownerId`) | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-72 | BR-59 | API | `DELETE /api/admin/users/:id` | `404` — no such route | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 
 ### 2.9 Migration and seed
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| MIG-01 | AC-42, BR-72, BR-74 | Migration | Apply Lab 2 migrations, insert Lab 2 data, apply the Lab 3 migration | Same ticket, attachment, and user counts and ids; every ticket's requester unchanged | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-02 | AC-42, BR-77 | Migration | `itPriority` on every pre-existing ticket | Equals `requestedPriority`; column is NOT NULL | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-03 | AC-42, BR-73, BR-76 | Migration | Migrated users before seeding | Role `REQUESTER`, activation unchanged, `mustChangePassword` true, no hash; login refused | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-04 | BR-75 | Migration | Migrated email with upper-case letters | Stored lowercased | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-05 | D-05 | Migration | `prisma migrate diff` from the migrations folder to `schema.prisma` | No difference — the hand-edited SQL matches the schema | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-06 | AC-43, BR-78 | Migration | Seed twice; change one seeded user's password, role, and activation, then seed again | Second run creates nothing; the changed values are kept | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-07 | AC-43, FR-38 | Migration | Seed content counts | ≥4 active + 1 inactive Requester, ≥3 active + 1 inactive IT Staff, 2 active Administrators, tickets in all 8 statuses, assigned and unassigned, comments and notes | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-08 | BR-76, BR-78 | Migration | Log in as each documented account after seeding | Works with the documented password; only `first.login@kmutt.ac.th` must change it | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-09 | BR-06, BR-79 | Migration | Search the database for the documented plaintext password | Not present in any column | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-01 | AC-42, BR-72, BR-74 | Migration | In a throwaway schema: apply the Lab 1 and Lab 2 migrations, insert Lab 2-shaped data (including a soft-removed attachment), apply the Lab 3 migration | Same ticket, attachment, and user counts and ids; every ticket's requester unchanged; schema dropped afterwards | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-02 | AC-42, BR-77 | Migration | In the MIG-01 schema, `itPriority` on every pre-existing ticket | Equals `requestedPriority`; column is NOT NULL | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-03 | AC-42, BR-73, BR-76 | Migration | In the MIG-01 schema, the migrated user rows (checked in the database — no login) | Role `REQUESTER`, activation unchanged, `mustChangePassword` true, `passwordHash` null — the locked state BR-10 refuses (login refusal itself is API-04) | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-04 | BR-75 | Migration | In the MIG-01 schema, a Lab 2 email inserted with upper-case letters and surrounding spaces | Stored trimmed and lowercased after the migration | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-05 | D-05 | Migration | In a throwaway schema with every migration applied, `prisma migrate diff --from-url <schema> --to-schema-datamodel prisma/schema.prisma --exit-code` | Exit code 0 — the hand-edited SQL, including the dropped `updatedAt` default and the dropped Lab 2 index, matches the schema | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-06 | AC-43, BR-78 | Migration | In a throwaway schema: seed twice; change one seeded user's password, role, and activation, then seed again | Second run creates nothing; the changed values are kept; the shared development database is never touched | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-07 | AC-43, FR-38 | Migration | In a freshly migrated and seeded throwaway schema, the seed content | Exactly 6 active + 1 inactive Requesters (incl. `first.login`), 3 active + 1 inactive IT Staff, 2 active Administrators; tickets in all 8 statuses, assigned and unassigned; comments and notes | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-08 | BR-76, BR-78 | Migration | In the MIG-07 schema, each documented account's stored hash and flag (checked with the password module — no login) | The documented password verifies against every documented account; only `first.login@kmutt.ac.th` has `mustChangePassword` set | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-09 | BR-06, BR-79 | Migration | In the MIG-07 schema, search every text column for the documented plaintext password | Not present anywhere | `server/tests/lab-03/migration-seed.test.ts` | Planned |
 
 ### 2.10 UI component
 
@@ -271,7 +290,7 @@ that owns the row runs it green.
 | AC-02 | API-11, API-12, UI-06, UI-12, E2E-02 |
 | AC-03 | API-03, API-04, UI-02, E2E-03 |
 | AC-04 | API-05, UI-03, E2E-03 |
-| AC-05 | UNIT-06, API-06, API-07, UI-04 |
+| AC-05 | UNIT-06, API-06, API-07, API-73, UI-04 |
 | AC-06 | API-09, UI-11, E2E-01 |
 | AC-07 | UNIT-02, UNIT-03, API-13, API-14, UI-07, UI-08 |
 | AC-08 | UNIT-05, API-10, UI-11 |
@@ -284,7 +303,7 @@ that owns the row runs it green.
 | AC-15 | UI-09, UI-10, RESP-05, E2E-11 |
 | AC-16 | SEC-06 |
 | AC-17 | REG-03, REG-04, REG-09, E2E-04 |
-| AC-18 | REG-08 |
+| AC-18 | REG-08, REG-14, REG-15, REG-16 |
 | AC-19 | API-18, API-19, UI-14, E2E-04 |
 | AC-20 | REG-10, REG-11, REG-12, UI-15, E2E-04 |
 | AC-21 | API-20 |
@@ -292,12 +311,12 @@ that owns the row runs it green.
 | AC-23 | API-21, API-22 |
 | AC-24 | UI-24, STYLE-03, E2E-07 |
 | AC-25 | UNIT-11, API-29, UI-17, E2E-05 |
-| AC-26 | UNIT-10, API-30, API-31, API-32, API-33, API-34, API-35, API-37, UI-18 |
+| AC-26 | UNIT-10, API-30, API-31, API-32, API-33, API-34, API-35, API-37, API-79, UI-18 |
 | AC-27 | UI-19, RESP-01 |
-| AC-28 | API-44, API-45, UI-22, E2E-05 |
+| AC-28 | API-44, API-45, API-74, UI-22, E2E-05 |
 | AC-29 | API-46, API-47 |
 | AC-30 | API-50, E2E-06 |
-| AC-31 | UNIT-07, UNIT-08, UNIT-09, API-52, API-53, API-54, API-55, API-56, API-57, UI-23, E2E-06 |
+| AC-31 | UNIT-07, UNIT-08, UNIT-09, API-52, API-53, API-54, API-55, API-56, API-57, API-75, API-78, UI-23, E2E-06 |
 | AC-32 | API-41, API-43, UI-21, STYLE-04 |
 | AC-33 | SEC-08, API-39, API-42, UI-20, UI-25, E2E-08 |
 | AC-34 | API-60, API-61, UI-26, E2E-09 |
@@ -321,18 +340,18 @@ level of an acceptance criterion and are traced to that rule in §2.
 | Issue | Tests | Count |
 | :--- | :--- | :--- |
 | 1 — Sprint 3 Specification & Test Plan | none — documentation only | 0 |
-| 2 — User Model, Lab 2 Migration & Seed | MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09 | 9 |
-| 3 — Authentication Foundation | UNIT-01, UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 32 |
-| 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, UI-09, UI-10, UI-11, STYLE-05 | 13 |
-| 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-04, REG-05, REG-06, REG-07, REG-08, REG-09, UI-13, UI-16 | 12 |
-| 6 — Public Comments & Internal Notes | API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 14 |
-| 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, UI-17, UI-18, UI-19, UI-20 | 18 |
-| 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-59, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 33 |
-| 9 — Administrator User Management | SEC-11, API-60, API-61, API-62, API-63, API-64, API-65, API-66, API-67, API-68, API-69, API-70, API-71, API-72, UI-26, UI-27, UI-28, UI-29, UI-30, UI-31 | 20 |
+| 2 — User Model, Lab 2 Migration & Seed | UNIT-01, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09 | 10 |
+| 3 — Authentication Foundation | UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, API-73, API-80, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 33 |
+| 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 14 |
+| 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-04, REG-05, REG-06, REG-07, REG-08, REG-09, REG-16, UI-13, UI-16 | 13 |
+| 6 — Public Comments & Internal Notes | REG-14, API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 15 |
+| 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, API-79, UI-17, UI-18, UI-19, UI-20 | 19 |
+| 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-59, API-74, API-75, API-76, API-78, API-81, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 38 |
+| 9 — Administrator User Management | SEC-11, API-60, API-61, API-62, API-63, API-64, API-65, API-66, API-67, API-68, API-69, API-70, API-71, API-77, API-72, UI-26, UI-27, UI-28, UI-29, UI-30, UI-31 | 21 |
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |
 
-**Totals:** UNIT 11, API 72, SEC 11, REG 13, MIG 9, UI 31, STYLE 6, RESP 6, E2E 11 — **170 planned tests**.
+**Totals:** UNIT 11, API 81, SEC 11, REG 16, MIG 9, UI 31, STYLE 6, RESP 6, E2E 11 — **182 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 
@@ -374,8 +393,10 @@ output recorded here as the Part 3 evidence (labsheet §14).
 
 ## 7. Known Limitations or Deferred Tests
 
-- **Login throttle is in-memory (D-12).** UNIT-06 and API-06/07 prove the rule within one server
-  process; a restart clears the counts. Multi-instance behaviour is out of scope for a local lab.
+- **Login throttle is in-memory (D-12).** UNIT-06, API-06/07, and API-73 prove the rule within one
+  server process; a restart clears the counts. Multi-instance behaviour is out of scope for a local
+  lab. API-73 simulates distinct client IPs with `X-Forwarded-For` under the test app's
+  `trust proxy` setting; through the Vite proxy every browser on one machine shares an IP.
 - **Cookie flags are asserted from response headers.** API-01 checks `HttpOnly`, `SameSite=Strict`,
   and `Path`; whether a browser honours them is the browser's behaviour, exercised indirectly by the
   Playwright suites rather than asserted on its own.
@@ -385,3 +406,7 @@ output recorded here as the Part 3 evidence (labsheet §14).
   the locking works; they do not measure behaviour under load.
 - **Actions Taken** and any resolution rule depending on them are Lab 4 scope; no test covers them.
 - **Cross-browser coverage** stays at Playwright's Chromium projects, as in Lab 2.
+- **E2E-created users remain** in the development database (no user-delete endpoint exists, BR-59).
+  Each run uses unique emails so runs never collide; `npx prisma migrate reset` clears them.
+- **Race tests (API-45, API-70, API-74 to API-77) fire two requests at once.** They prove the locks
+  serialise the pair; they are run several times before a PR to rule out a lucky ordering.
