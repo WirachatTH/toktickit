@@ -14,7 +14,7 @@ added where the minimum list didn't have an obvious home for a needed area
 replacement for the required ones.
 
 Detailed reasoning for every test, including additional real-world scenarios beyond
-what's below, lives in the gitignored working file `test.md` at the repo root; this
+what's below, lives in the gitignored working file `test.md`; this
 document is the curated, graded planned-test table plus traceability required by
 §9.1 and §14 Part 3.
 

@@ -147,3 +147,60 @@ docker-compose exec client npx playwright test
 
 Full traceability from each acceptance criterion to its automated test is in
 `docs/lab-02/tests.md`.
+
+## Lab 3 — Users, Roles, IT Staff Ticketing & Administration
+
+Lab 3 replaces the Development Requester selector with real email/password sign-in
+and server-enforced roles (Requester, IT Staff, Administrator), and adds the IT Staff
+Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
+engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
+`ui-spec.md`, `tests.md`).
+
+> **Status:** contract only (Issue 1). The commands below describe the planned
+> workflow and become true as Issues 2–10 land; each issue updates this section.
+
+### Applying the Lab 3 migration and seed (planned — Issue 2)
+```bash
+docker-compose exec server npx prisma migrate deploy
+docker-compose exec server npm run prisma:seed
+```
+The migration renames `RequesterUser` to `User` in place, so every Lab 2 ticket and
+attachment survives (`specification.md` §7.5). Migrated accounts have no password
+until the seed or an Administrator gives them one.
+
+### Local development accounts (planned — Issue 2)
+Seeded accounts for **local development only** — never reuse these anywhere else.
+All share the password `TokTickIT-dev-2026`:
+
+| Role | Accounts |
+| :--- | :--- |
+| Requester | the six Lab 2 Requesters (`somchai.prasert@kmutt.ac.th`, … — one inactive) and `first.login@kmutt.ac.th` (must change its password at first sign-in) |
+| IT Staff | three active, one inactive — listed here when Issue 2 lands |
+| Administrator | two active — listed here when Issue 2 lands |
+
+The seed never overwrites a password that already exists. To restore every account
+to the state above after a demo: `docker-compose exec server npx prisma migrate reset`.
+
+### Configuration and upgrading an existing Docker stack (planned — Issue 3)
+The browser talks only to the Vite dev server, which proxies `/api` to the API, so
+the session cookie works the same in local development and in the Playwright E2E
+setup (`docs/lab-03/specification.md` D-11). New settings, all with working
+defaults:
+
+| Variable | Service | Default |
+| :--- | :--- | :--- |
+| `CLIENT_ORIGINS` | server | `http://localhost:5173,http://localhost:5174` |
+| `API_PROXY_TARGET` | client | `http://localhost:3000` (`http://server:3000` in Docker) |
+
+The server container keeps `node_modules` in an anonymous volume, so after pulling
+Lab 3 it still has the Lab 2 packages and Prisma client. Rebuild it once:
+```bash
+docker-compose up -d --build --renew-anon-volumes server
+```
+
+### Running Lab 3 tests (planned)
+```bash
+docker-compose exec server npm test               # server/tests/lab-01..03
+docker-compose exec client npm test               # client/tests/lab-01..03
+docker-compose exec client npx playwright test    # e2e/lab-02..03, three viewports
+```
