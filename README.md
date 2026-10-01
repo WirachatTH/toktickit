@@ -190,7 +190,6 @@ defaults:
 | Variable | Service | Default |
 | :--- | :--- | :--- |
 | `CLIENT_ORIGINS` | server | `http://localhost:5173,http://localhost:5174` |
-| `TRUST_PROXY` | server | `loopback` |
 | `API_PROXY_TARGET` | client | `http://localhost:3000` (`http://server:3000` in Docker) |
 
 The server container keeps `node_modules` in an anonymous volume, so after pulling

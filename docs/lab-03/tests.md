@@ -26,7 +26,14 @@ sandbox (`server/vitest.config.ts` runs files sequentially). Each test therefore
 users and tickets under a unique prefix and deletes them afterwards, and never modifies a seeded
 row. Tests whose effects the seed would not undo — the migration and seed tests (MIG-01 to MIG-09)
 and the last-Administrator race (API-70) — create a throwaway PostgreSQL schema, run there, and
-drop it, so the README credentials keep working after any number of `npm test` runs.
+drop it, so the README credentials keep working after any number of `npm test` runs. API-70 runs
+through the Express app, whose Prisma client is a singleton built from `DATABASE_URL` on first use,
+so it lives in its own file (`last-administrator.api.test.ts`) that points `DATABASE_URL` at the
+throwaway schema before first importing the app; Vitest isolates modules per file.
+
+**In-memory state.** The login throttle (BR-14) lives in server memory for the whole test file, so
+`auth.api.test.ts` calls the exported `resetLoginThrottle()` in `beforeEach`, and every test uses its
+own users. No test's failed logins can therefore throttle a later test.
 
 File paths follow labsheet §12 (`server/tests/lab-03/`, `client/tests/lab-03/`, `e2e/lab-03/`,
 D-20), with additional files where the minimum list has no home for an area (unit modules, the
@@ -44,7 +51,7 @@ that owns the row runs it green.
 | UNIT-03 | AC-07, BR-08 | Unit | New password identical to the current one | Rejected with the "different from your current password" rule | `server/tests/lab-03/password.test.ts` | Planned |
 | UNIT-04 | BR-15 | Unit | Session token generation and storage | Token is 32 random bytes base64url; stored value is its SHA-256 hex and never equals the raw token | `server/tests/lab-03/session.test.ts` | Planned |
 | UNIT-05 | AC-08, BR-17 | Unit | Session validity at `expiresAt - 1ms`, `expiresAt`, and later | Valid only before `expiresAt` | `server/tests/lab-03/session.test.ts` | Planned |
-| UNIT-06 | AC-05, BR-14 | Unit | Login throttle store: 5 failures for one email + IP, a different IP for the same email, 20 failures from one IP across many emails, sliding window, success reset, 10,000-key cap | 6th attempt for the pair blocked while another IP is not; the IP ceiling blocks at 21; keys free as failures age out; success clears only its pair; at the cap, expired keys are evicted first, then the oldest | `server/tests/lab-03/login-throttle.test.ts` | Planned |
+| UNIT-06 | AC-05, BR-14, D-12 | Unit | Login throttle store: 5 failures for one email, a different email meanwhile, sliding window, success reset, `resetLoginThrottle()`, 10,000-email cap | 6th attempt for that email blocked while another email is not; entries free as failures age out; success clears only its email; reset empties the store; at the cap, expired entries are evicted first, then the oldest | `server/tests/lab-03/login-throttle.test.ts` | Planned |
 | UNIT-07 | AC-31, BR-41 | Unit | Transition table: every (from, to) pair of the 8×8 status grid | Exactly the BR-41 pairs are permitted; same-status and terminal sources never are | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-08 | AC-31, BR-42 | Unit | Owner requirement per target status | Only `CANCELLED` is permitted without an owner | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-09 | AC-31, BR-44, BR-45 | Unit | Required text per target and its bounds (summary 10–2000, reason 10–1000, trimmed) | `RESOLVED` needs a summary, `CANCELLED`/`REOPENED` a reason; boundary values accepted, one past rejected | `server/tests/lab-03/transitions.test.ts` | Planned |
@@ -60,7 +67,7 @@ that owns the row runs it green.
 | API-03 | AC-03, BR-12 | API | Wrong password vs. unknown email | Byte-identical `401 INVALID_CREDENTIALS` bodies; no `Set-Cookie`; no session row | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-04 | AC-03, BR-10 | API | Login to a migrated account with no password hash | Same `401 INVALID_CREDENTIALS` as a wrong password | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-05 | AC-04, BR-13 | API | Inactive account with correct password, then with a wrong password | Correct → `403 ACCOUNT_INACTIVE`, no session; wrong → generic `401` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-06 | AC-05, BR-14 | API | 5 failed logins for one email from one IP, then the correct password from that IP; same sequence for an unknown email | 6th request `429 TOO_MANY_ATTEMPTS` with `Retry-After`, even with the right password; identical for the unknown email | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-06 | AC-05, BR-14 | API | 5 failed logins for one email, then the correct password; same sequence for an unknown email (throttle reset before the test) | 6th request `429 TOO_MANY_ATTEMPTS` with `Retry-After`, even with the right password; identical for the unknown email | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-07 | AC-05, BR-14 | API | 4 failures, a success, then 4 more failures | No throttling — the success cleared the count | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-08 | BR-09 | API | Login with the email in mixed case and surrounded by spaces | Succeeds | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-09 | AC-06, BR-18 | API | Logout, then reuse the old cookie; logout with no session | `204`; session row gone; old cookie → `401` on `/me`; logout without a session still `204` | `server/tests/lab-03/auth.api.test.ts` | Planned |
@@ -171,7 +178,7 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-73 | AC-05, BR-14, D-12 | API | 5 failures for an Administrator's email from one IP, then the correct password from another IP; then 20 failures from one IP across different emails | The other IP signs in normally (no targeted lockout); the 21st failure from the single IP is `429` | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-73 | AC-05, BR-14 | API | While one email is throttled, another account signs in from the same client | The other account signs in normally — the throttle is per email, not global | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-80 | BR-17 | API | User with two expired sessions logs in | Both expired rows are deleted; the new session works | `server/tests/lab-03/auth.api.test.ts` | Planned |
 | API-79 | AC-26, BR-64 | API | Request page 1 with no parameters, rebuild the URL from its `appliedQuery`, request pages 1–3 with that URL | Identical page 1, and pages 1–3 match the default-order pages with no repeats or gaps | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
 | API-74 | AC-28, BR-31, BR-80 | API | Race: claim a `NEW` ticket (`expectedStatus: NEW`) while another request cancels it | Never a `CANCELLED` ticket that is `OPEN` or owned; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
@@ -189,7 +196,8 @@ that owns the row runs it green.
 | API-67 | BR-59 | API | Change a signed-in user's role | Their sessions end; after re-login the new role's permissions apply | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-68 | AC-38, BR-56 | API | Set a new initial password for a signed-in user | Sessions end; next login works with the new password and is forced to change | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-69 | AC-39, BR-57 | API | Administrator deactivates self, changes own role, sets own initial password | Each `409 SELF_CHANGE_FORBIDDEN`; nothing changed | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
-| API-70 | AC-40, BR-58, D-22 | API | In a throwaway schema with exactly two active Administrators: they deactivate (and, separately, demote) each other in parallel | Exactly one succeeds, the other `409 LAST_ADMINISTRATOR`; one active Administrator remains; seeded accounts never involved | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
+| API-70 | AC-40, BR-58, BR-81, D-22 | API | In a throwaway schema with exactly two active Administrators: they deactivate (and, separately, demote) each other in parallel | Exactly one `200`, the other `409 LAST_ADMINISTRATOR` — never a `500` from a deadlock; one active Administrator remains; seeded accounts never involved | `server/tests/lab-03/last-administrator.api.test.ts` | Planned |
+| API-82 | BR-81 | API | In the API-70 schema with four active Administrators: two Administrators deactivate two different other Administrators at the same moment, repeated | Both succeed every time — no deadlock (`40P01`) and no `500`; locks are taken in one statement in ascending id order | `server/tests/lab-03/last-administrator.api.test.ts` | Planned |
 | API-71 | BR-60 | API | Demote an IT Staff member who owns an open ticket; reassign, then demote; deactivate instead | `409 OWNS_OPEN_TICKETS`, then `200`; deactivation allowed | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-77 | BR-60, BR-81 | API | Race: demote an IT Staff member to `REQUESTER` while another request assigns them an open ticket | Never a `REQUESTER` owning an open ticket: one succeeds, the other is refused (`409 OWNS_OPEN_TICKETS` or `400` on `fields.ownerId`) | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-72 | BR-59 | API | `DELETE /api/admin/users/:id` | `404` — no such route | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
@@ -272,7 +280,7 @@ that owns the row runs it green.
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | E2E-01 | AC-01, AC-06 | E2E | Requester signs in, sees name and role, signs out, opens a protected URL | Login screen shown after sign-out | `e2e/lab-03/authentication.spec.ts` | Planned |
 | E2E-02 | AC-02, AC-35 | E2E | Administrator API creates a fresh user; that user signs in | Forced to Change Password; lands on home after a valid change | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-03 | AC-03, AC-04 | E2E | Wrong password, then an inactive account | Each shows its own message | `e2e/lab-03/authentication.spec.ts` | Planned |
+| E2E-03 | AC-03, AC-04 | E2E | Wrong password for this run's fresh user, then an inactive account created for this run | Each shows its own message; per-run emails keep repeated runs from throttling a shared account | `e2e/lab-03/authentication.spec.ts` | Planned |
 | E2E-04 | AC-17, AC-19, AC-20 | E2E | Requester creates a ticket with an attachment, finds it, comments, marks appears resolved | Each step visible in the UI | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
 | E2E-05 | AC-25, AC-28 | E2E | IT Staff filter the queue to unassigned and claim a `NEW` ticket | Ticket shows them as owner and `OPEN` | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
 | E2E-06 | AC-30, AC-31 | E2E | IT Staff raise IT Priority, move to In Progress, then Resolved with a summary | Requester sees the status and the resolution summary | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
@@ -347,11 +355,11 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 6 — Public Comments & Internal Notes | REG-14, API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 15 |
 | 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, API-79, UI-17, UI-18, UI-19, UI-20 | 19 |
 | 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-59, API-74, API-75, API-76, API-78, API-81, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 38 |
-| 9 — Administrator User Management | SEC-11, API-60, API-61, API-62, API-63, API-64, API-65, API-66, API-67, API-68, API-69, API-70, API-71, API-77, API-72, UI-26, UI-27, UI-28, UI-29, UI-30, UI-31 | 21 |
+| 9 — Administrator User Management | SEC-11, API-60, API-61, API-62, API-63, API-64, API-65, API-66, API-67, API-68, API-69, API-70, API-82, API-71, API-77, API-72, UI-26, UI-27, UI-28, UI-29, UI-30, UI-31 | 22 |
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |
 
-**Totals:** UNIT 11, API 81, SEC 11, REG 16, MIG 9, UI 31, STYLE 6, RESP 6, E2E 11 — **182 planned tests**.
+**Totals:** UNIT 11, API 82, SEC 11, REG 16, MIG 9, UI 31, STYLE 6, RESP 6, E2E 11 — **183 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 
@@ -393,10 +401,9 @@ output recorded here as the Part 3 evidence (labsheet §14).
 
 ## 7. Known Limitations or Deferred Tests
 
-- **Login throttle is in-memory (D-12).** UNIT-06, API-06/07, and API-73 prove the rule within one
-  server process; a restart clears the counts. Multi-instance behaviour is out of scope for a local
-  lab. API-73 simulates distinct client IPs with `X-Forwarded-For` under the test app's
-  `trust proxy` setting; through the Vite proxy every browser on one machine shares an IP.
+- **Login throttle is in-memory and keyed by email only (D-12).** UNIT-06, API-06/07, and API-73
+  prove the rule within one server process; a restart clears it. Targeted lockout of a known email
+  is a documented lab limitation, not a tested defence; multi-instance behaviour is out of scope.
 - **Cookie flags are asserted from response headers.** API-01 checks `HttpOnly`, `SameSite=Strict`,
   and `Path`; whether a browser honours them is the browser's behaviour, exercised indirectly by the
   Playwright suites rather than asserted on its own.
@@ -408,5 +415,5 @@ output recorded here as the Part 3 evidence (labsheet §14).
 - **Cross-browser coverage** stays at Playwright's Chromium projects, as in Lab 2.
 - **E2E-created users remain** in the development database (no user-delete endpoint exists, BR-59).
   Each run uses unique emails so runs never collide; `npx prisma migrate reset` clears them.
-- **Race tests (API-45, API-70, API-74 to API-77) fire two requests at once.** They prove the locks
+- **Race tests (API-45, API-70, API-74 to API-77, API-82) fire two requests at once.** They prove the locks
   serialise the pair; they are run several times before a PR to rule out a lucky ordering.

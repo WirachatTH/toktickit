@@ -59,10 +59,11 @@ Every protected request passes these checks in order and stops at the first fail
 7. business rules (transition, conflicts, safety rules) → `409 …`
 
 Every operation that changes a ticket or adds to it locks the ticket row before
-step 7 and holds it until it commits (BR-80); assigning an owner and changing a
-user's role or activation also lock the user row, always ticket first, then user
-(BR-81). Concurrent requests on one ticket are therefore checked one after the
-other, never against a stale read.
+step 7 and holds it until it commits (BR-80). Assigning an owner and changing a
+user's role or activation also lock user rows, following the one system-wide lock
+order of BR-81: tickets before users, and several user rows only in one statement
+in ascending `id` order. Concurrent requests are therefore checked one after the
+other, never against a stale read, and never deadlock.
 
 ### 0.4 Error envelope (unchanged from Lab 2)
 ```json
@@ -97,7 +98,7 @@ Lab 2 codes keep their meaning; Lab 3 adds the rest.
 | `OWNS_OPEN_TICKETS` | 409 | role change to `REQUESTER` for a user who owns non-terminal tickets (BR-60) |
 | `PAYLOAD_TOO_LARGE` | 413 | Lab 2: attachment over 5 MB |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Lab 2: attachment type not allowed |
-| `TOO_MANY_ATTEMPTS` | 429 | login throttled for this email + client IP, or for this IP overall (BR-14); `Retry-After` header gives seconds |
+| `TOO_MANY_ATTEMPTS` | 429 | login throttled for this email (BR-14); `Retry-After` header gives seconds |
 | `INTERNAL_ERROR` | 500 | unexpected failure; message is always "Something went wrong. Please try again." |
 
 ### 0.6 Shared shapes
@@ -123,7 +124,6 @@ No response anywhere contains `passwordHash`, a session token, or a token hash.
 ### 1.1 `POST /api/auth/login`
 **Auth:** public. **Body:** `{ "email": "string", "password": "string" }`
 
-The client IP is `req.ip`, with `trust proxy` limited to `TRUST_PROXY` (D-12).
 Processing (BR-09 to BR-15): email trimmed and lowercased → throttle check → user
 lookup (a dummy hash is verified when the email is unknown) → password verified →
 only then activation state checked → session created, `lastLoginAt` set, cookie set.
@@ -137,7 +137,7 @@ A user with `mustChangePassword: true` still receives a session; it can only rea
 | `400` | `VALIDATION_ERROR` | email or password missing |
 | `401` | `INVALID_CREDENTIALS` | unknown email, wrong password, or no password set (identical response) |
 | `403` | `ACCOUNT_INACTIVE` | correct password, inactive account |
-| `429` | `TOO_MANY_ATTEMPTS` | 5 failures for this email from this IP, or 20 failures from this IP across all emails, in the last 15 minutes (counted the same for unknown emails) |
+| `429` | `TOO_MANY_ATTEMPTS` | 5 failures for this email in the last 15 minutes (counted the same for unknown emails) |
 
 ### 1.2 `GET /api/auth/me`
 **Auth:** any session, including one that must change its password.
