@@ -156,30 +156,51 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** contract only (Issue 1). The commands below describe the planned
-> workflow and become true as Issues 2–10 land; each issue updates this section.
+> **Status:** Issues 1–2 are in (contract; users, migration, and seed). Sections
+> still marked *planned* become true as Issues 3–10 land; each issue updates them.
+> Until Issue 5, the Lab 2 Development Requester selector is still how the app is
+> used — it now lists Requester accounts only.
 
-### Applying the Lab 3 migration and seed (planned — Issue 2)
+### Applying the Lab 3 migration and seed
+Back up first if your database holds anything you care about — the migration is
+written to keep every Lab 2 row, and a backup makes that a choice rather than a hope:
 ```bash
+docker exec toktickit-db pg_dump -U toktickit -d toktickit -Fc > pre-lab3.dump
 docker-compose exec server npx prisma migrate deploy
 docker-compose exec server npm run prisma:seed
+docker-compose restart server        # regenerates the Prisma client for the Lab 3 schema
 ```
-The migration renames `RequesterUser` to `User` in place, so every Lab 2 ticket and
-attachment survives (`specification.md` §7.5). Migrated accounts have no password
-until the seed or an Administrator gives them one.
+*Expected result:* `migrate deploy` applies `…_lab3_users_roles_workflow`, which
+renames `RequesterUser` to `User` **in place** (hand-written SQL — Prisma's own diff
+would have dropped the table; `specification.md` D-05), so every Lab 2 ticket and
+attachment keeps its Requester. Migrated accounts have no password until the seed or
+an Administrator gives them one. The seed prints how many accounts and sample
+tickets it created; a second run creates nothing. `npx prisma migrate diff
+--from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma` then reports
+*No difference detected.*
 
-### Local development accounts (planned — Issue 2)
+### Local development accounts
 Seeded accounts for **local development only** — never reuse these anywhere else.
-All share the password `TokTickIT-dev-2026`:
+Every one uses the password **`TokTickIT-dev-2026`**. Sign-in itself arrives with
+Issue 3.
 
-| Role | Accounts |
-| :--- | :--- |
-| Requester | the six Lab 2 Requesters (`somchai.prasert@kmutt.ac.th`, … — one inactive) and `first.login@kmutt.ac.th` (must change its password at first sign-in) |
-| IT Staff | three active, one inactive — listed here when Issue 2 lands |
-| Administrator | two active — listed here when Issue 2 lands |
+| Role | Account | Notes |
+| :--- | :--- | :--- |
+| Requester | `somchai.prasert@kmutt.ac.th`, `napassorn.chaiyasit@kmutt.ac.th`, `teerapat.wongsawat@kmutt.ac.th`, `kanyarat.suksawang@kmutt.ac.th`, `piyawat.chatchai@kmutt.ac.th` | the Lab 2 Requesters, carried over by the migration |
+| Requester (inactive) | `ananya.ruangrit@kmutt.ac.th` | cannot sign in |
+| Requester (must change password) | `first.login@kmutt.ac.th` | the only account forced to set a new password at first sign-in |
+| IT Staff | `chanon.rattanakorn@kmutt.ac.th`, `pimchanok.srisuk@kmutt.ac.th`, `worawit.thongdee@kmutt.ac.th` | |
+| IT Staff (inactive) | `suda.kaewmanee@kmutt.ac.th` | still owns a ticket — ownership survives deactivation |
+| Administrator | `siriporn.boonmee@kmutt.ac.th`, `krit.wattana@kmutt.ac.th` | two, so the last-Administrator rule can be exercised |
 
-The seed never overwrites a password that already exists. To restore every account
-to the state above after a demo: `docker-compose exec server npx prisma migrate reset`.
+The seed also creates 18 sample tickets covering all eight statuses, every priority,
+assigned and unassigned ownership, Public Comments, and Internal Notes.
+
+**The seed only adds.** It never overwrites a password, role, or activation state
+that already exists, and never edits an existing ticket, so a demo's changes survive
+a re-run. To restore every account and sample ticket to the state above:
+`docker-compose exec server npx prisma migrate reset` (this empties the database
+first, then migrates and seeds).
 
 ### Configuration and upgrading an existing Docker stack (planned — Issue 3)
 The browser talks only to the Vite dev server, which proxies `/api` to the API, so

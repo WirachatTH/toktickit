@@ -87,8 +87,11 @@ app.get("/api/systems", async (_req: Request, res: Response) => {
 
 app.get("/api/requesters", async (_req: Request, res: Response) => {
   try {
-    const requesters = await getPrisma().requesterUser.findMany({
-      where: { isActive: true },
+    // Lab 3: IT Staff and Administrators now share the User table, so the
+    // selector must list Requesters only — otherwise a staff account could be
+    // chosen and act as a Requester until Issue 5 removes the selector.
+    const requesters = await getPrisma().user.findMany({
+      where: { isActive: true, role: "REQUESTER" },
       select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     });
@@ -229,6 +232,8 @@ app.post("/api/tickets", (req: Request, res: Response) => {
               summary: fields.summary,
               description: fields.description,
               requestedPriority: fields.requestedPriority,
+              // Lab 3 BR-34 — IT Priority starts as the Requester's own value.
+              itPriority: fields.requestedPriority,
               // Placeholder, replaced below once the real id exists — a
               // Ticket Number can't be computed before the row is inserted,
               // but both statements commit together (BR-01).

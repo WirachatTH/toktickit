@@ -16,7 +16,7 @@ describe("Lab 2 seed data", () => {
     const countsBefore = {
       category: await prisma.category.count(),
       relatedSystem: await prisma.relatedSystem.count(),
-      requesterUser: await prisma.requesterUser.count(),
+      user: await prisma.user.count(),
     };
 
     await seed(prisma);
@@ -24,7 +24,7 @@ describe("Lab 2 seed data", () => {
     const countsAfter = {
       category: await prisma.category.count(),
       relatedSystem: await prisma.relatedSystem.count(),
-      requesterUser: await prisma.requesterUser.count(),
+      user: await prisma.user.count(),
     };
 
     expect(countsAfter).toEqual(countsBefore);
@@ -41,14 +41,14 @@ describe("Lab 2 seed data", () => {
   });
 
   it("seeds at least 4 active and at least 1 inactive Development Requester", async () => {
-    const activeCount = await prisma.requesterUser.count({ where: { isActive: true } });
-    const inactiveCount = await prisma.requesterUser.count({ where: { isActive: false } });
+    const activeCount = await prisma.user.count({ where: { role: "REQUESTER", isActive: true } });
+    const inactiveCount = await prisma.user.count({ where: { role: "REQUESTER", isActive: false } });
     expect(activeCount).toBeGreaterThanOrEqual(4);
     expect(inactiveCount).toBeGreaterThanOrEqual(1);
   });
 
   it("the seeded inactive requester is queryable directly (data exists even though the Selector will exclude it)", async () => {
-    const inactive = await prisma.requesterUser.findUnique({
+    const inactive = await prisma.user.findUnique({
       where: { email: "ananya.ruangrit@kmutt.ac.th" },
     });
     expect(inactive).not.toBeNull();
@@ -71,7 +71,7 @@ describe("Ticket schema constraints", () => {
 
   beforeAll(async () => {
     await seed(prisma);
-    const requester = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: true } });
+    const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true } });
     const category = await prisma.category.findFirstOrThrow();
     const relatedSystem = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
     requesterId = requester.id;
@@ -99,6 +99,7 @@ describe("Ticket schema constraints", () => {
       ticketNumber,
       summary: "Constraint test ticket",
       description: "Used to verify the ticketNumber unique constraint at the DB level.",
+      itPriority: "MEDIUM" as const, // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     };
 
     const created = await prisma.ticket.create({ data: base });
@@ -115,6 +116,7 @@ describe("Ticket schema constraints", () => {
       ticketNumber: `TCK-FKTEST${Date.now()}`,
       summary: "FK constraint test",
       description: "Used to verify the requesterId foreign key constraint.",
+      itPriority: "MEDIUM" as const, // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     };
 
     // Rejected before insert, so nothing is created and nothing needs tracking.
@@ -132,6 +134,7 @@ describe("Ticket schema constraints", () => {
         ticketNumber: `TCK-RESTRICT${Date.now()}`,
         summary: "Restrict-delete test ticket",
         description: "Used to verify Category cannot be deleted while referenced.",
+        itPriority: "MEDIUM" as const, // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     createdTicketIds.push(ticket.id);

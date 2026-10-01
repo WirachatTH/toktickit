@@ -305,7 +305,7 @@ resolve or close it.
 | ID | Rule |
 | :--- | :--- |
 | BR-68 | Every Lab 2 Requester rule (Lab 2 BR-01 to BR-48) keeps its meaning, with "the selected Requester" read as "the signed-in Requester", **except** the rules Lab 3 deliberately supersedes: Lab 2 BR-03 and BR-06 to BR-10 (the selector and its header, replaced by FR-01 to FR-04 and BR-03), Lab 2 BR-41 (selector visibility, replaced by BR-01), Lab 2 BR-46 (no comment box on Ticket Detail, replaced by FR-14 to FR-16), and Lab 2 BR-47 and BR-48 (no credentials on the Requester model, replaced by §7). |
-| BR-69 | Lab 1 and Lab 2 behaviour tests keep their assertions and change only how they authenticate (session instead of `X-Dev-Requester-Id`), with two exceptions: a test that asserts a rule BR-68 lists as superseded is rewritten to assert the Lab 3 rule that replaces it, and a test that existed only to check the selector is retired. Every rewritten or retired test is named in the PR that changes it. |
+| BR-69 | Lab 1 and Lab 2 behaviour tests keep their assertions and change only their setup — how they authenticate (session instead of `X-Dev-Requester-Id`), the renamed `User` model, fixture fields the Lab 3 schema requires (such as `itPriority`), and creating their own Requesters where a fixture asserts exact totals (D-22) — with two exceptions: a test that asserts a rule BR-68 lists as superseded is rewritten to assert the Lab 3 rule that replaces it, and a test that existed only to check the selector is retired. Every rewritten or retired test is named in the PR that changes it. |
 | BR-70 | A Requester cannot add or soft-remove attachments on a `CLOSED` or `CANCELLED` ticket (`409`); existing attachments remain downloadable. |
 | BR-71 | The Requester Ticket Detail shows the owner's name or "Not yet assigned", but never IT Priority, Internal Notes, or any IT Staff control. |
 
@@ -550,7 +550,7 @@ pagination shape are unchanged from Lab 2.
 | ID | Criterion |
 | :--- | :--- |
 | AC-17 | Given a signed-in Requester, when they create a ticket, list and search their tickets, open its detail, and add, download, and soft-remove attachments, then every Lab 2 behaviour still holds, the ticket's Requester is the signed-in user, and no selector exists anywhere in the app. |
-| AC-18 | Given the Lab 1 and Lab 2 test suites (server, client, and the Lab 2 E2E journey), when they run against the Lab 3 build, then they pass with only their authentication setup changed, except tests of superseded Lab 2 rules, which are rewritten to the Lab 3 rule that replaces them (BR-69). |
+| AC-18 | Given the Lab 1 and Lab 2 test suites (server, client, and the Lab 2 E2E journey), when they run against the Lab 3 build, then they pass with only their setup changed (BR-69), except tests of superseded Lab 2 rules, which are rewritten to the Lab 3 rule that replaces them (BR-69). |
 | AC-19 | Given a Requester's own ticket, when they post a Public Comment, then it appears in their thread and in IT Staff Ticket Detail with author name, role, and time. |
 | AC-20 | Given a Requester's own open ticket, when they mark "Problem Appears Resolved", then the signal is recorded and visible to IT Staff, the status does not change, and no Requester request can set any status. |
 
@@ -608,8 +608,8 @@ pagination shape are unchanged from Lab 2.
       direct API calls with no session and with each wrong role.
 - [ ] The migration has been applied to a database holding Lab 2 data and the
       migration tests prove nothing was lost.
-- [ ] All Lab 1 and Lab 2 behaviour tests pass with only their authentication setup
-      changed, apart from the rewritten and retired tests BR-69 allows, each named in
+- [ ] All Lab 1 and Lab 2 behaviour tests pass with only their setup changed (BR-69),
+      apart from the rewritten and retired tests BR-69 allows, each named in
       its PR; no reference to the Development Requester selector remains.
 - [ ] Every implemented screen and endpoint matches this specification,
       `api-spec.md`, and `ui-spec.md`; any deviation is written back into these docs.

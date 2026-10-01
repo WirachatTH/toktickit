@@ -40,6 +40,7 @@ async function createOwnedTicket(requesterId: number, summary = "Attachment life
       ticketNumber: `TCK-ATTTEST${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
       summary,
       description: "Fixture ticket created directly for Issue 6 attachment-lifecycle tests.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
   createdTicketIds.push(ticket.id);
@@ -52,7 +53,7 @@ function authHeader(requesterId: number) {
 
 beforeAll(async () => {
   await seed(prisma);
-  const requesters = await prisma.requesterUser.findMany({ where: { isActive: true }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true }, take: 2 });
   requesterAId = requesters[0].id;
   requesterBId = requesters[1].id;
   const category = await prisma.category.findFirstOrThrow();
