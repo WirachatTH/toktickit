@@ -47,17 +47,30 @@ const PRIORITY_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 beforeAll(async () => {
   await seed(prisma);
 
-  const requesters = await prisma.requesterUser.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 4 });
-  [ownerAId, ownerBId, sortFixtureRequesterId, paginationRequesterId] = requesters.map((r) => r.id);
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true }, orderBy: { id: "asc" }, take: 2 });
+  [ownerAId, ownerBId] = requesters.map((r) => r.id);
 
-  const inactive = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: false } });
+  // Lab 3: the sort and pagination fixtures assert exact totals (6 and 23), so
+  // they need Requesters that own nothing else. The Lab 3 seed now gives the
+  // seeded Requesters sample tickets, so these two are created by the test
+  // itself and removed in afterAll (docs/lab-03/specification.md D-22).
+  const sortFixtureRequester = await prisma.user.create({
+    data: { name: "Sort Fixture Requester", email: `sort-fixture-${Date.now()}@kmutt.ac.th`, isActive: true },
+  });
+  sortFixtureRequesterId = sortFixtureRequester.id;
+  const paginationRequester = await prisma.user.create({
+    data: { name: "Pagination Fixture Requester", email: `pagination-fixture-${Date.now()}@kmutt.ac.th`, isActive: true },
+  });
+  paginationRequesterId = paginationRequester.id;
+
+  const inactive = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: false } });
   inactiveRequesterId = inactive.id;
 
-  const freshRequester = await prisma.requesterUser.create({
+  const freshRequester = await prisma.user.create({
     data: { name: "Edge Case Fresh Requester", email: `edge-fresh-${Date.now()}@kmutt.ac.th`, isActive: true },
   });
   freshRequesterId = freshRequester.id;
-  const edgeCaseRequester = await prisma.requesterUser.create({
+  const edgeCaseRequester = await prisma.user.create({
     data: { name: "Edge Case Requester", email: `edge-case-${Date.now()}@kmutt.ac.th`, isActive: true },
   });
   edgeCaseRequesterId = edgeCaseRequester.id;
@@ -76,6 +89,7 @@ beforeAll(async () => {
       ticketNumber: "TCK-OWNER-A001",
       summary: "Requester A's own ticket",
       description: "Only Requester A should ever see this ticket in their list.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
   await prisma.ticket.create({
@@ -86,6 +100,7 @@ beforeAll(async () => {
       ticketNumber: "TCK-OWNER-B001",
       summary: "Requester B's own ticket",
       description: "Only Requester B should ever see this ticket in their list.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
 
@@ -113,6 +128,7 @@ beforeAll(async () => {
         ticketNumber: `TCK-FIX-${f.n}`,
         summary: f.summary,
         description: `Fixture ticket ${f.n} for Issue 7 search/filter/sort tests.`,
+        itPriority: f.priority, // Lab 3: required column, equal to requestedPriority at creation (BR-34)
         requestedPriority: f.priority,
         // updatedAt deliberately runs opposite to createdAt so a test that
         // sorts by the wrong field (e.g. always by createdAt) is caught.
@@ -132,6 +148,7 @@ beforeAll(async () => {
       ticketNumber: `TCK-PAGE-${String(i).padStart(3, "0")}`,
       summary: `Pagination fixture ticket ${i}`,
       description: "Fixture ticket for Issue 7 pagination tests.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       createdAt: minutes(i),
     })),
   });
@@ -177,7 +194,9 @@ afterAll(async () => {
   // Ticket.requester is onDelete: Restrict — these two self-created
   // Requesters can only be deleted once every Ticket referencing them
   // (the deleteMany above) is already gone.
-  await prisma.requesterUser.deleteMany({ where: { id: { in: [freshRequesterId, edgeCaseRequesterId] } } });
+  await prisma.user.deleteMany({
+    where: { id: { in: [freshRequesterId, edgeCaseRequesterId, sortFixtureRequesterId, paginationRequesterId] } },
+  });
 });
 
 describe("GET /api/tickets — ownership scoping", () => {
@@ -493,6 +512,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-PCT1",
         summary: "Battery at 50% capacity issue",
         description: "Edge-case fixture for LIKE wildcard escaping.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     await prisma.ticket.create({
@@ -503,6 +523,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-PCT2",
         summary: "50 items delivered late today",
         description: "Edge-case fixture for LIKE wildcard escaping — must NOT match a search for '50%'.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -524,6 +545,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-USC1",
         summary: "Config key report_2026 is missing",
         description: "Edge-case fixture: literal underscore must not act as a single-character wildcard.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     await prisma.ticket.create({
@@ -534,6 +556,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-USC2",
         summary: "Config key reportX2026 is missing",
         description: "Edge-case fixture — must NOT match a search for 'report_2026'.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     const underscoreRes = await request(app)
@@ -551,6 +574,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-ATT1",
         summary: "Ticket for attachmentCount cross-issue integration check",
         description: "Verifies GET /api/tickets' attachmentCount excludes soft-removed attachments.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -587,6 +611,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-SYS1",
         summary: "Filed against a System that will later be decommissioned",
         description: "A Requester's historical ticket must keep displaying correctly even after IT deactivates that System.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -616,6 +641,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-THAI",
         summary: "เครื่องพิมพ์ขัดข้องที่ห้อง 204",
         description: "Edge-case fixture confirming ILIKE-based search works correctly on non-ASCII (Thai) text.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -819,6 +845,7 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
             ticketNumber: `TCK-EDGE-TIE${n}`,
             summary: `Tiebreak fixture ${n}`,
             description: "Shares an identical createdAt with its siblings to exercise the id-desc tiebreak.",
+            itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
             createdAt: tiedCreatedAt,
           },
         });

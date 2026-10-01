@@ -30,7 +30,7 @@ function authHeader(requesterId: number) {
 
 beforeAll(async () => {
   await seed(prisma);
-  const requesters = await prisma.requesterUser.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true }, orderBy: { id: "asc" }, take: 2 });
   [ownerId, otherId] = requesters.map((r) => r.id);
   category = await prisma.category.findFirstOrThrow();
   system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
@@ -65,6 +65,7 @@ async function createOwnedTicket(overrides: Partial<{ requesterId: number; summa
       ticketNumber: `TCK-DETAIL-${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
       summary: overrides.summary ?? "Ticket Detail fixture ticket",
       description: "Fixture ticket created directly for Issue 8 ticket-detail tests.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
 }

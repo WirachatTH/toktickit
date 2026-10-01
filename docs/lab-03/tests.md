@@ -24,7 +24,7 @@ session authentication (REG-08) rather than rewritten.
 **Test isolation (D-22).** All server tests share one development database with no per-test
 sandbox (`server/vitest.config.ts` runs files sequentially). Each test therefore creates its own
 users and tickets under a unique prefix and deletes them afterwards, and never modifies a seeded
-row. Tests whose effects the seed would not undo — the migration and seed tests (MIG-01 to MIG-09)
+row. Tests whose effects the seed would not undo — the migration and seed tests (MIG-01 to MIG-11)
 and the last-Administrator race (API-70) — create a throwaway PostgreSQL schema, run there, and
 drop it, so the README credentials keep working after any number of `npm test` runs. API-70 runs
 through the Express app, whose Prisma client is a singleton built from `DATABASE_URL` on first use,
@@ -46,7 +46,7 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UNIT-01 | BR-06 | Unit | Hash a password, verify it with the right and a wrong password; hash the same password twice; verify against an empty hash | Right → true, wrong → false, empty hash → false; stored as `scrypt$N$r$p$salt$hash`; the two hashes differ (per-user salt) | `server/tests/lab-03/password.test.ts` | Planned |
+| UNIT-01 | BR-06 | Unit | Hash a password, verify it with the right and a wrong password; hash the same password twice; verify against an empty hash | Right → true, wrong → false, empty hash → false; stored as `scrypt$N$r$p$salt$hash`; the two hashes differ (per-user salt) | `server/tests/lab-03/password.test.ts` | Pass |
 | UNIT-02 | AC-07, BR-07 | Unit | Password policy boundaries: 9/10/128/129 characters, no digit, no letter, equal to own email in another letter case | 10 and 128 accepted; 9, 129, no-digit, no-letter, and email-equal rejected with the matching rule message | `server/tests/lab-03/password.test.ts` | Planned |
 | UNIT-03 | AC-07, BR-08 | Unit | New password identical to the current one | Rejected with the "different from your current password" rule | `server/tests/lab-03/password.test.ts` | Planned |
 | UNIT-04 | BR-15 | Unit | Session token generation and storage | Token is 32 random bytes base64url; stored value is its SHA-256 hex and never equals the raw token | `server/tests/lab-03/session.test.ts` | Planned |
@@ -103,7 +103,7 @@ that owns the row runs it green.
 | REG-01 | AC-12, BR-03 | Regression | `POST /api/tickets` with another user's id in a `requesterId` field | Ticket belongs to the session user | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-02 | AC-12, BR-03 | Regression | `GET /api/tickets?requesterId=<other>` with `X-Dev-Requester-Id: <other>` | Only the session user's tickets | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-03 | AC-17, FR-12 | Regression | Create with attachment → list → detail → upload → download → soft-remove, through a session | Every step behaves as in Lab 2 | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
-| REG-04 | AC-17, BR-34 | Regression | Database row of a newly created ticket, and the create response | `itPriority = requestedPriority`, no owner, `NEW`; response has no `itPriority` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
+| REG-04 | AC-17, BR-34 | Regression | Database row of a newly created ticket, and the create response | `itPriority = requestedPriority`, no owner, `NEW`; response has no `itPriority` | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
 | REG-05 | BR-71 | Regression | `GET /api/tickets/:id` payload | Has `owner`, `resolutionSummary`, `requesterResolvedAt`; no `itPriority`, no note fields | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-06 | BR-70 | Regression | Add and soft-remove attachments on `CLOSED` and `CANCELLED` tickets; download an existing one | `409 TICKET_CLOSED`; download still `200` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-07 | D-18 | Regression | Categories, Related Systems, and health with no session and as each role | `200` with the Lab 1/Lab 2 shapes in every case — they stay public | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
@@ -116,6 +116,7 @@ that owns the row runs it green.
 | REG-14 | AC-18, BR-68, BR-69 | Regression | Lab 2 `RequesterTicketDetail.test.tsx` BR-46 test, rewritten for Lab 3 | Asserts the Lab 3 rule instead: a comment box is present, while internal notes, IT Priority, Actions Taken, and any status control stay absent | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
 | REG-15 | AC-18, D-18 | Regression | Lab 1 suites and the public System Status page with no session | `health.test.ts`, `categories.test.ts`, and `App.test.tsx` pass unchanged; "Check System" reports Online | `server/tests/lab-01/*.test.ts` | Planned |
 | REG-16 | AC-18, BR-69 | Regression | Lab 2 client suites and the Lab 2 E2E journey after the selector is removed | They sign in instead of choosing a Requester and otherwise keep their assertions; selector-only tests (`RequesterSelector`, `RequireRequester`) are retired and named in the PR | `client/tests/lab-02/*.test.tsx` | Planned |
+| REG-17 | AC-12, BR-03 | Regression | Until Issue 5 removes the selector: the Development Requester list and the `X-Dev-Requester-Id` lookup with IT Staff and Administrator accounts present | Staff accounts never appear in the list, and their ids are refused like unknown ones — no staff account can act as a Requester | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
 
 ### 2.5 API — Public Comments and Internal Notes
 
@@ -206,15 +207,17 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| MIG-01 | AC-42, BR-72, BR-74 | Migration | In a throwaway schema: apply the Lab 1 and Lab 2 migrations, insert Lab 2-shaped data (including a soft-removed attachment), apply the Lab 3 migration | Same ticket, attachment, and user counts and ids; every ticket's requester unchanged; schema dropped afterwards | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-02 | AC-42, BR-77 | Migration | In the MIG-01 schema, `itPriority` on every pre-existing ticket | Equals `requestedPriority`; column is NOT NULL | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-03 | AC-42, BR-73, BR-76 | Migration | In the MIG-01 schema, the migrated user rows (checked in the database — no login) | Role `REQUESTER`, activation unchanged, `mustChangePassword` true, `passwordHash` null — the locked state BR-10 refuses (login refusal itself is API-04) | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-04 | BR-75 | Migration | In the MIG-01 schema, a Lab 2 email inserted with upper-case letters and surrounding spaces | Stored trimmed and lowercased after the migration | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-05 | D-05 | Migration | In a throwaway schema with every migration applied, `prisma migrate diff --from-url <schema> --to-schema-datamodel prisma/schema.prisma --exit-code` | Exit code 0 — the hand-edited SQL, including the dropped `updatedAt` default and the dropped Lab 2 index, matches the schema | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-06 | AC-43, BR-78 | Migration | In a throwaway schema: seed twice; change one seeded user's password, role, and activation, then seed again | Second run creates nothing; the changed values are kept; the shared development database is never touched | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-07 | AC-43, FR-38 | Migration | In a freshly migrated and seeded throwaway schema, the seed content | Exactly 6 active + 1 inactive Requesters (incl. `first.login`), 3 active + 1 inactive IT Staff, 2 active Administrators; tickets in all 8 statuses, assigned and unassigned; comments and notes | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-08 | BR-76, BR-78 | Migration | In the MIG-07 schema, each documented account's stored hash and flag (checked with the password module — no login) | The documented password verifies against every documented account; only `first.login@kmutt.ac.th` has `mustChangePassword` set | `server/tests/lab-03/migration-seed.test.ts` | Planned |
-| MIG-09 | BR-06, BR-79 | Migration | In the MIG-07 schema, search every text column for the documented plaintext password | Not present anywhere | `server/tests/lab-03/migration-seed.test.ts` | Planned |
+| MIG-01 | AC-42, BR-72, BR-74 | Migration | In a throwaway schema: apply the Lab 1 and Lab 2 migrations, insert Lab 2-shaped data (including a soft-removed attachment), apply the Lab 3 migration | Same ticket, attachment, and user counts and ids; every ticket's requester unchanged; schema dropped afterwards | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-02 | AC-42, BR-77 | Migration | In the MIG-01 schema, `itPriority` on every pre-existing ticket | Equals `requestedPriority`; column is NOT NULL | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-03 | AC-42, BR-73, BR-76 | Migration | In the MIG-01 schema, the migrated user rows (checked in the database — no login) | Role `REQUESTER`, activation unchanged, `mustChangePassword` true, `passwordHash` null — the locked state BR-10 refuses (login refusal itself is API-04) | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-04 | BR-75 | Migration | In the MIG-01 schema, a Lab 2 email inserted with upper-case letters and surrounding spaces | Stored trimmed and lowercased after the migration | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-05 | D-05 | Migration | In a throwaway schema with every migration applied, `prisma migrate diff --from-url <schema> --to-schema-datamodel prisma/schema.prisma --exit-code` | Exit code 0 — the hand-edited SQL, including the dropped `updatedAt` default and the dropped Lab 2 index, matches the schema | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-06 | AC-43, BR-78 | Migration | In a throwaway schema: seed twice; change one seeded user's password, role, and activation, then seed again | Second run creates nothing; the changed values are kept; the shared development database is never touched | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-07 | AC-43, FR-38 | Migration | In a freshly migrated and seeded throwaway schema, the seed content | Exactly 6 active + 1 inactive Requesters (incl. `first.login`), 3 active + 1 inactive IT Staff, 2 active Administrators; tickets in all 8 statuses, assigned and unassigned; comments and notes | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-08 | BR-76, BR-78 | Migration | In the MIG-07 schema, each documented account's stored hash and flag (checked with the password module — no login) | The documented password verifies against every documented account; only `first.login@kmutt.ac.th` has `mustChangePassword` set | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-09 | BR-06, BR-79 | Migration | In the MIG-07 schema, search every text column for the documented plaintext password | Not present anywhere | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-10 | BR-54 | Migration | In the MIG-07 schema, create a user, then a second user with the same email | The database refuses the second (Prisma `P2002` on `User_email_key`); exactly one row exists | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-11 | BR-53 | Migration | In the MIG-07 schema, insert a user whose role is not one of the three (raw SQL, bypassing the typed client) | The database enum refuses it; no row is created; the `Role` enum holds exactly `REQUESTER`, `IT_STAFF`, `ADMINISTRATOR` | `server/tests/lab-03/migration-seed.test.ts` | Pass |
 
 ### 2.10 UI component
 
@@ -305,7 +308,7 @@ that owns the row runs it green.
 | AC-09 | API-15 |
 | AC-10 | SEC-01 |
 | AC-11 | SEC-02, SEC-03 |
-| AC-12 | REG-01, REG-02 |
+| AC-12 | REG-01, REG-02, REG-17 |
 | AC-13 | SEC-05, REG-13 |
 | AC-14 | SEC-04 |
 | AC-15 | UI-09, UI-10, RESP-05, E2E-11 |
@@ -348,10 +351,10 @@ level of an acceptance criterion and are traced to that rule in §2.
 | Issue | Tests | Count |
 | :--- | :--- | :--- |
 | 1 — Sprint 3 Specification & Test Plan | none — documentation only | 0 |
-| 2 — User Model, Lab 2 Migration & Seed | UNIT-01, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09 | 10 |
+| 2 — User Model, Lab 2 Migration & Seed | UNIT-01, REG-04, REG-17, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09, MIG-10, MIG-11 | 14 |
 | 3 — Authentication Foundation | UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, API-73, API-80, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 33 |
 | 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 14 |
-| 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-04, REG-05, REG-06, REG-07, REG-08, REG-09, REG-16, UI-13, UI-16 | 13 |
+| 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-05, REG-06, REG-07, REG-08, REG-09, REG-16, UI-13, UI-16 | 12 |
 | 6 — Public Comments & Internal Notes | REG-14, API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 15 |
 | 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, API-79, UI-17, UI-18, UI-19, UI-20 | 19 |
 | 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-59, API-74, API-75, API-76, API-78, API-81, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 38 |
@@ -359,7 +362,7 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |
 
-**Totals:** UNIT 11, API 82, SEC 11, REG 16, MIG 9, UI 31, STYLE 6, RESP 6, E2E 11 — **183 planned tests**.
+**Totals:** UNIT 11, API 82, SEC 11, REG 17, MIG 11, UI 31, STYLE 6, RESP 6, E2E 11 — **186 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 

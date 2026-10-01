@@ -23,23 +23,61 @@ model Category {
 }
 
 // ---------------------------------------------------------------------------
-// Lab 2, Issue 2 — Data model for Requester ticketing
-// See docs/lab-02/specification.md §7 for field-by-field rationale.
+// Lab 3 — users, roles, and sessions (docs/lab-03/specification.md §7)
 // ---------------------------------------------------------------------------
 
-// Testing-only identity for Lab 2 (BR-03, BR-47/48). Not an authentication
-// mechanism — no password/session field exists here on purpose, and Lab 3
-// replaces this model's role rather than extending it.
-model RequesterUser {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  isActive  Boolean  @default(true)
+// BR-20 — every user holds exactly one of these.
+enum Role {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
+}
+
+// Lab 2's RequesterUser, renamed and extended rather than replaced, so every
+// existing id and every Ticket.requesterId survives (BR-72). The rename is
+// hand-written SQL in the migration: Prisma has no rename detection and would
+// otherwise drop the table (D-05).
+model User {
+  id       Int     @id @default(autoincrement())
+  name     String
+  // Stored trimmed and lowercased; compared case-insensitively (BR-09).
+  email    String  @unique
+  isActive Boolean @default(true)
+
+  // A salted scrypt hash, never the password (BR-06). Nullable on purpose: the
+  // migration cannot compute a hash, and an account without one cannot log in
+  // until the seed or an Administrator gives it a password (BR-10, D-07).
+  passwordHash       String?
+  role               Role      @default(REQUESTER)
+  mustChangePassword Boolean   @default(true)
+  lastLoginAt        DateTime?
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tickets Ticket[]
+  requestedTickets Ticket[]        @relation("TicketRequester")
+  ownedTickets     Ticket[]        @relation("TicketOwner")
+  sessions         Session[]
+  publicComments   PublicComment[]
+  internalNotes    InternalNote[]
 
-  @@index([isActive])
+  // The assignable-owner list, the Administrator role filter, and the
+  // last-Administrator count (§7.3).
+  @@index([role, isActive])
+}
+
+// D-01, D-02 — a server-side session; the browser holds the raw token, the
+// database only its SHA-256, so a copied database holds no usable session.
+model Session {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model RelatedSystem {
@@ -53,45 +91,68 @@ model RelatedSystem {
   @@index([isActive])
 }
 
-enum RequestedPriority {
+// Renamed from Lab 2's RequestedPriority, because IT Priority now shares the
+// same three values (BR-35). Declaration order is the sort order: LOW < MEDIUM < HIGH.
+enum Priority {
   LOW
   MEDIUM
   HIGH
 }
 
-// Only NEW is reachable in Lab 2 (ticket lifecycle beyond creation is out of
-// scope this sprint). Later labs extend this enum rather than Lab 2
-// pre-building unused status values.
+// BR-38 — declaration order is the lifecycle order the queue sorts by.
 enum TicketStatus {
   NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_REQUESTER
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
 }
 
 model Ticket {
   id     Int    @id @default(autoincrement())
   // Backend-generated after insert, format TCK-###### derived from `id`
-  // (BR-01). Stored (not just computed on read) so it can carry a real
+  // (Lab 2 BR-01). Stored (not just computed on read) so it can carry a real
   // unique constraint and be searched/sorted on directly.
   ticketNumber String @unique
 
   requesterId     Int
-  requester       RequesterUser @relation(fields: [requesterId], references: [id], onDelete: Restrict)
+  requester       User          @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  // BR-28 — zero or one owner; new tickets arrive unassigned. Restrict: users
+  // are deactivated, never deleted (BR-59).
+  ownerId         Int?
+  owner           User?         @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   categoryId      Int
   category        Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   relatedSystemId Int
   relatedSystem   RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
 
-  summary           String            @db.VarChar(120)
-  description       String            @db.VarChar(2000)
-  requestedPriority RequestedPriority @default(MEDIUM)
-  currentStatus     TicketStatus      @default(NEW)
+  summary           String       @db.VarChar(120)
+  description       String       @db.VarChar(2000)
+  // BR-33 — the Requester's value, immutable for every role.
+  requestedPriority Priority     @default(MEDIUM)
+  // BR-34 — copied from requestedPriority at creation, then IT Staff's to change.
+  // No database default: it must always equal the Requester's value at creation.
+  itPriority        Priority
+  currentStatus     TicketStatus @default(NEW)
+  // BR-47 — the Requester's "Problem Appears Resolved" signal.
+  requesterResolvedAt DateTime?
+  // BR-44 — required for RESOLVED, visible to the Requester.
+  resolutionSummary   String?    @db.VarChar(2000)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  attachments Attachment[]
+  attachments    Attachment[]
+  publicComments PublicComment[]
+  internalNotes  InternalNote[]
 
   @@index([requesterId])
   @@index([requesterId, createdAt])
+  @@index([ownerId])
+  @@index([currentStatus, itPriority, createdAt])
 }
 
 model Attachment {
@@ -100,7 +161,7 @@ model Attachment {
   ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   originalFilename String
-  // Generated, collision-proof, path-traversal-safe on-disk name (BR-33) —
+  // Generated, collision-proof, path-traversal-safe on-disk name (Lab 2 BR-33) —
   // unrelated to originalFilename on purpose.
   storedFilename String @unique
   mimeType       String
@@ -112,4 +173,34 @@ model Attachment {
   removedReason String?
 
   @@index([ticketId, isRemoved])
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3 — Public Comments and Internal Notes. Two tables, not one with a
+// visibility flag, so a missing filter can never surface a note in a
+// Requester's thread (BR-49, D-04). Append-only in Lab 3 (BR-51).
+// ---------------------------------------------------------------------------
+
+model PublicComment {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body      String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model InternalNote {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body      String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
 }

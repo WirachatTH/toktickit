@@ -45,9 +45,9 @@ async function trackAndCleanupTicket(ticketId: number) {
 
 beforeAll(async () => {
   await seed(prisma);
-  const requester = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: true } });
+  const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true } });
   activeRequesterId = requester.id;
-  const inactive = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: false } });
+  const inactive = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: false } });
   inactiveRequesterId = inactive.id;
   const category = await prisma.category.findFirstOrThrow();
   categoryId = category.id;
