@@ -1,5 +1,5 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { AuthUser, fetchCurrentUser, logout as apiLogout } from "../api.js";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AuthUser, fetchCurrentUser, logout as apiLogout, onSessionEnded } from "../api.js";
 
 // Lab 3, Issue 3 — who is signed in (api-spec.md §1.2).
 //
@@ -12,6 +12,8 @@ export type AuthStatus = "loading" | "ready";
 interface AuthContextValue {
   user: AuthUser | null;
   status: AuthStatus;
+  /** True once the server has ended a session this browser was using (Issue 4, AC-08). */
+  sessionEnded: boolean;
   setUser: (user: AuthUser | null) => void;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,6 +24,7 @@ interface AuthContextValue {
 const SIGNED_OUT: AuthContextValue = {
   user: null,
   status: "ready",
+  sessionEnded: false,
   setUser: () => {},
   refresh: async () => {},
   signOut: async () => {},
@@ -30,8 +33,17 @@ const SIGNED_OUT: AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>(SIGNED_OUT);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const userRef = useRef<AuthUser | null>(null);
+  userRef.current = user;
+
+  // Signing in (a user arrives) clears any earlier "session ended" notice.
+  const setUser = useCallback((next: AuthUser | null) => {
+    setUserState(next);
+    if (next) setSessionEnded(false);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,11 +55,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setStatus("ready");
     }
-  }, []);
+  }, [setUser]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Issue 4 — any request answered 401 while someone is signed in ends the
+  // session here too; the route guards then show Login with the notice.
+  useEffect(
+    () =>
+      onSessionEnded(() => {
+        if (!userRef.current) return;
+        setUserState(null);
+        setSessionEnded(true);
+      }),
+    [],
+  );
 
   const signOut = useCallback(async () => {
     try {
@@ -55,11 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       // Even if the request failed, forget the user locally; the cookie is
       // HttpOnly and the server deletes the session on the next successful call.
-      setUser(null);
+      setUserState(null);
+      setSessionEnded(false);
     }
   }, []);
 
-  const value = useMemo(() => ({ user, status, setUser, refresh, signOut }), [user, status, refresh, signOut]);
+  const value = useMemo(
+    () => ({ user, status, sessionEnded, setUser, refresh, signOut }),
+    [user, status, sessionEnded, setUser, refresh, signOut],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

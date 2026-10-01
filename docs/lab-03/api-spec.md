@@ -58,6 +58,15 @@ Every protected request passes these checks in order and stops at the first fail
 6. request body / parameters valid → `400 VALIDATION_ERROR`
 7. business rules (transition, conflicts, safety rules) → `409 …`
 
+Steps 1–4 run once, for every route, from one route-policy table that mirrors §7
+(`server/src/authorization.ts`); a path and method missing from the table never
+reaches a handler and answers `404 NOT_FOUND`. The JSON body is read only after
+step 4, so a caller who may not use a route learns nothing from sending a malformed
+body; a body that cannot be read at all is reported as `400 VALIDATION_ERROR`
+before step 5, since no handler has run yet. Step 5 is the shared ownership rule:
+a Requester reaches only their own tickets, IT Staff and Administrators any ticket
+their role check admitted.
+
 Every operation that changes a ticket or adds to it locks the ticket row before
 step 7 and holds it until it commits (BR-80). Assigning an owner and changing a
 user's role or activation also lock user rows, following the one system-wide lock
@@ -78,14 +87,14 @@ Lab 2 codes keep their meaning; Lab 3 adds the rest.
 
 | Code | Status | Meaning |
 | :--- | :--- | :--- |
-| `VALIDATION_ERROR` | 400 | body or parameter failed validation; see `fields` |
+| `VALIDATION_ERROR` | 400 | body or parameter failed validation; see `fields` (a body that is not readable JSON at all has no `fields`) |
 | `UNAUTHENTICATED` | 401 | no session, unknown token, or expired session |
 | `INVALID_CREDENTIALS` | 401 | login: unknown email, wrong password, or account without a password — one message for all three (BR-10, BR-12) |
 | `ACCOUNT_INACTIVE` | 403 | login: correct password for an inactive account (BR-13) |
 | `PASSWORD_CHANGE_REQUIRED` | 403 | the session must change its password first (BR-02) |
 | `FORBIDDEN` | 403 | the role is not permitted this operation (BR-20, BR-23) |
 | `FORBIDDEN_ORIGIN` | 403 | state-changing request from a disallowed origin (BR-26) |
-| `NOT_FOUND` | 404 | missing, or a ticket/attachment the Requester does not own (BR-24) |
+| `NOT_FOUND` | 404 | missing, or a ticket/attachment the Requester does not own (BR-24); also any path and method not listed in §7 |
 | `CONFLICT` | 409 | Lab 2: attachment limit reached, or attachment already removed |
 | `TICKET_CLOSED` | 409 | the operation is not allowed on a `CLOSED` or `CANCELLED` ticket (BR-37, BR-52, BR-70) |
 | `INVALID_TRANSITION` | 409 | target status not permitted from the current one, or equal to it (BR-41) |
@@ -96,8 +105,8 @@ Lab 2 codes keep their meaning; Lab 3 adds the rest.
 | `SELF_CHANGE_FORBIDDEN` | 409 | an Administrator tried to deactivate themselves, change their own role, or set their own initial password (BR-56, BR-57) |
 | `LAST_ADMINISTRATOR` | 409 | the change would leave no active Administrator (BR-58) |
 | `OWNS_OPEN_TICKETS` | 409 | role change to `REQUESTER` for a user who owns non-terminal tickets (BR-60) |
-| `PAYLOAD_TOO_LARGE` | 413 | Lab 2: attachment over 5 MB |
-| `UNSUPPORTED_MEDIA_TYPE` | 415 | Lab 2: attachment type not allowed |
+| `PAYLOAD_TOO_LARGE` | 413 | Lab 2: attachment over 5 MB; also a JSON body over the server's 100 KB body limit |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | Lab 2: attachment type not allowed; also a JSON body in an unsupported character encoding |
 | `TOO_MANY_ATTEMPTS` | 429 | login throttled for this email (BR-14); `Retry-After` header gives seconds |
 | `INTERNAL_ERROR` | 500 | unexpected failure; message is always "Something went wrong. Please try again." |
 
@@ -518,7 +527,9 @@ No user-delete endpoint exists (BR-59).
 | `PATCH` | `/api/admin/users/:id` | yes | Administrator |
 | `POST` | `/api/admin/users/:id/initial-password` | yes | Administrator |
 
-29 routes. Removed from Lab 2: `GET /api/requesters`.
+29 routes. Removed from Lab 2: `GET /api/requesters`. (Until Issue 5 removes the
+selector, that list is still served as a public route; it no longer identifies
+anyone, because every Requester endpoint takes the Requester from the session.)
 
 ## 8. Status code summary
 

@@ -1,3 +1,5 @@
+import type { Role } from "../api.js";
+
 export type Priority = "LOW" | "MEDIUM" | "HIGH";
 export type TicketStatus = "NEW";
 
@@ -31,4 +33,18 @@ interface StatusBadgeProps {
 export function Badge({ kind, value }: PriorityBadgeProps | StatusBadgeProps) {
   const modifier = (kind === "priority" ? PRIORITY_CLASS[value] : STATUS_CLASS[value]) ?? "zg-badge--unknown";
   return <span className={`zg-badge ${modifier}`}>{value}</span>;
+}
+
+// Lab 3, Issue 4 — role badges (docs/lab-03/ui-spec.md §1.4). Outlined pills
+// (Administrator filled), so a role is never mistaken for a status or a
+// priority, and always in words: colour is never the only signal.
+const ROLE_BADGE: Record<Role, [string, string]> = {
+  REQUESTER: ["zg-badge--role-requester", "Requester"],
+  IT_STAFF: ["zg-badge--role-it-staff", "IT Staff"],
+  ADMINISTRATOR: ["zg-badge--role-administrator", "Administrator"],
+};
+
+export function RoleBadge({ role }: { role: Role }) {
+  const [modifier, label] = ROLE_BADGE[role] ?? ["zg-badge--unknown", String(role)];
+  return <span className={`zg-badge ${modifier}`}>{label}</span>;
 }

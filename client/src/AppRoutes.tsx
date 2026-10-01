@@ -1,29 +1,34 @@
 import { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { useRequester } from "./context/RequesterContext.js";
+import type { Role } from "./api.js";
 import { useAuth } from "./context/AuthContext.js";
 import { Login } from "./screens/Login.js";
 import { ChangePassword } from "./screens/ChangePassword.js";
-import { RequireRequester } from "./components/RequireRequester.js";
+import { RequireAuth } from "./components/RequireAuth.js";
 import { AppShell } from "./components/AppShell.js";
 import SystemStatus from "./screens/SystemStatus.js";
 import { RequesterSelector } from "./screens/RequesterSelector.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
-import { ROUTES } from "./routes.js";
+import { ComingSoon } from "./screens/ComingSoon.js";
+import { ROUTES, SCREEN_ROLES } from "./routes.js";
 
 // The actual route table the app ships, extracted out of App.tsx so tests
 // can render it directly inside a MemoryRouter instead of only ever testing
 // synthetic route tables the test files build themselves (review finding,
 // message.txt Blocking 1 — see client/tests/lab-02/AppRoutes.test.tsx).
 
-function ShellLayout({ children }: { children: ReactNode }) {
-  const { requester, changeRequester } = useRequester();
+// Lab 3, Issue 4 — every protected screen is reached through RequireAuth with
+// the roles that may open it (routes.ts SCREEN_ROLES), inside the role-aware
+// shell. The Requester screens take the signed-in user as "the Requester"
+// (RequesterContext); the Lab 2 selector is no longer on their path, and Issue 5
+// removes it.
+function Protected({ roles, children }: { roles: readonly Role[]; children: ReactNode }) {
   return (
-    <AppShell currentRequesterName={requester?.name} onChangeRequester={changeRequester}>
-      {children}
-    </AppShell>
+    <RequireAuth roles={roles}>
+      <AppShell>{children}</AppShell>
+    </RequireAuth>
   );
 }
 
@@ -52,36 +57,47 @@ function AppRouteTable() {
     <Routes>
       <Route path={ROUTES.login} element={<Login />} />
       <Route path={ROUTES.changePassword} element={<ChangePassword />} />
+      {/* Lab 1's System Status page stays public (D-18). */}
       <Route path="/" element={<SystemStatus />} />
       <Route path={ROUTES.select} element={<RequesterSelector />} />
       <Route
         path={ROUTES.list}
         element={
-          <RequireRequester>
-            <ShellLayout>
-              <MyTickets />
-            </ShellLayout>
-          </RequireRequester>
+          <Protected roles={SCREEN_ROLES.requester}>
+            <MyTickets />
+          </Protected>
         }
       />
       <Route
         path={ROUTES.create}
         element={
-          <RequireRequester>
-            <ShellLayout>
-              <CreateTicket />
-            </ShellLayout>
-          </RequireRequester>
+          <Protected roles={SCREEN_ROLES.requester}>
+            <CreateTicket />
+          </Protected>
         }
       />
       <Route
         path={ROUTES.detailPattern}
         element={
-          <RequireRequester>
-            <ShellLayout>
-              <RequesterTicketDetail />
-            </ShellLayout>
-          </RequireRequester>
+          <Protected roles={SCREEN_ROLES.requester}>
+            <RequesterTicketDetail />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.staffQueue}
+        element={
+          <Protected roles={SCREEN_ROLES.staffQueue}>
+            <ComingSoon title="Ticket Queue" />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.adminUsers}
+        element={
+          <Protected roles={SCREEN_ROLES.adminUsers}>
+            <ComingSoon title="User Management" />
+          </Protected>
         }
       />
     </Routes>

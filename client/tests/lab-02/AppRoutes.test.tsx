@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoutes } from "../../src/AppRoutes.js";
 import { RequesterProvider } from "../../src/context/RequesterContext.js";
+import { AuthProvider } from "../../src/context/AuthContext.js";
 import { ROUTES } from "../../src/routes.js";
 import * as api from "../../src/api.js";
 import { ROUTER_FUTURE } from "./routerFuture.js";
@@ -17,17 +18,26 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 // This imports AppRoutes directly (the same component App.tsx renders
 // inside BrowserRouter), so that specific regression is no longer possible
 // without this file failing.
+//
+// Lab 3, Issue 4 (BR-69): the guard on these screens is now sign-in, not the
+// Development Requester selection (Lab 2 BR-08 is superseded, Lab 3 BR-68). The
+// "redirects to the Selector" cases are rewritten to assert the Lab 3 rule —
+// redirect to Login — and the "renders directly" cases sign a Requester in
+// instead of storing a selection; their assertions are unchanged.
 
-const STORAGE_KEY = "tokTickIT.devRequester";
 const A_REQUESTER = { id: 1, name: "Somchai Prasert", email: "somchai.prasert@kmutt.ac.th" };
+
+const SIGNED_IN_REQUESTER: api.AuthUser = { ...A_REQUESTER, role: "REQUESTER", isActive: true, mustChangePassword: false };
 
 function renderAt(path: string) {
   return render(
-    <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
-      <RequesterProvider>
-        <AppRoutes />
-      </RequesterProvider>
-    </MemoryRouter>
+    <AuthProvider>
+      <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
+        <RequesterProvider>
+          <AppRoutes />
+        </RequesterProvider>
+      </MemoryRouter>
+    </AuthProvider>
   );
 }
 
@@ -43,20 +53,21 @@ describe("AppRoutes — the real route table, guarded end to end", () => {
     // Selector's own states are covered elsewhere; here only the guard's
     // decision (redirect vs. render) matters, so keep the fetch fast.
     vi.spyOn(api, "fetchActiveRequesters").mockResolvedValue([A_REQUESTER]);
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
   });
 
   it.each(GUARDED_PATHS)(
-    "redirects %s to the Selector when no Requester is selected",
+    "redirects %s to Login when nobody is signed in",
     async (_label, path) => {
       renderAt(path);
-      expect(await screen.findByText(/this is not a login screen/i)).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     }
   );
 
   it.each(GUARDED_PATHS)(
-    "renders %s directly when a Requester is already selected — the guard doesn't over-block",
+    "renders %s directly when a Requester is already signed in — the guard doesn't over-block",
     async (_label, path) => {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(A_REQUESTER));
+      vi.mocked(api.fetchCurrentUser).mockResolvedValue(SIGNED_IN_REQUESTER);
       renderAt(path);
       expect(screen.queryByText(/this is not a login screen/i)).not.toBeInTheDocument();
       expect(await screen.findByText(A_REQUESTER.name)).toBeInTheDocument();

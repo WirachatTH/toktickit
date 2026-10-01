@@ -73,24 +73,33 @@ function ticketRowLocator(page: Page, breakpoint: string, ticketNumber: string) 
   return container.getByText(ticketNumber, { exact: true });
 }
 
+// Lab 3, Issue 4 (REG-16, BR-69): the journey signs in instead of choosing a
+// Development Requester — only how it becomes a Requester changes. These are
+// the documented local-development accounts (README "Local development
+// accounts"); the journey only needs two different Requesters.
+const REQUESTER_ACCOUNTS = ["somchai.prasert@kmutt.ac.th", "napassorn.chaiyasit@kmutt.ac.th"];
+const DEV_PASSWORD = "TokTickIT-dev-2026";
+
 async function selectRequester(page: Page, index: number): Promise<string> {
-  await page.goto("/select-requester");
-  const select = page.getByLabel("Development Requester");
-  await expect(select).toBeVisible();
-
-  const optionValues = await select.locator("option[value]:not([value=''])").all();
-  expect(optionValues.length).toBeGreaterThan(index);
-  const name = (await optionValues[index].textContent())!.trim();
-
-  await select.selectOption({ label: name });
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.goto("/tickets");
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel(/^Email/).fill(REQUESTER_ACCOUNTS[index]);
+  await page.getByLabel(/^Password/).fill(DEV_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tickets$/);
+  // The shell's account block holds the signed-in Requester's name.
+  const account = page.getByRole("group", { name: "Account" });
+  if (!(await account.isVisible())) await page.getByRole("button", { name: "Toggle navigation menu" }).click();
+  const name = (await account.locator(".zg-shell-account-name").textContent())!.trim();
+  if (await page.getByRole("button", { name: "Toggle navigation menu" }).isVisible()) {
+    await page.getByRole("button", { name: "Toggle navigation menu" }).click();
+  }
   return name;
 }
 
 async function changeRequester(page: Page): Promise<void> {
-  await clickNavControl(page, "button", "Change Requester");
-  await expect(page).toHaveURL(/\/select-requester$/);
+  await clickNavControl(page, "button", "Log out");
+  await expect(page).toHaveURL(/\/login$/);
 }
 
 test.describe("Full Requester journey (E2E-01, RESP-02)", () => {

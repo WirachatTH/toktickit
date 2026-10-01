@@ -1,9 +1,15 @@
 import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
 import { Requester } from "../api.js";
+import { useAuth } from "./AuthContext.js";
 
 // Lab 2, Issue 4 — the selected Development Requester (BR-07, BR-08, BR-09).
 // Deliberately NOT authentication: no token, no session, just an id/name/email
 // the app trusts for testing purposes (BR-03, BR-47/48).
+//
+// Lab 3, Issue 4 — once someone is signed in, "the Requester" is the signed-in
+// user (Lab 3 BR-68): the Lab 2 screens read it from here unchanged, and the
+// stored selection is ignored. The server takes the Requester from the session
+// whatever this says (BR-03). Issue 5 removes the selection and this context.
 
 const STORAGE_KEY = "tokTickIT.devRequester";
 
@@ -61,9 +67,15 @@ export function RequesterProvider({ children }: { children: ReactNode }) {
     setRequester(null);
   }, []);
 
+  const { user } = useAuth();
+  const current = useMemo<Requester | null>(() => {
+    if (!user) return requester; // nobody signed in: the Lab 2 selection, as before
+    return user.role === "REQUESTER" ? { id: user.id, name: user.name, email: user.email } : null;
+  }, [user, requester]);
+
   const value = useMemo(
-    () => ({ requester, selectRequester, changeRequester }),
-    [requester, selectRequester, changeRequester]
+    () => ({ requester: current, selectRequester, changeRequester }),
+    [current, selectRequester, changeRequester]
   );
 
   return <RequesterContext.Provider value={value}>{children}</RequesterContext.Provider>;
