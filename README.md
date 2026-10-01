@@ -148,6 +148,11 @@ docker-compose exec client npx playwright test
 Full traceability from each acceptance criterion to its automated test is in
 `docs/lab-02/tests.md`.
 
+> **Since Lab 3 (Issue 4):** the Requester screens need a sign-in instead of a
+> selection. Sign in as one of the seeded Requesters (see *Local development
+> accounts* below) for step 1, and for step 3 log out and sign in as a different
+> Requester instead of using "Change Requester".
+
 ## Lab 3 — Users, Roles, IT Staff Ticketing & Administration
 
 Lab 3 replaces the Development Requester selector with real email/password sign-in
@@ -156,11 +161,11 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–3 are in (contract; users, migration, and seed; sign-in).
-> Sections still marked *planned* become true as Issues 4–10 land; each issue
-> updates them. Until Issue 5, Requester screens still use the Lab 2 Development
-> Requester selector — it lists Requester accounts only — so after signing in a
-> Requester is asked to pick one.
+> **Status:** Issues 1–4 are in (contract; users, migration, and seed; sign-in;
+> roles and the app shell). Sections still marked *planned* become true as Issues
+> 5–10 land; each issue updates them. The Requester screens now take the Requester
+> from the session. The Lab 2 selector page (`/select-requester`) is no longer on
+> any screen's path and is removed in Issue 5.
 
 ### Applying the Lab 3 migration and seed
 Back up first if your database holds anything you care about — the migration is
@@ -224,6 +229,13 @@ docker-compose up -d client
 ```
 
 ### Signing in
+- Each role lands on its own home and sees only the screens it may open:
+  Requester → *My Tickets* and *Create Ticket*; IT Staff → *Ticket Queue*;
+  Administrator → *User Management* and *Ticket Queue*. The Ticket Queue and User
+  Management screens are placeholders until Issues 7 and 9.
+- Opening a screen your role may not use takes you to your home with "You don't
+  have access to that page." The server refuses the same requests (`403`) whatever
+  the screen shows.
 - Five wrong passwords for one email within 15 minutes refuse further attempts for
   that email until the oldest failure is 15 minutes old — the right password
   included. Restarting the server clears this if you lock yourself out while
@@ -232,7 +244,7 @@ docker-compose up -d client
   is permanent until `npx prisma migrate reset` (the seed never overwrites a
   password), so use another account if you want to keep the documented state.
 
-### Running Lab 3 tests (planned)
+### Running Lab 3 tests
 ```bash
 docker-compose exec server npm test               # server/tests/lab-01..03
 docker-compose exec client npm test               # client/tests/lab-01..03

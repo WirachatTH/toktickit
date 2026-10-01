@@ -274,7 +274,7 @@ describe("Mandatory password change (BR-02) and POST /api/auth/change-password",
     expect(changed.body.user.mustChangePassword).toBe(false);
 
     // The gate no longer applies: the route now answers as it would for any
-    // session (until Issue 5 it still authenticates Requesters by the Lab 2 header).
+    // Requester session. (The Lab 2 header sent alongside is ignored since Issue 4.)
     const after = await request(app).get("/api/tickets").set("Cookie", cookie).set("X-Dev-Requester-Id", String(accounts.mustChange.id));
     expect(after.status).toBe(200);
     expect((await request(app).post("/api/auth/logout").set("Cookie", cookie)).status).toBe(204);

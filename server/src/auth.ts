@@ -1,5 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import { getPrisma } from "./prisma.js";
+import { sessionUser } from "./authorization.js";
 import { loginThrottle, type AttemptOutcome } from "./loginThrottle.js";
 import { hashPassword, newPasswordError, passwordRuleError, verifyPassword, verifyPasswordForLogin } from "./password.js";
 import {
@@ -17,8 +18,9 @@ import {
 // Lab 3, Issue 3 — authentication (docs/lab-03/api-spec.md §1).
 //
 // Identity enters the server in exactly one place, the tt_session cookie
-// (BR-03). Role-based authorization is Issue 4; this module only establishes
-// who is asking and keeps a must-change session inside the change-password path.
+// (BR-03). This module establishes who is asking; whether they may ask —
+// session required, password change pending, role — is decided once, for
+// every route, by authorize() in authorization.ts (Issue 4).
 
 export interface AuthContext {
   sessionId: number;
@@ -49,7 +51,7 @@ function clearSessionCookie(res: Response) {
 }
 
 // Resolves the cookie, if any, into req.auth. A request with no cookie costs
-// nothing, so the Lab 2 X-Dev-Requester-Id flow is untouched until Issue 5.
+// nothing. A database failure here goes to the safe-error handler (500).
 export async function attachSession(req: Request, _res: Response, next: NextFunction) {
   const token = sessionToken(req);
   if (token === null) return next();
@@ -60,30 +62,6 @@ export async function attachSession(req: Request, _res: Response, next: NextFunc
   } catch (error) {
     next(error);
   }
-}
-
-// BR-02 — while a password change is required, a session may only read the
-// current user, change the password, or log out. The public endpoints (D-18)
-// do not act through the session and stay reachable. Everything else — any
-// method or path not listed, including ones that do not exist yet — is refused,
-// so the gate fails closed.
-const PUBLIC = new Set(["GET /api/health", "GET /api/categories", "GET /api/systems", "POST /api/auth/login"]);
-const ALLOWED_DURING_PASSWORD_CHANGE = new Set([
-  "GET /api/auth/me",
-  "POST /api/auth/change-password",
-  "POST /api/auth/logout",
-]);
-
-export function passwordChangeGate(req: Request, res: Response, next: NextFunction) {
-  if (!req.auth?.user.mustChangePassword) return next();
-  const route = `${req.method} ${req.path}`;
-  if (PUBLIC.has(route) || ALLOWED_DURING_PASSWORD_CHANGE.has(route)) return next();
-  return sendError(res, 403, "PASSWORD_CHANGE_REQUIRED", "Set a new password before using the rest of TokTickIT.");
-}
-
-export function requireSession(req: Request, res: Response, next: NextFunction) {
-  if (!req.auth) return sendError(res, 401, "UNAUTHENTICATED", "Sign in to continue.");
-  return next();
 }
 
 // One message for an unknown email, a wrong password, and an account without a
@@ -181,14 +159,16 @@ authRouter.post("/logout", async (req: Request, res: Response) => {
   }
 });
 
-// §1.2 — GET /api/auth/me
-authRouter.get("/me", requireSession, (req: Request, res: Response) => {
-  return res.status(200).json({ user: req.auth!.user });
+// §1.2 — GET /api/auth/me. Any signed-in user, a must-change one included
+// (ROUTE_POLICIES); authorize() has already answered 401 without a session.
+authRouter.get("/me", (req: Request, res: Response) => {
+  return res.status(200).json({ user: sessionUser(req) });
 });
 
 // §1.4 — POST /api/auth/change-password
-authRouter.post("/change-password", requireSession, async (req: Request, res: Response) => {
-  const { user, sessionId } = req.auth!;
+authRouter.post("/change-password", async (req: Request, res: Response) => {
+  const user = sessionUser(req);
+  const sessionId = req.auth!.sessionId;
   const body = (req.body ?? {}) as Record<string, unknown>;
   const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
   const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 
 const PNG_BASE = Buffer.from(
@@ -34,8 +35,13 @@ let freshRequesterId: number;
 let edgeCaseRequesterId: number;
 let inactiveRequesterId: number;
 
-function authHeader(requesterId: number) {
-  return { "X-Dev-Requester-Id": String(requesterId) };
+// Lab 3 (REG-08, BR-69): Lab 2's X-Dev-Requester-Id header is replaced by a
+// session for the same Requester — only how the test authenticates changes.
+// An id with no session (one that names nobody) sends no cookie at all.
+let sessionCookies = new Map<number, string>();
+function authHeader(requesterId: number): Record<string, string> {
+  const cookie = sessionCookies.get(requesterId);
+  return cookie ? { Cookie: cookie } : {};
 }
 
 // requestedPriority is a Postgres native enum — Postgres sorts native enums
@@ -47,7 +53,7 @@ const PRIORITY_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 beforeAll(async () => {
   await seed(prisma);
 
-  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true }, orderBy: { id: "asc" }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" }, take: 2 });
   [ownerAId, ownerBId] = requesters.map((r) => r.id);
 
   // Lab 3: the sort and pagination fixtures assert exact totals (6 and 23), so
@@ -55,11 +61,11 @@ beforeAll(async () => {
   // seeded Requesters sample tickets, so these two are created by the test
   // itself and removed in afterAll (docs/lab-03/specification.md D-22).
   const sortFixtureRequester = await prisma.user.create({
-    data: { name: "Sort Fixture Requester", email: `sort-fixture-${Date.now()}@kmutt.ac.th`, isActive: true },
+    data: { name: "Sort Fixture Requester", email: `sort-fixture-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
   });
   sortFixtureRequesterId = sortFixtureRequester.id;
   const paginationRequester = await prisma.user.create({
-    data: { name: "Pagination Fixture Requester", email: `pagination-fixture-${Date.now()}@kmutt.ac.th`, isActive: true },
+    data: { name: "Pagination Fixture Requester", email: `pagination-fixture-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
   });
   paginationRequesterId = paginationRequester.id;
 
@@ -67,11 +73,11 @@ beforeAll(async () => {
   inactiveRequesterId = inactive.id;
 
   const freshRequester = await prisma.user.create({
-    data: { name: "Edge Case Fresh Requester", email: `edge-fresh-${Date.now()}@kmutt.ac.th`, isActive: true },
+    data: { name: "Edge Case Fresh Requester", email: `edge-fresh-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
   });
   freshRequesterId = freshRequester.id;
   const edgeCaseRequester = await prisma.user.create({
-    data: { name: "Edge Case Requester", email: `edge-case-${Date.now()}@kmutt.ac.th`, isActive: true },
+    data: { name: "Edge Case Requester", email: `edge-case-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
   });
   edgeCaseRequesterId = edgeCaseRequester.id;
 
@@ -152,9 +158,12 @@ beforeAll(async () => {
       createdAt: minutes(i),
     })),
   });
+
+  sessionCookies = await sessionCookiesFor(prisma, [ownerAId, ownerBId, sortFixtureRequesterId, paginationRequesterId, freshRequesterId, edgeCaseRequesterId, inactiveRequesterId]);
 });
 
 afterAll(async () => {
+  await endTestSessions(prisma);
   // Clean up any attachment files written to disk by this file's tests
   const edgeTickets = await prisma.ticket.findMany({
     where: {

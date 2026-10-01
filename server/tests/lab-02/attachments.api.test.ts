@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 import { buildAttachmentContentDisposition } from "../../src/attachmentPersistence.js";
 
@@ -47,22 +48,30 @@ async function createOwnedTicket(requesterId: number, summary = "Attachment life
   return ticket;
 }
 
-function authHeader(requesterId: number) {
-  return { "X-Dev-Requester-Id": String(requesterId) };
+// Lab 3 (REG-08, BR-69): Lab 2's X-Dev-Requester-Id header is replaced by a
+// session for the same Requester — only how the test authenticates changes.
+// An id with no session (one that names nobody) sends no cookie at all.
+let sessionCookies = new Map<number, string>();
+function authHeader(requesterId: number): Record<string, string> {
+  const cookie = sessionCookies.get(requesterId);
+  return cookie ? { Cookie: cookie } : {};
 }
 
 beforeAll(async () => {
   await seed(prisma);
-  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, take: 2 });
   requesterAId = requesters[0].id;
   requesterBId = requesters[1].id;
   const category = await prisma.category.findFirstOrThrow();
   categoryId = category.id;
   const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
   systemId = system.id;
+
+  sessionCookies = await sessionCookiesFor(prisma, [requesterAId, requesterBId]);
 });
 
 afterAll(async () => {
+  await endTestSessions(prisma);
   const attachments = await prisma.attachment.findMany({
     where: { ticketId: { in: createdTicketIds } },
     select: { storedFilename: true },

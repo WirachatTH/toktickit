@@ -84,37 +84,39 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | AC-10, FR-07 | Security | Every protected route (table-driven from api-spec §7) with no session | `401 UNAUTHENTICATED`; body has no resource data | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-02 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is not granted | `403 FORBIDDEN`; body has no resource data | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-03 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is granted (including Administrator on assignable users) | Never `401`/`403` — proves the matrix is not over-restrictive | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-04 | AC-14, BR-25 | Security | Requester `GET` and `POST` Internal Notes on an own ticket, another Requester's ticket, and a missing id | All three `403`, identical bodies, no note content or count | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-05 | AC-13, BR-24 | Security | Requester requests another Requester's ticket, attachment metadata, download, and comments | `404`, identical to a ticket id that does not exist | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-06 | AC-16, BR-26, D-11 | Security | `POST`, `PATCH`, and a multipart upload with a foreign `Origin` and with `Origin: null`; the same requests with each default client origin (`:5173`, `:5174`); a `GET` with a foreign origin | Foreign and `null` → `403 FORBIDDEN_ORIGIN`, nothing changed; both default origins and the `GET` succeed | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-07 | BR-22, BR-23 | Security | Guard order: no session + wrong role; must-change + wrong role | `401` wins over `403`; `PASSWORD_CHANGE_REQUIRED` wins over `FORBIDDEN` | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-08 | AC-33, BR-21 | Security | Administrator calls owner, IT Priority, status, post-comment, and post-note | Every one `403 FORBIDDEN`; ticket unchanged | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-09 | BR-06, BR-15 | Security | Scan every JSON response produced by the suite | No `passwordHash`, `tokenHash`, or session token anywhere | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| SEC-10 | FR-13 | Security | `GET /api/requesters` after Lab 3 | `404` — the route no longer exists | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| SEC-01 | AC-10, FR-07 | Security | Every protected route (table-driven from api-spec §7) with no session | `401 UNAUTHENTICATED`; body has no resource data | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-02 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is not granted | `403 FORBIDDEN`; body has no resource data | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-03 | AC-11, BR-20 | Security | Matrix sweep: every route × every role it is granted (including Administrator on assignable users) | Never `401`/`403` — proves the matrix is not over-restrictive | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-04 | AC-14, BR-25 | Security | Requester `GET` and `POST` Internal Notes on an own ticket, another Requester's ticket, and a missing id | All three `403`, identical bodies, no note content or count | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-05 | AC-13, BR-24 | Security | Requester requests another Requester's ticket, attachment metadata, download, and comments | `404`, identical to a ticket id that does not exist | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-06 | AC-16, BR-26, D-11 | Security | `POST`, `PATCH`, and a multipart upload with a foreign `Origin` and with `Origin: null`; the same requests with each default client origin (`:5173`, `:5174`); a `GET` with a foreign origin | Foreign and `null` → `403 FORBIDDEN_ORIGIN`, nothing changed; both default origins and the `GET` succeed | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-07 | BR-22, BR-23 | Security | Guard order: no session + wrong role; must-change + wrong role | `401` wins over `403`; `PASSWORD_CHANGE_REQUIRED` wins over `FORBIDDEN` | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-08 | AC-33, BR-21 | Security | Administrator calls owner, IT Priority, status, post-comment, and post-note | Every one `403 FORBIDDEN`; ticket unchanged | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-09 | BR-06, BR-15 | Security | Scan every JSON response produced by the suite | No `passwordHash`, `tokenHash`, or session token anywhere | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-10 | FR-13 | Security | `GET /api/requesters` after Lab 3 | `404` — the route no longer exists; the selector-only `server/tests/lab-02/requesters.api.test.ts` is retired and named in the PR | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | SEC-11 | AC-41 | Security | Requester and IT Staff call every `/api/admin/users` route | `403 FORBIDDEN`, no user data | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| SEC-12 | FR-08, BR-23 | Security | Safe errors (api-spec §0.4, §0.5): malformed JSON, a body over the JSON limit, an unsupported charset, an unknown route, a granted route with no handler yet; a database failure in the session lookup and in a handler | `400 VALIDATION_ERROR`, `413 PAYLOAD_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`, `404 NOT_FOUND`, and `500 INTERNAL_ERROR` — each the bare error envelope, with no stack trace, SQL, or path; the server keeps answering afterwards | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| SEC-13 | FR-07, FR-08, BR-20 | Security | Every route registered on the Express app and its auth router, against the server's route-policy table | Each registered route has exactly one policy, and the table equals api-spec §7 role for role — so no route is unclassified, and an unclassified one is unreachable (`404`) | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 
 ### 2.4 Requester regression
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| REG-01 | AC-12, BR-03 | Regression | `POST /api/tickets` with another user's id in a `requesterId` field | Ticket belongs to the session user | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
-| REG-02 | AC-12, BR-03 | Regression | `GET /api/tickets?requesterId=<other>` with `X-Dev-Requester-Id: <other>` | Only the session user's tickets | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
+| REG-01 | AC-12, BR-03 | Regression | `POST /api/tickets` with another user's id in a `requesterId` field | Ticket belongs to the session user | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
+| REG-02 | AC-12, BR-03 | Regression | `GET /api/tickets?requesterId=<other>` with `X-Dev-Requester-Id: <other>` | Only the session user's tickets | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
 | REG-03 | AC-17, FR-12 | Regression | Create with attachment → list → detail → upload → download → soft-remove, through a session | Every step behaves as in Lab 2 | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-04 | AC-17, BR-34 | Regression | Database row of a newly created ticket, and the create response | `itPriority = requestedPriority`, no owner, `NEW`; response has no `itPriority` | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
 | REG-05 | BR-71 | Regression | `GET /api/tickets/:id` payload | Has `owner`, `resolutionSummary`, `requesterResolvedAt`; no `itPriority`, no note fields | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-06 | BR-70 | Regression | Add and soft-remove attachments on `CLOSED` and `CANCELLED` tickets; download an existing one | `409 TICKET_CLOSED`; download still `200` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-07 | D-18 | Regression | Categories, Related Systems, and health with no session and as each role | `200` with the Lab 1/Lab 2 shapes in every case — they stay public | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
-| REG-08 | AC-18, BR-69 | Regression | Lab 2 server suites run with a session-based helper in place of `X-Dev-Requester-Id` | All pass with unchanged assertions; the selector-only `requesters.api.test.ts` is retired and named in the PR | `server/tests/lab-02/*.test.ts` | Planned |
-| REG-09 | AC-17, BR-20 | Regression | IT Staff and Administrator call `POST /api/tickets` and `GET /api/tickets` | `403 FORBIDDEN` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
+| REG-08 | AC-18, BR-69 | Regression | Lab 2 server suites run with a session-based helper in place of `X-Dev-Requester-Id` | All pass with unchanged assertions | `server/tests/lab-02/*.test.ts` | Pass |
+| REG-09 | AC-17, BR-20 | Regression | IT Staff and Administrator call `POST /api/tickets` and `GET /api/tickets` | `403 FORBIDDEN` | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
 | REG-10 | AC-20, BR-47 | Regression | Mark an own `IN_PROGRESS` ticket "appears resolved" with and without a comment | `200`; `requesterResolvedAt` set; status unchanged; comment stored as a Public Comment by the Requester | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-11 | AC-20, BR-47 | Regression | Mark again; mark on `RESOLVED`, `CLOSED`, `CANCELLED` | `409 ALREADY_MARKED`; nothing changes | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-12 | AC-20, BR-05 | Regression | Requester calls the staff status route; sends `status`/`currentStatus` in every Requester body | Status route `403`; the fields are ignored; status never changes | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-13 | AC-13 | Regression | Mark another Requester's ticket | `404` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-14 | AC-18, BR-68, BR-69 | Regression | Lab 2 `RequesterTicketDetail.test.tsx` BR-46 test, rewritten for Lab 3 | Asserts the Lab 3 rule instead: a comment box is present, while internal notes, IT Priority, Actions Taken, and any status control stay absent | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
-| REG-15 | AC-18, D-18 | Regression | Lab 1 suites and the public System Status page with no session | `health.test.ts`, `categories.test.ts`, and `App.test.tsx` pass unchanged; "Check System" reports Online | `server/tests/lab-01/*.test.ts` | Planned |
+| REG-15 | AC-18, D-18 | Regression | Lab 1 suites and the public System Status page with no session | `health.test.ts`, `categories.test.ts`, and `App.test.tsx` pass unchanged; "Check System" reports Online | `server/tests/lab-01/*.test.ts` | Pass |
 | REG-16 | AC-18, BR-69 | Regression | Lab 2 client suites and the Lab 2 E2E journey after the selector is removed | They sign in instead of choosing a Requester and otherwise keep their assertions; selector-only tests (`RequesterSelector`, `RequireRequester`) are retired and named in the PR | `client/tests/lab-02/*.test.tsx` | Planned |
 | REG-17 | AC-12, BR-03 | Regression | Until Issue 5 removes the selector: the Development Requester list and the `X-Dev-Requester-Id` lookup with IT Staff and Administrator accounts present | Staff accounts never appear in the list, and their ids are refused like unknown ones — no staff account can act as a Requester | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
 
@@ -232,9 +234,9 @@ that owns the row runs it green.
 | UI-06 | AC-02, FR-04 | UI | Change Password in forced mode | No Cancel or navigation; success goes to the role's home | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
 | UI-07 | AC-07, BR-07 | UI | Typing into New password and Confirm | Checklist items flip per rule; Save disabled until all pass and Confirm matches | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
 | UI-08 | AC-07 | UI | Server rejects current or new password | Message below the matching field; inputs kept | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
-| UI-09 | AC-15, FR-09, FR-10 | UI | App shell for each role | Exact nav destinations per role; name and role badge; Change password and Log out | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
-| UI-10 | AC-15, FR-11 | UI | Forbidden route for a role; protected route while signed out | Home screen with forbidden callout; Login, then back to the original route after sign-in | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
-| UI-11 | AC-06, AC-08 | UI | Log out; any request answered `401` mid-session | Back to Login; session-ended banner in the second case | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
+| UI-09 | AC-15, FR-09, FR-10 | UI | App shell for each role | Exact nav destinations per role; name and role badge; Change password and Log out | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
+| UI-10 | AC-15, FR-11 | UI | Forbidden route for a role; protected route while signed out | Home screen with forbidden callout; Login, then back to the original route after sign-in | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
+| UI-11 | AC-06, AC-08 | UI | Log out; any request answered `401` mid-session | Back to Login; session-ended banner in the second case | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
 | UI-12 | AC-02, BR-02 | UI | Must-change user opens any route | Redirected to Change Password | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
 | UI-13 | FR-13 | UI | Render the app and inspect routes, components, and storage | No selector route or component; the `tokTickIT.devRequester` key is never read or written | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
 | UI-14 | AC-19, FR-14 | UI | Requester Ticket Detail comments thread and composer, including a closed ticket | Oldest first with author, role, time; post adds it; empty body blocked; closed ticket disables the composer | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Planned |
@@ -264,7 +266,7 @@ that owns the row runs it green.
 | STYLE-02 | AC-44 | UI Style | Contrast of every badge and Internal-region pair, computed from the CSS | Each ≥ 4.5:1 | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
 | STYLE-03 | AC-24 | UI Style | Internal region | Uses `--zg-internal-*` tokens and carries the caption text | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
 | STYLE-04 | AC-32 | UI Style | Ticket controls vs ticket information | Controls use the editable field class; information uses `zg-field--readonly` | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
-| STYLE-05 | AC-44 | UI Style | Role badges and shared priority badges | Roles outlined/filled per §1.4; Requested and IT Priority of the same value share one class | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
+| STYLE-05 | AC-44 | UI Style | Role badges and shared priority badges | Roles outlined/filled per §1.4; Requested and IT Priority of the same value share one class | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 | STYLE-06 | AC-44 | UI Style | Scan new components and CSS for hex literals | None outside the token and badge definitions | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
 
 ### 2.12 Responsive
@@ -354,8 +356,8 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 1 — Sprint 3 Specification & Test Plan | none — documentation only | 0 |
 | 2 — User Model, Lab 2 Migration & Seed | UNIT-01, REG-04, REG-17, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09, MIG-10, MIG-11 | 14 |
 | 3 — Authentication Foundation | UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, API-73, API-80, API-83, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 34 |
-| 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 14 |
-| 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-05, REG-06, REG-07, REG-08, REG-09, REG-16, UI-13, UI-16 | 12 |
+| 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, SEC-12, SEC-13, REG-01, REG-02, REG-08, REG-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 20 |
+| 5 — Requester Regression on Authenticated Identity | SEC-10, REG-03, REG-05, REG-06, REG-07, REG-16, UI-13, UI-16 | 8 |
 | 6 — Public Comments & Internal Notes | REG-14, API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 15 |
 | 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, API-79, UI-17, UI-18, UI-19, UI-20 | 19 |
 | 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-59, API-74, API-75, API-76, API-78, API-81, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 38 |
@@ -363,7 +365,7 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |
 
-**Totals:** UNIT 11, API 83, SEC 11, REG 17, MIG 11, UI 31, STYLE 6, RESP 6, E2E 11 — **187 planned tests**.
+**Totals:** UNIT 11, API 83, SEC 13, REG 17, MIG 11, UI 31, STYLE 6, RESP 6, E2E 11 — **189 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 
@@ -416,6 +418,10 @@ output recorded here as the Part 3 evidence (labsheet §14).
 - **Concurrency tests use small bursts** (API-45, API-70): two parallel requests are enough to show
   the locking works; they do not measure behaviour under load.
 - **Actions Taken** and any resolution rule depending on them are Lab 4 scope; no test covers them.
+- **Route classification is proved from the route table (SEC-13).** A test cannot register a new
+  Express handler ahead of the guard chain, so "an unclassified route is unreachable" is shown by
+  dropping a policy row in the mutation pass (it then answers `404` and SEC-03/SEC-13 fail), not by
+  a runtime probe.
 - **Cross-browser coverage** stays at Playwright's Chromium projects, as in Lab 2.
 - **E2E-created users remain** in the development database (no user-delete endpoint exists, BR-59).
   Each run uses unique emails so runs never collide; `npx prisma migrate reset` clears them.

@@ -189,6 +189,13 @@ textarea.zg-field {
    visibly distinct rather than an unstyled/blank badge. */
 .zg-badge--unknown { background: #E5E5E5; color: #4A4A4A; }
 
+/* Lab 3 role badges (docs/lab-03/ui-spec.md §1.4): outlined, so a role never
+   reads as a status or priority pill; Administrator filled. The 1px border is
+   inside the same pill geometry as every other badge. */
+.zg-badge--role-requester { background: #fff; border: 1px solid #5B6B62; color: #5B6B62; }
+.zg-badge--role-it-staff { background: #fff; border: 1px solid #0B7A46; color: #0B7A46; }
+.zg-badge--role-administrator { background: #006B3C; color: #fff; }
+
 /* ---------------------------------------------------------------------
    Loading / empty / error states
    --------------------------------------------------------------------- */
@@ -494,4 +501,41 @@ textarea.zg-field {
 
 @media (max-width: 767.98px) {
   .zg-password-toggle { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 4 — the role-aware shell (docs/lab-03/ui-spec.md §2).
+   --------------------------------------------------------------------- */
+
+.zg-shell-account {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: #fff;
+}
+.zg-shell-account-name { font-weight: 600; }
+/* Account actions sit on the dark header: same rule as the Lab 2 requester
+   button above, so the tertiary colour never disappears into --zg-primary. */
+.zg-shell-nav .zg-shell-account .zg-btn-tertiary,
+.zg-shell-nav .zg-shell-account a {
+  color: #fff;
+}
+.zg-shell-nav .zg-shell-account .zg-btn-tertiary:hover:not(:disabled) { color: #fff; }
+
+.zg-banner--warning { background: var(--zg-warning-bg); color: var(--zg-warning-text); }
+.zg-banner-dismiss {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  padding: 0 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .zg-shell-account { margin-left: 1rem; }
+}
+@media (max-width: 767.98px) {
+  .zg-shell-account { padding-top: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.4); }
+  .zg-banner-dismiss { min-height: 44px; }
 }

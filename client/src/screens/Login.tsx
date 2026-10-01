@@ -2,7 +2,8 @@ import { FormEvent, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, login } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
-import { homeFor, ROUTES } from "../routes.js";
+import { canOpen, homeFor, ROUTES } from "../routes.js";
+import type { FromState } from "../components/RequireAuth.js";
 import { Button } from "../components/Button.js";
 import { FormField } from "../components/FormField.js";
 import { TextInput } from "../components/TextInput.js";
@@ -21,7 +22,10 @@ export function Login() {
   const { setUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const sessionEnded = (location.state as { sessionEnded?: boolean } | null)?.sessionEnded === true;
+  const state = location.state as FromState | null;
+  const sessionEnded = state?.sessionEnded === true;
+  // Issue 4 — where a guard sent the visitor from, to return there after sign-in.
+  const from = state?.from;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +50,14 @@ export function Login() {
     try {
       const user = await login(email.trim(), password);
       setUser(user);
-      navigate(user.mustChangePassword ? ROUTES.changePassword : homeFor(user.role), { replace: true });
+      // ui-spec §2: back to the route they asked for if their role may open it,
+      // otherwise their home. A pending password change comes first (BR-02).
+      const destination = user.mustChangePassword
+        ? ROUTES.changePassword
+        : from && canOpen(user.role, from.pathname)
+          ? from.pathname + from.search
+          : homeFor(user.role);
+      navigate(destination, { replace: true });
     } catch (error) {
       const err = error instanceof ApiError ? error : null;
       if (err?.code === "INVALID_CREDENTIALS") {

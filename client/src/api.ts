@@ -117,16 +117,35 @@ function retryAfterOf(res: Response): number | undefined {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
+// Lab 3, Issue 4 — a request answered 401 UNAUTHENTICATED means the server no
+// longer knows this browser's session (expired, logged out elsewhere, user
+// deactivated). AuthProvider listens and returns the user to Login with the
+// session-ended message (ui-spec.md §2, AC-08). A failed sign-in is
+// INVALID_CREDENTIALS, never this code, so it does not trigger it.
+type SessionEndedListener = () => void;
+const sessionEndedListeners = new Set<SessionEndedListener>();
+
+export function onSessionEnded(listener: SessionEndedListener): () => void {
+  sessionEndedListeners.add(listener);
+  return () => {
+    sessionEndedListeners.delete(listener);
+  };
+}
+
 async function toApiError(res: Response): Promise<ApiError> {
   try {
     const body = await res.json();
-    return new ApiError(
+    const error = new ApiError(
       res.status,
       body?.error?.code ?? "INTERNAL_ERROR",
       body?.error?.message ?? "Something went wrong. Please try again.",
       body?.error?.fields,
       retryAfterOf(res)
     );
+    if (error.status === 401 && error.code === "UNAUTHENTICATED") {
+      sessionEndedListeners.forEach((listener) => listener());
+    }
+    return error;
   } catch {
     // Response body wasn't JSON at all (e.g. a proxy/network-level failure) —
     // never surface that raw detail to the user (BR-28).

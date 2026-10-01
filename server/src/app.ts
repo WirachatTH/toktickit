@@ -16,8 +16,17 @@ import {
   serializeAttachment,
   buildAttachmentContentDisposition,
 } from "./attachmentPersistence.js";
-import { authenticateRequester } from "./requesterAuth.js";
-import { attachSession, authRouter, passwordChangeGate } from "./auth.js";
+import { attachSession, authRouter } from "./auth.js";
+import {
+  accessibleTicketWhere,
+  authorize,
+  findAccessibleTicket,
+  isValidId,
+  notFound,
+  rejectForeignOrigin,
+  safeErrors,
+  sessionUser,
+} from "./authorization.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -33,13 +42,17 @@ const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173,htt
   .map((origin) => origin.trim())
   .filter((origin) => origin.length > 0);
 app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
-app.use(express.json());
-app.use(cookieParser());
 
-// Lab 3 — who is asking (Issue 3). The session is resolved for every request,
-// then a must-change session is kept inside the change-password path (BR-02).
+// Lab 3, Issue 4 — the guard chain, in the BR-22 order (see authorization.ts).
+// The cross-origin check comes first, before the session is read or the body
+// parsed; then who is asking (Issue 3); then whether they may ask this at all.
+// Only an admitted request has its body parsed, so a malformed body from
+// someone who may not call the route is still a 401 or 403, not a 400.
+app.use(rejectForeignOrigin(CLIENT_ORIGINS));
+app.use(cookieParser());
 app.use(attachSession);
-app.use(passwordChangeGate);
+app.use(authorize);
+app.use(express.json());
 app.use("/api/auth", authRouter);
 
 await ensureUploadDir();
@@ -191,13 +204,8 @@ app.post("/api/tickets", (req: Request, res: Response) => {
     const prisma = getPrisma();
 
     try {
-      const auth = await authenticateRequester(prisma, req);
-      if (!auth) {
-        return res
-          .status(401)
-          .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-      }
-      const { requesterId } = auth;
+      const user = sessionUser(req);
+      const requesterId = user.id;
 
       const { fields, errors } = validateTicketFields(req.body);
       if (errors) {
@@ -371,12 +379,7 @@ function escapeLikePattern(value: string): string {
 app.get("/api/tickets", async (req: Request, res: Response) => {
   const prisma = getPrisma();
   try {
-    const auth = await authenticateRequester(prisma, req);
-    if (!auth) {
-      return res
-        .status(401)
-        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-    }
+    const user = sessionUser(req);
 
     const page = parsePage(req.query.page);
     const pageSize = parsePageSize(req.query.pageSize);
@@ -395,7 +398,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
     // can widen this (API-11). Prisma's fluent filters are parameterized by
     // construction, so a SQL-meaningful search string (API-17) is safe too.
     const where: Prisma.TicketWhereInput = {
-      requesterId: auth.requesterId,
+      requesterId: user.id,
       ...(search
         ? {
             OR: [
@@ -478,15 +481,8 @@ class AlreadyRemovedError extends Error {}
 // so that check alone lets an oversized id reach Prisma, which throws on
 // the conversion and falls into the generic catch as a 500. A malformed-
 // looking id (this one included) must be a safe 404 instead, the same as
-// a non-numeric one already is (tests.md API-21).
-function isValidId(value: number): boolean {
-  return Number.isSafeInteger(value) && value > 0 && value <= 2147483647;
-}
-
-async function findOwnedTicket(prisma: PrismaClient, ticketId: number, requesterId: number) {
-  if (!isValidId(ticketId)) return null;
-  return prisma.ticket.findFirst({ where: { id: ticketId, requesterId } });
-}
+// a non-numeric one already is (tests.md API-21). isValidId now lives in
+// authorization.ts beside the Lab 3 ownership rule (BR-24) that uses it.
 
 app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
   upload.single("file")(req, res, async (uploadError: unknown) => {
@@ -510,15 +506,10 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
 
     const prisma = getPrisma();
     try {
-      const auth = await authenticateRequester(prisma, req);
-      if (!auth) {
-        return res
-          .status(401)
-          .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-      }
+      const user = sessionUser(req);
 
       const ticketId = Number(req.params.id);
-      const ticket = await findOwnedTicket(prisma, ticketId, auth.requesterId);
+      const ticket = await findAccessibleTicket(prisma, user, ticketId);
       if (!ticket) {
         return res.status(404).json(TICKET_NOT_FOUND);
       }
@@ -583,15 +574,10 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
 app.get("/api/tickets/:ticketId/attachments/:attachmentId", async (req: Request, res: Response) => {
   const prisma = getPrisma();
   try {
-    const auth = await authenticateRequester(prisma, req);
-    if (!auth) {
-      return res
-        .status(401)
-        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-    }
+    const user = sessionUser(req);
 
     const ticketId = Number(req.params.ticketId);
-    const ticket = await findOwnedTicket(prisma, ticketId, auth.requesterId);
+    const ticket = await findAccessibleTicket(prisma, user, ticketId);
     if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
     const attachmentId = Number(req.params.attachmentId);
@@ -609,15 +595,10 @@ app.get("/api/tickets/:ticketId/attachments/:attachmentId", async (req: Request,
 app.get("/api/tickets/:ticketId/attachments/:attachmentId/download", async (req: Request, res: Response) => {
   const prisma = getPrisma();
   try {
-    const auth = await authenticateRequester(prisma, req);
-    if (!auth) {
-      return res
-        .status(401)
-        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-    }
+    const user = sessionUser(req);
 
     const ticketId = Number(req.params.ticketId);
-    const ticket = await findOwnedTicket(prisma, ticketId, auth.requesterId);
+    const ticket = await findAccessibleTicket(prisma, user, ticketId);
     if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
     const attachmentId = Number(req.params.attachmentId);
@@ -649,15 +630,10 @@ app.get("/api/tickets/:ticketId/attachments/:attachmentId/download", async (req:
 app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req: Request, res: Response) => {
   const prisma = getPrisma();
   try {
-    const auth = await authenticateRequester(prisma, req);
-    if (!auth) {
-      return res
-        .status(401)
-        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-    }
+    const user = sessionUser(req);
 
     const ticketId = Number(req.params.ticketId);
-    const ticket = await findOwnedTicket(prisma, ticketId, auth.requesterId);
+    const ticket = await findAccessibleTicket(prisma, user, ticketId);
     if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
     const attachmentId = Number(req.params.attachmentId);
@@ -723,18 +699,13 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
 app.get("/api/tickets/:id", async (req: Request, res: Response) => {
   const prisma = getPrisma();
   try {
-    const auth = await authenticateRequester(prisma, req);
-    if (!auth) {
-      return res
-        .status(401)
-        .json({ error: { code: "UNAUTHENTICATED", message: "A Development Requester must be selected." } });
-    }
+    const user = sessionUser(req);
 
     const ticketId = Number(req.params.id);
     if (!isValidId(ticketId)) return res.status(404).json(TICKET_NOT_FOUND);
 
     const ticket = await prisma.ticket.findFirst({
-      where: { id: ticketId, requesterId: auth.requesterId },
+      where: accessibleTicketWhere(user, ticketId),
       include: {
         requester: { select: { id: true, name: true, email: true } },
         category: { select: { id: true, name: true } },
@@ -783,5 +754,12 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
   }
 });
 // ---------------------------------------------------------------------------
+
+// Lab 3, Issue 4 — the end of the chain (§6.2). A classified route whose
+// handler a later issue adds answers 404 until then; an error that escaped a
+// handler or middleware becomes a safe 400/413/415 (a body the client sent
+// wrong) or 500, never a stack trace.
+app.use(notFound);
+app.use(safeErrors);
 
 export default app;
