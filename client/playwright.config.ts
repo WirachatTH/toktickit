@@ -34,14 +34,11 @@ export default defineConfig({
   },
   webServer: {
     // A dedicated Vite instance on its own port (5174), separate from the
-    // one a human uses via the host browser (5173, client/.env's
-    // VITE_API_URL="http://localhost:3000"). A browser launched *inside*
-    // the client container can't reach the host's port-mapped
-    // localhost:3000 the way a real host browser can — nothing listens on
-    // that port inside this container — so this instance is started with
-    // VITE_API_URL pointed at the `server` service by its Docker Compose
-    // name instead, resolvable over the compose network.
-    command: "VITE_API_URL=http://server:3000 npm run dev -- --host --port 5174",
+    // one a human uses via the host browser (5173). Since Lab 3 (D-11) the
+    // page only ever calls its own origin's /api, which this dev server
+    // proxies to the `server` service by its Docker Compose name — so the
+    // session cookie is first-party for the browser Playwright drives.
+    command: "API_PROXY_TARGET=http://server:3000 npm run dev -- --host --port 5174",
     url: "http://localhost:5174",
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

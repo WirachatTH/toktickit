@@ -137,7 +137,7 @@ A user with `mustChangePassword: true` still receives a session; it can only rea
 | `400` | `VALIDATION_ERROR` | email or password missing |
 | `401` | `INVALID_CREDENTIALS` | unknown email, wrong password, or no password set (identical response) |
 | `403` | `ACCOUNT_INACTIVE` | correct password, inactive account |
-| `429` | `TOO_MANY_ATTEMPTS` | 5 failures for this email in the last 15 minutes (counted the same for unknown emails) |
+| `429` | `TOO_MANY_ATTEMPTS` | 5 failures for this email in the last 15 minutes, or failures plus attempts still in flight reaching 5 (counted the same for unknown emails; BR-14) |
 
 ### 1.2 `GET /api/auth/me`
 **Auth:** any session, including one that must change its password.

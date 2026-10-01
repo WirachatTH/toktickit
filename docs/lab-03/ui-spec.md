@@ -150,8 +150,9 @@ icon with text.
 Card layout like Login, max-width 480px.
 
 - **Forced mode** (`mustChangePassword`): heading **Set a new password**, copy "You
-  must set a new password before you can continue." No navigation in the shell
-  except the user menu's Log out. No Cancel.
+  must set a new password before you can continue." No Cancel; a **Log out**
+  tertiary action on the screen itself, so the user is never trapped. Every other
+  route redirects back here (BR-02).
 - **Voluntary mode** (from the user menu): heading **Change password**, with Cancel
   returning to the previous screen.
 - Fields: Current password, New password, Confirm new password — each with a

@@ -1,4 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+// Lab 3 D-11 — the browser only ever talks to its own origin: every call is a
+// relative /api/... URL, which the Vite dev server proxies to the API
+// (API_PROXY_TARGET). The session cookie is therefore first-party in local
+// development and in the Docker E2E setup alike. VITE_API_URL is retired.
+const API_URL = "";
 
 export interface Category {
   id: number;
@@ -95,13 +99,22 @@ export class ApiError extends Error {
   status: number;
   code: string;
   fields?: Record<string, string>;
+  /** Seconds from a Retry-After header (429 TOO_MANY_ATTEMPTS). */
+  retryAfterSeconds?: number;
 
-  constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
+  constructor(status: number, code: string, message: string, fields?: Record<string, string>, retryAfterSeconds?: number) {
     super(message);
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+function retryAfterOf(res: Response): number | undefined {
+  const raw = res.headers?.get?.("Retry-After");
+  const seconds = raw === null || raw === undefined ? NaN : Number(raw);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
 async function toApiError(res: Response): Promise<ApiError> {
@@ -111,7 +124,8 @@ async function toApiError(res: Response): Promise<ApiError> {
       res.status,
       body?.error?.code ?? "INTERNAL_ERROR",
       body?.error?.message ?? "Something went wrong. Please try again.",
-      body?.error?.fields
+      body?.error?.fields,
+      retryAfterOf(res)
     );
   } catch {
     // Response body wasn't JSON at all (e.g. a proxy/network-level failure) —
@@ -324,4 +338,57 @@ export async function checkSystem(): Promise<SystemStatus> {
   const categories: Category[] = await categoriesRes.json();
   
   return { online: true, categories };
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 3 — authentication (api-spec.md §1). The session lives in an
+// HttpOnly cookie the browser sends by itself; this code never sees the token.
+// ---------------------------------------------------------------------------
+
+export type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  mustChangePassword: boolean;
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    credentials: "include",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).user;
+}
+
+export async function logout(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/auth/logout`, { method: "POST", credentials: "include" });
+  if (!res.ok) throw await toApiError(res);
+}
+
+/** The signed-in user, or null when there is no session (401). */
+export async function fetchCurrentUser(): Promise<AuthUser | null> {
+  const res = await fetch(`${API_URL}/api/auth/me`, { credentials: "include" });
+  if (res.status === 401) return null;
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).user;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthUser> {
+  const res = await fetch(`${API_URL}/api/auth/change-password`, {
+    method: "POST",
+    credentials: "include",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).user;
 }

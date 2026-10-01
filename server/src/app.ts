@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -16,13 +17,30 @@ import {
   buildAttachmentContentDisposition,
 } from "./attachmentPersistence.js";
 import { authenticateRequester } from "./requesterAuth.js";
+import { attachSession, authRouter, passwordChangeGate } from "./auth.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
 export const app = express();
 
-app.use(cors());          // already wired: lets the Vite dev server call this API
+// Lab 3 D-11 — the browser reaches the API through the Vite dev server's
+// same-origin /api proxy, so CORS only matters for direct callers. A session
+// cookie can never be sent to a wildcard origin, so the origins are named.
+// CLIENT_ORIGINS (comma-separated) replaces the default: the dev server and
+// the Playwright instance.
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173,http://localhost:5174")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
+
+// Lab 3 — who is asking (Issue 3). The session is resolved for every request,
+// then a must-change session is kept inside the change-password path (BR-02).
+app.use(attachSession);
+app.use(passwordChangeGate);
+app.use("/api/auth", authRouter);
 
 await ensureUploadDir();
 const upload = multer({
