@@ -1,8 +1,5 @@
-# Private Doc
-Lab_02_labsheet.md
-plan.md
-issues.md
-test.md
+# Private working files — not part of the deliverable
+private/
 # dependencies
 node_modules/
 # e2e/node_modules is a symlink to /app/node_modules created inside the
@@ -21,6 +18,8 @@ build/
 server/prisma/*.db
 # lab 2 attachment storage (real uploaded files must never be committed)
 server/uploads/
+# Lab 2 screenshot evidence — regenerated locally on every run, never pushed.
+artifacts/lab-02/screenshots/
 # Playwright (Issue 9)
 client/test-results/
 client/playwright-report/
