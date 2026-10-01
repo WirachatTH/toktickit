@@ -12,7 +12,12 @@ import { PrismaClient } from "@prisma/client";
 
 const SERVER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const MIGRATIONS_DIR = path.join(SERVER_ROOT, "prisma", "migrations");
-const PRISMA_BIN = path.join(SERVER_ROOT, "node_modules", ".bin", process.platform === "win32" ? "prisma.cmd" : "prisma");
+// The Prisma CLI's own entry point, run with the current Node binary. Spawning
+// the `.bin/prisma.cmd` shim is refused on Windows by newer Node versions
+// (EINVAL), and `shell: true` would route every argument — database URLs
+// included — through cmd.exe parsing. Running node directly needs no shell and
+// behaves the same on Windows and Linux.
+const PRISMA_CLI = path.join(SERVER_ROOT, "node_modules", "prisma", "build", "index.js");
 
 function baseUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -36,7 +41,11 @@ export function migrationFiles(): string[] {
 }
 
 export function runPrisma(args: string[]): string {
-  return execFileSync(PRISMA_BIN, args, { cwd: SERVER_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync(process.execPath, [PRISMA_CLI, ...args], {
+    cwd: SERVER_ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 }
 
 export class ThrowawaySchema {

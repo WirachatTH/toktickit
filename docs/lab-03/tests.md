@@ -24,7 +24,7 @@ session authentication (REG-08) rather than rewritten.
 **Test isolation (D-22).** All server tests share one development database with no per-test
 sandbox (`server/vitest.config.ts` runs files sequentially). Each test therefore creates its own
 users and tickets under a unique prefix and deletes them afterwards, and never modifies a seeded
-row. Tests whose effects the seed would not undo — the migration and seed tests (MIG-01 to MIG-09)
+row. Tests whose effects the seed would not undo — the migration and seed tests (MIG-01 to MIG-11)
 and the last-Administrator race (API-70) — create a throwaway PostgreSQL schema, run there, and
 drop it, so the README credentials keep working after any number of `npm test` runs. API-70 runs
 through the Express app, whose Prisma client is a singleton built from `DATABASE_URL` on first use,
@@ -216,6 +216,8 @@ that owns the row runs it green.
 | MIG-07 | AC-43, FR-38 | Migration | In a freshly migrated and seeded throwaway schema, the seed content | Exactly 6 active + 1 inactive Requesters (incl. `first.login`), 3 active + 1 inactive IT Staff, 2 active Administrators; tickets in all 8 statuses, assigned and unassigned; comments and notes | `server/tests/lab-03/migration-seed.test.ts` | Pass |
 | MIG-08 | BR-76, BR-78 | Migration | In the MIG-07 schema, each documented account's stored hash and flag (checked with the password module — no login) | The documented password verifies against every documented account; only `first.login@kmutt.ac.th` has `mustChangePassword` set | `server/tests/lab-03/migration-seed.test.ts` | Pass |
 | MIG-09 | BR-06, BR-79 | Migration | In the MIG-07 schema, search every text column for the documented plaintext password | Not present anywhere | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-10 | BR-54 | Migration | In the MIG-07 schema, create a user, then a second user with the same email | The database refuses the second (Prisma `P2002` on `User_email_key`); exactly one row exists | `server/tests/lab-03/migration-seed.test.ts` | Pass |
+| MIG-11 | BR-53 | Migration | In the MIG-07 schema, insert a user whose role is not one of the three (raw SQL, bypassing the typed client) | The database enum refuses it; no row is created; the `Role` enum holds exactly `REQUESTER`, `IT_STAFF`, `ADMINISTRATOR` | `server/tests/lab-03/migration-seed.test.ts` | Pass |
 
 ### 2.10 UI component
 
@@ -349,7 +351,7 @@ level of an acceptance criterion and are traced to that rule in §2.
 | Issue | Tests | Count |
 | :--- | :--- | :--- |
 | 1 — Sprint 3 Specification & Test Plan | none — documentation only | 0 |
-| 2 — User Model, Lab 2 Migration & Seed | UNIT-01, REG-04, REG-17, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09 | 12 |
+| 2 — User Model, Lab 2 Migration & Seed | UNIT-01, REG-04, REG-17, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09, MIG-10, MIG-11 | 14 |
 | 3 — Authentication Foundation | UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, API-73, API-80, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 33 |
 | 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 14 |
 | 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-05, REG-06, REG-07, REG-08, REG-09, REG-16, UI-13, UI-16 | 12 |
@@ -360,7 +362,7 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |
 
-**Totals:** UNIT 11, API 82, SEC 11, REG 17, MIG 9, UI 31, STYLE 6, RESP 6, E2E 11 — **184 planned tests**.
+**Totals:** UNIT 11, API 82, SEC 11, REG 17, MIG 11, UI 31, STYLE 6, RESP 6, E2E 11 — **186 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 

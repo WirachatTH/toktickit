@@ -231,6 +231,39 @@ describe("Lab 3 seed in a freshly migrated schema (MIG-06 to MIG-09)", () => {
     }
   });
 
+  it("MIG-10 rejects a second user with the same email at the database level", async () => {
+    const email = `duplicate.${Date.now()}@kmutt.ac.th`;
+    await db.user.create({ data: { name: "First holder", email } });
+
+    // The unique index, not application code, refuses it (Prisma P2002 on User_email_key).
+    await expect(db.user.create({ data: { name: "Second holder", email } })).rejects.toMatchObject({
+      code: "P2002",
+      meta: { target: ["email"] },
+    });
+    expect(await db.user.count({ where: { email } })).toBe(1);
+    // Case-insensitive uniqueness (BR-54) rests on every email being stored
+    // lowercased — the migration does that for existing rows (MIG-04) and the
+    // API does it for new ones (Issues 3 and 9).
+  });
+
+  it("MIG-11 rejects a role outside the three permitted values at the database level", async () => {
+    // Raw SQL, because the typed Prisma client would not even compile with a
+    // bad role — this proves the database enum itself refuses it (BR-53).
+    const email = `bad.role.${Date.now()}@kmutt.ac.th`;
+    await expect(
+      db.$executeRawUnsafe(
+        `INSERT INTO "User" ("name", "email", "role", "updatedAt") VALUES ('Bad role', $1, 'SUPERUSER', now())`,
+        email,
+      ),
+    ).rejects.toThrow(/invalid input value for enum "Role"/);
+    expect(await db.user.count({ where: { email } })).toBe(0);
+
+    const [{ values }] = await db.$queryRawUnsafe<{ values: string[] }[]>(
+      `SELECT enum_range(NULL::"Role")::text[] AS values`,
+    );
+    expect(values).toEqual(["REQUESTER", "IT_STAFF", "ADMINISTRATOR"]);
+  });
+
   it("MIG-06 is idempotent and never overwrites a changed password, role, activation, or ticket", async () => {
     const snapshot = async () => ({
       users: await db.user.count(),
