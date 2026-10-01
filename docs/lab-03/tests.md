@@ -47,11 +47,11 @@ that owns the row runs it green.
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | UNIT-01 | BR-06 | Unit | Hash a password, verify it with the right and a wrong password; hash the same password twice; verify against an empty hash | Right → true, wrong → false, empty hash → false; stored as `scrypt$N$r$p$salt$hash`; the two hashes differ (per-user salt) | `server/tests/lab-03/password.test.ts` | Pass |
-| UNIT-02 | AC-07, BR-07 | Unit | Password policy boundaries: 9/10/128/129 characters, no digit, no letter, equal to own email in another letter case | 10 and 128 accepted; 9, 129, no-digit, no-letter, and email-equal rejected with the matching rule message | `server/tests/lab-03/password.test.ts` | Planned |
-| UNIT-03 | AC-07, BR-08 | Unit | New password identical to the current one | Rejected with the "different from your current password" rule | `server/tests/lab-03/password.test.ts` | Planned |
-| UNIT-04 | BR-15 | Unit | Session token generation and storage | Token is 32 random bytes base64url; stored value is its SHA-256 hex and never equals the raw token | `server/tests/lab-03/session.test.ts` | Planned |
-| UNIT-05 | AC-08, BR-17 | Unit | Session validity at `expiresAt - 1ms`, `expiresAt`, and later | Valid only before `expiresAt` | `server/tests/lab-03/session.test.ts` | Planned |
-| UNIT-06 | AC-05, BR-14, D-12 | Unit | Login throttle store: 5 failures for one email, a different email meanwhile, sliding window, success reset, `resetLoginThrottle()`, 10,000-email cap | 6th attempt for that email blocked while another email is not; entries free as failures age out; success clears only its email; reset empties the store; at the cap, expired entries are evicted first, then the oldest | `server/tests/lab-03/login-throttle.test.ts` | Planned |
+| UNIT-02 | AC-07, BR-07 | Unit | Password policy boundaries: 9/10/128/129 characters, no digit, no letter, equal to own email in another letter case | 10 and 128 accepted; 9, 129, no-digit, no-letter, and email-equal rejected with the matching rule message | `server/tests/lab-03/password.test.ts` | Pass |
+| UNIT-03 | AC-07, BR-08 | Unit | New password identical to the current one | Rejected with the "different from your current password" rule | `server/tests/lab-03/password.test.ts` | Pass |
+| UNIT-04 | BR-15 | Unit | Session token generation and storage | Token is 32 random bytes base64url; stored value is its SHA-256 hex and never equals the raw token | `server/tests/lab-03/session.test.ts` | Pass |
+| UNIT-05 | AC-08, BR-17 | Unit | Session validity at `expiresAt - 1ms`, `expiresAt`, and later | Valid only before `expiresAt` | `server/tests/lab-03/session.test.ts` | Pass |
+| UNIT-06 | AC-05, BR-14, D-12 | Unit | Login throttle store: 5 failures for one email, sliding window, normalised keys, success reset, reservations in flight (a burst of 20), neutral outcomes, the cap, eviction, `resetLoginThrottle()` | A 6th attempt is refused with the right wait; freed as the oldest failure leaves the window; only 5 of 20 simultaneous reservations allowed; neutral outcomes not counted; a throttled email is never evicted; reset empties the store | `server/tests/lab-03/login-throttle.test.ts` | Pass |
 | UNIT-07 | AC-31, BR-41 | Unit | Transition table: every (from, to) pair of the 8×8 status grid | Exactly the BR-41 pairs are permitted; same-status and terminal sources never are | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-08 | AC-31, BR-42 | Unit | Owner requirement per target status | Only `CANCELLED` is permitted without an owner | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-09 | AC-31, BR-44, BR-45 | Unit | Required text per target and its bounds (summary 10–2000, reason 10–1000, trimmed) | `RESOLVED` needs a summary, `CANCELLED`/`REOPENED` a reason; boundary values accepted, one past rejected | `server/tests/lab-03/transitions.test.ts` | Planned |
@@ -62,23 +62,23 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-01 | AC-01, BR-15, BR-16 | API | `POST /api/auth/login` with valid credentials | `200`, safe user payload; `Set-Cookie` has `HttpOnly`, `SameSite=Strict`, `Path=/api`, `Max-Age=28800`; one session row holding the token hash | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-02 | AC-01, FR-02 | API | `GET /api/auth/me` with the login cookie | Same user payload; `lastLoginAt` was set by the login | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-03 | AC-03, BR-12 | API | Wrong password vs. unknown email | Byte-identical `401 INVALID_CREDENTIALS` bodies; no `Set-Cookie`; no session row | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-04 | AC-03, BR-10 | API | Login to a migrated account with no password hash | Same `401 INVALID_CREDENTIALS` as a wrong password | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-05 | AC-04, BR-13 | API | Inactive account with correct password, then with a wrong password | Correct → `403 ACCOUNT_INACTIVE`, no session; wrong → generic `401` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-06 | AC-05, BR-14 | API | 5 failed logins for one email, then the correct password; same sequence for an unknown email (throttle reset before the test) | 6th request `429 TOO_MANY_ATTEMPTS` with `Retry-After`, even with the right password; identical for the unknown email | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-07 | AC-05, BR-14 | API | 4 failures, a success, then 4 more failures | No throttling — the success cleared the count | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-08 | BR-09 | API | Login with the email in mixed case and surrounded by spaces | Succeeds | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-09 | AC-06, BR-18 | API | Logout, then reuse the old cookie; logout with no session | `204`; session row gone; old cookie → `401` on `/me`; logout without a session still `204` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-10 | AC-08, BR-17 | API | Request with a session whose `expiresAt` is in the past | `401 UNAUTHENTICATED`; the expired row is deleted | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-11 | AC-02, BR-02 | API | Must-change session: first `GET /api/tickets`, a comment post, and the staff queue; then `/me`; then change-password; then `GET /api/tickets` again; logout last | Blocked routes `403 PASSWORD_CHANGE_REQUIRED` (checked while the flag is still set); `/me` `200`; change-password `200` clears the flag; the route then `200`; logout `204` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-12 | AC-02 | API | Change password from a must-change session, then call a normal route | Flag cleared; normal route succeeds with the same session | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-13 | AC-07, BR-07, BR-08 | API | Change password with each policy violation and with the current password | `400 VALIDATION_ERROR` on `fields.newPassword`; hash unchanged | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-14 | AC-07 | API | Change password with a wrong current password | `400` on `fields.currentPassword` (not `401`); session still valid | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-15 | AC-09, BR-19 | API | Two sessions for one user; change password in session A | Session B → `401`; session A still works | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-16 | BR-06 | API | Inspect the stored hash and the login, `/me`, and change-password responses | Stored value never equals the plaintext; no response contains `passwordHash` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-17 | FR-07 | API | `/api/health` without a session; login with missing fields | Health `200`; login `400 VALIDATION_ERROR` | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-01 | AC-01, BR-15, BR-16 | API | `POST /api/auth/login` with valid credentials | `200`, safe user payload; `Set-Cookie` has `HttpOnly`, `SameSite=Strict`, `Path=/api`, `Max-Age=28800`; one session row holding the token hash | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-02 | AC-01, FR-02 | API | `GET /api/auth/me` with the login cookie | Same user payload; `lastLoginAt` was set by the login | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-03 | AC-03, BR-12 | API | Wrong password vs. unknown email | Byte-identical `401 INVALID_CREDENTIALS` bodies; no `Set-Cookie`; no session row | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-04 | AC-03, BR-10 | API | Login to a migrated account with no password hash | Same `401 INVALID_CREDENTIALS` as a wrong password | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-05 | AC-04, BR-13 | API | Inactive account with correct password, then with a wrong password | Correct → `403 ACCOUNT_INACTIVE`, no session; wrong → generic `401` | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-06 | AC-05, BR-14 | API | 5 failed logins for one email, then the correct password; same sequence for an unknown email (throttle reset before the test) | 6th request `429 TOO_MANY_ATTEMPTS` with `Retry-After`, even with the right password; identical for the unknown email | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-07 | AC-05, BR-14 | API | 4 failures, a success, then 4 more failures | No throttling — the success cleared the count | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-08 | BR-09 | API | Login with the email in mixed case and surrounded by spaces | Succeeds | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-09 | AC-06, BR-18 | API | Logout, then reuse the old cookie; logout with no session | `204`; session row gone; old cookie → `401` on `/me`; logout without a session still `204` | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-10 | AC-08, BR-17 | API | Request with a session whose `expiresAt` is in the past | `401 UNAUTHENTICATED`; the expired row is deleted | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-11 | AC-02, BR-02 | API | Must-change session: first `GET /api/tickets`, a comment post, and the staff queue; then `/me`; then change-password; then `GET /api/tickets` again; logout last | Blocked routes `403 PASSWORD_CHANGE_REQUIRED` (checked while the flag is still set); `/me` `200`; change-password `200` clears the flag; the route then `200`; logout `204` | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-12 | AC-02 | API | Change password from a must-change session, then call a normal route | Flag cleared; normal route succeeds with the same session | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-13 | AC-07, BR-07, BR-08 | API | Change password with each policy violation and with the current password | `400 VALIDATION_ERROR` on `fields.newPassword`; hash unchanged | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-14 | AC-07 | API | Change password with a wrong current password | `400` on `fields.currentPassword` (not `401`); session still valid | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-15 | AC-09, BR-19 | API | Two sessions for one user; change password in session A | Session B → `401`; session A still works | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-16 | BR-06 | API | Inspect the stored hash and the login, `/me`, and change-password responses | Stored value never equals the plaintext; no response contains `passwordHash` | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-17 | FR-07 | API | `/api/health` without a session; login with missing fields, including six for a real email with the password missing | Health `200`; each login `400 VALIDATION_ERROR` on the missing field, and none is counted — that email still signs in | `server/tests/lab-03/auth.api.test.ts` | Pass |
 
 ### 2.3 Security and authorization
 
@@ -179,8 +179,9 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-73 | AC-05, BR-14 | API | While one email is throttled, another account signs in from the same client | The other account signs in normally — the throttle is per email, not global | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-80 | BR-17 | API | User with two expired sessions logs in | Both expired rows are deleted; the new session works | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-73 | AC-05, BR-14 | API | While one email is throttled, another account signs in from the same client | The other account signs in normally — the throttle is per email, not global | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-80 | BR-17 | API | User with two expired sessions logs in | Both expired rows are deleted; the new session works | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-83 | AC-05, BR-14 | API | 20 wrong passwords for one email at once; then 19 wrong plus the correct one at once | Exactly 5 evaluated (`401`) and 15 refused (`429`); in the mixed burst at most 5 are evaluated and a session exists only if the correct one was among them | `server/tests/lab-03/auth.api.test.ts` | Pass |
 | API-79 | AC-26, BR-64 | API | Request page 1 with no parameters, rebuild the URL from its `appliedQuery`, request pages 1–3 with that URL | Identical page 1, and pages 1–3 match the default-order pages with no repeats or gaps | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
 | API-74 | AC-28, BR-31, BR-80 | API | Race: claim a `NEW` ticket (`expectedStatus: NEW`) while another request cancels it | Never a `CANCELLED` ticket that is `OPEN` or owned; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-75 | AC-31, BR-43, BR-80 | API | Race: unassign an `OPEN` ticket while another request moves it to `IN_PROGRESS` | Never an ownerless `IN_PROGRESS` ticket; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
@@ -223,18 +224,18 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UI-01 | AC-01, FR-01 | UI | Login with valid credentials | Calls login once, stores the user, navigates to the role's home | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-02 | AC-03 | UI | Login answered `401` | Generic banner; password cleared, email kept, focus on password | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-03 | AC-04 | UI | Login answered `403 ACCOUNT_INACTIVE` | Inactive-account banner, distinct from the generic one | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-04 | AC-05 | UI | Login answered `429` with `Retry-After` | Throttle banner with minutes | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-05 | FR-01 | UI | Empty fields; double-click Sign in | Inline required messages, no request; busy state sends exactly one request | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-06 | AC-02, FR-04 | UI | Change Password in forced mode | No Cancel or navigation; success goes to the role's home | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
-| UI-07 | AC-07, BR-07 | UI | Typing into New password and Confirm | Checklist items flip per rule; Save disabled until all pass and Confirm matches | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
-| UI-08 | AC-07 | UI | Server rejects current or new password | Message below the matching field; inputs kept | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
+| UI-01 | AC-01, FR-01 | UI | Login with valid credentials | Calls login once, stores the user, navigates to the role's home | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-02 | AC-03 | UI | Login answered `401` | Generic banner; password cleared, email kept, focus on password | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-03 | AC-04 | UI | Login answered `403 ACCOUNT_INACTIVE` | Inactive-account banner, distinct from the generic one | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-04 | AC-05 | UI | Login answered `429` with `Retry-After` | Throttle banner with minutes | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-05 | FR-01 | UI | Empty fields; double-click Sign in | Inline required messages, no request; busy state sends exactly one request | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-06 | AC-02, FR-04 | UI | Change Password in forced mode | No Cancel or navigation; success goes to the role's home | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
+| UI-07 | AC-07, BR-07 | UI | Typing into New password and Confirm | Checklist items flip per rule; Save disabled until all pass and Confirm matches | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
+| UI-08 | AC-07 | UI | Server rejects current or new password | Message below the matching field; inputs kept | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
 | UI-09 | AC-15, FR-09, FR-10 | UI | App shell for each role | Exact nav destinations per role; name and role badge; Change password and Log out | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
 | UI-10 | AC-15, FR-11 | UI | Forbidden route for a role; protected route while signed out | Home screen with forbidden callout; Login, then back to the original route after sign-in | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
 | UI-11 | AC-06, AC-08 | UI | Log out; any request answered `401` mid-session | Back to Login; session-ended banner in the second case | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
-| UI-12 | AC-02, BR-02 | UI | Must-change user opens any route | Redirected to Change Password | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
+| UI-12 | AC-02, BR-02 | UI | Must-change user opens any route | Redirected to Change Password | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
 | UI-13 | FR-13 | UI | Render the app and inspect routes, components, and storage | No selector route or component; the `tokTickIT.devRequester` key is never read or written | `client/tests/lab-03/AppShellRoles.test.tsx` | Planned |
 | UI-14 | AC-19, FR-14 | UI | Requester Ticket Detail comments thread and composer, including a closed ticket | Oldest first with author, role, time; post adds it; empty body blocked; closed ticket disables the composer | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Planned |
 | UI-15 | AC-20, BR-47 | UI | Problem appears resolved flow | Confirmation dialog with optional comment; after success the pill and date replace the button | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Planned |
@@ -301,7 +302,7 @@ that owns the row runs it green.
 | AC-02 | API-11, API-12, UI-06, UI-12, E2E-02 |
 | AC-03 | API-03, API-04, UI-02, E2E-03 |
 | AC-04 | API-05, UI-03, E2E-03 |
-| AC-05 | UNIT-06, API-06, API-07, API-73, UI-04 |
+| AC-05 | UNIT-06, API-06, API-07, API-73, API-83, UI-04 |
 | AC-06 | API-09, UI-11, E2E-01 |
 | AC-07 | UNIT-02, UNIT-03, API-13, API-14, UI-07, UI-08 |
 | AC-08 | UNIT-05, API-10, UI-11 |
@@ -352,7 +353,7 @@ level of an acceptance criterion and are traced to that rule in §2.
 | :--- | :--- | :--- |
 | 1 — Sprint 3 Specification & Test Plan | none — documentation only | 0 |
 | 2 — User Model, Lab 2 Migration & Seed | UNIT-01, REG-04, REG-17, MIG-01, MIG-02, MIG-03, MIG-04, MIG-05, MIG-06, MIG-07, MIG-08, MIG-09, MIG-10, MIG-11 | 14 |
-| 3 — Authentication Foundation | UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, API-73, API-80, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 33 |
+| 3 — Authentication Foundation | UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06, API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, API-11, API-12, API-13, API-14, API-15, API-16, API-17, API-73, API-80, API-83, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-12 | 34 |
 | 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 14 |
 | 5 — Requester Regression on Authenticated Identity | SEC-10, REG-01, REG-02, REG-03, REG-05, REG-06, REG-07, REG-08, REG-09, REG-16, UI-13, UI-16 | 12 |
 | 6 — Public Comments & Internal Notes | REG-14, API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 15 |
@@ -362,7 +363,7 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |
 
-**Totals:** UNIT 11, API 82, SEC 11, REG 17, MIG 11, UI 31, STYLE 6, RESP 6, E2E 11 — **186 planned tests**.
+**Totals:** UNIT 11, API 83, SEC 11, REG 17, MIG 11, UI 31, STYLE 6, RESP 6, E2E 11 — **187 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 

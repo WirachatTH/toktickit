@@ -107,12 +107,17 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     await expect(page).toHaveURL(/\/tickets\/new$/);
 
     const categorySelect = page.getByLabel("Category");
+    // locator.all() takes a snapshot without waiting, so wait for the options
+    // the API fills in first. Lab 3 routes the request through the Vite /api
+    // proxy (D-11), which exposed this race; the assertion below is unchanged.
+    await expect(categorySelect.locator("option[value]:not([value=''])").first()).toBeAttached();
     const categoryOptions = await categorySelect.locator("option[value]:not([value=''])").all();
     expect(categoryOptions.length).toBeGreaterThan(0);
     const categoryValue = await categoryOptions[0].getAttribute("value");
     await categorySelect.selectOption(categoryValue!);
 
     const systemSelect = page.getByLabel("Related System");
+    await expect(systemSelect.locator("option[value]:not([value=''])").first()).toBeAttached();
     const systemOptions = await systemSelect.locator("option[value]:not([value=''])").all();
     expect(systemOptions.length).toBeGreaterThan(0);
     const systemValue = await systemOptions[0].getAttribute("value");

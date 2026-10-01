@@ -49,3 +49,54 @@ export async function verifyPassword(password: string, stored: string | null): P
   // of the hash matched.
   return derived.length === expected.length && timingSafeEqual(derived, expected);
 }
+
+// ---------------------------------------------------------------------------
+// Sign-in timing (BR-10, BR-12)
+// ---------------------------------------------------------------------------
+
+// Started when the module loads, not on the first unknown email, so the first
+// such request does not stand out by doing two scrypt operations.
+const dummyHash: Promise<string> = hashPassword(randomBytes(32).toString("base64"));
+
+// Used by login. When there is no hash to check — an unknown email, or a
+// migrated account that has no password yet — it still runs one full scrypt
+// verification against a dummy hash, so response time does not reveal which
+// emails exist or which accounts have a password. Always false in that case.
+export async function verifyPasswordForLogin(password: string, stored: string | null): Promise<boolean> {
+  if (!stored) {
+    await verifyPassword(password, await dummyHash);
+    return false;
+  }
+  return verifyPassword(password, stored);
+}
+
+// ---------------------------------------------------------------------------
+// Password rules (BR-07, BR-08)
+// ---------------------------------------------------------------------------
+
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 128;
+
+// The rules a new password must meet, each with the exact wording the Change
+// Password checklist shows (ui-spec §4). Characters are counted as code points,
+// so an emoji or a Thai character is one character. scrypt has no input-length
+// limit, so no separate byte limit is needed (unlike bcrypt's 72 bytes).
+// Passwords are never trimmed: a space is a character the user chose.
+export function passwordRuleError(password: string, email: string): string | null {
+  const length = [...password].length;
+  if (length < PASSWORD_MIN_LENGTH || length > PASSWORD_MAX_LENGTH) {
+    return `Use ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters.`;
+  }
+  if (!/\p{L}/u.test(password)) return "Include at least one letter.";
+  if (!/\p{Nd}/u.test(password)) return "Include at least one number.";
+  if (password.toLowerCase() === email.trim().toLowerCase()) return "Don't use your email address as your password.";
+  return null;
+}
+
+// BR-08 — needs the current password, so the change-password handler calls
+// this only after it has verified the current password is correct.
+export const SAME_AS_CURRENT = "Choose a password different from your current one.";
+
+export function newPasswordError(newPassword: string, email: string, currentPassword: string): string | null {
+  return passwordRuleError(newPassword, email) ?? (newPassword === currentPassword ? SAME_AS_CURRENT : null);
+}

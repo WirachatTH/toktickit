@@ -156,10 +156,11 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–2 are in (contract; users, migration, and seed). Sections
-> still marked *planned* become true as Issues 3–10 land; each issue updates them.
-> Until Issue 5, the Lab 2 Development Requester selector is still how the app is
-> used — it now lists Requester accounts only.
+> **Status:** Issues 1–3 are in (contract; users, migration, and seed; sign-in).
+> Sections still marked *planned* become true as Issues 4–10 land; each issue
+> updates them. Until Issue 5, Requester screens still use the Lab 2 Development
+> Requester selector — it lists Requester accounts only — so after signing in a
+> Requester is asked to pick one.
 
 ### Applying the Lab 3 migration and seed
 Back up first if your database holds anything you care about — the migration is
@@ -181,8 +182,8 @@ tickets it created; a second run creates nothing. `npx prisma migrate diff
 
 ### Local development accounts
 Seeded accounts for **local development only** — never reuse these anywhere else.
-Every one uses the password **`TokTickIT-dev-2026`**. Sign-in itself arrives with
-Issue 3.
+Every one uses the password **`TokTickIT-dev-2026`**. Sign in at
+[http://localhost:5173/login](http://localhost:5173/login).
 
 | Role | Account | Notes |
 | :--- | :--- | :--- |
@@ -202,7 +203,7 @@ a re-run. To restore every account and sample ticket to the state above:
 `docker-compose exec server npx prisma migrate reset` (this empties the database
 first, then migrates and seeds).
 
-### Configuration and upgrading an existing Docker stack (planned — Issue 3)
+### Configuration and upgrading an existing Docker stack
 The browser talks only to the Vite dev server, which proxies `/api` to the API, so
 the session cookie works the same in local development and in the Playwright E2E
 setup (`docs/lab-03/specification.md` D-11). New settings, all with working
@@ -214,10 +215,22 @@ defaults:
 | `API_PROXY_TARGET` | client | `http://localhost:3000` (`http://server:3000` in Docker) |
 
 The server container keeps `node_modules` in an anonymous volume, so after pulling
-Lab 3 it still has the Lab 2 packages and Prisma client. Rebuild it once:
+Lab 3 it still has the Lab 2 packages (Lab 3 adds `cookie-parser`) and Prisma
+client. Rebuild it once, and recreate the client so it picks up
+`API_PROXY_TARGET`:
 ```bash
 docker-compose up -d --build --renew-anon-volumes server
+docker-compose up -d client
 ```
+
+### Signing in
+- Five wrong passwords for one email within 15 minutes refuse further attempts for
+  that email until the oldest failure is 15 minutes old — the right password
+  included. Restarting the server clears this if you lock yourself out while
+  testing (`docker-compose restart server`).
+- `first.login@kmutt.ac.th` is sent straight to *Set a new password*. Changing it
+  is permanent until `npx prisma migrate reset` (the seed never overwrites a
+  password), so use another account if you want to keep the documented state.
 
 ### Running Lab 3 tests (planned)
 ```bash
