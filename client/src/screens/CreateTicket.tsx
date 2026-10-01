@@ -10,7 +10,7 @@ import {
   RequestedPriority,
   Ticket,
 } from "../api.js";
-import { useRequester } from "../context/RequesterContext.js";
+import { useAuth } from "../context/AuthContext.js";
 import { checkFileBeforeUpload, formatFileSize, MAX_ACTIVE_ATTACHMENTS } from "../attachmentRules.js";
 import { FormField } from "../components/FormField.js";
 import { TextInput } from "../components/TextInput.js";
@@ -41,7 +41,9 @@ interface PendingFile {
 type Screen = "form" | "success";
 
 export function CreateTicket() {
-  const { requester } = useRequester();
+  // Lab 3, Issue 5 — the Requester is the signed-in user (the server takes it
+  // from the session, BR-03); the name is shown for reference only.
+  const { user: requester } = useAuth();
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -124,7 +126,7 @@ export function CreateTicket() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (submitting || !requester) return;
+    if (submitting) return;
 
     const errors = validate();
     if (Object.keys(errors).length > 0) {
@@ -138,7 +140,7 @@ export function CreateTicket() {
     setSubmitting(true);
     try {
       const validFiles = pendingFiles.filter((f) => !f.error).map((f) => f.file);
-      const ticket = await createTicket(requester.id, {
+      const ticket = await createTicket({
         categoryId: Number(categoryId),
         relatedSystemId: Number(relatedSystemId),
         summary: summary.trim(),

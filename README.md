@@ -161,11 +161,11 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–4 are in (contract; users, migration, and seed; sign-in;
-> roles and the app shell). Sections still marked *planned* become true as Issues
-> 5–10 land; each issue updates them. The Requester screens now take the Requester
-> from the session. The Lab 2 selector page (`/select-requester`) is no longer on
-> any screen's path and is removed in Issue 5.
+> **Status:** Issues 1–5 are in (contract; users, migration, and seed; sign-in;
+> roles and the app shell; the Lab 2 Requester flows on sign-in). Sections still
+> marked *planned* become true as Issues 6–10 land; each issue updates them. The
+> Lab 2 Development Requester selector, its header, and its list endpoint are
+> gone: the Requester is always the signed-in user.
 
 ### Applying the Lab 3 migration and seed
 Back up first if your database holds anything you care about — the migration is

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import * as api from "../../src/api.js";
+import { AuthProvider } from "../../src/context/AuthContext.js";
 import type { ComponentProps } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,6 +10,20 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // Issue 3 — App shell navigation, Requester display, responsive mobile nav
 // (docs/lab-02/ui-spec.md §6.1, issues.md Issue 3 "To test": UI-18/STYLE-02).
+//
+// Lab 3, Issue 5 (BR-69): the shell's Development Requester display and its
+// Change Requester action are superseded by the signed-in user's block (Lab 2
+// BR-41 → Lab 3 FR-09), so the three tests that used them are rewritten to the
+// Lab 3 rule; the navigation and mobile tests are unchanged.
+
+const SIGNED_IN: api.AuthUser = {
+  id: 3,
+  name: "Somchai Prasert",
+  email: "somchai.prasert@kmutt.ac.th",
+  role: "REQUESTER",
+  isActive: true,
+  mustChangePassword: false,
+};
 
 function renderShell(path: string, props: Partial<ComponentProps<typeof AppShell>> = {}) {
   return render(
@@ -16,6 +32,19 @@ function renderShell(path: string, props: Partial<ComponentProps<typeof AppShell
         <p>Page content</p>
       </AppShell>
     </MemoryRouter>
+  );
+}
+
+function renderSignedInShell(path: string) {
+  vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(SIGNED_IN);
+  return render(
+    <AuthProvider>
+      <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
+        <AppShell>
+          <p>Page content</p>
+        </AppShell>
+      </MemoryRouter>
+    </AuthProvider>
   );
 }
 
@@ -38,18 +67,18 @@ describe("AppShell", () => {
     expect(myTickets).not.toHaveAttribute("aria-current");
   });
 
-  it("shows the current Requester name and calls onChangeRequester when clicked", async () => {
-    const onChangeRequester = vi.fn();
-    renderShell("/tickets", { currentRequesterName: "Somchai Prasert", onChangeRequester });
+  it("shows the signed-in user's name and ends the session when Log out is clicked", async () => {
+    const logout = vi.spyOn(api, "logout").mockResolvedValue();
+    renderSignedInShell("/tickets");
 
-    expect(screen.getByText("Somchai Prasert")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /change requester/i }));
-    expect(onChangeRequester).toHaveBeenCalledOnce();
+    expect(await screen.findByText("Somchai Prasert")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
+    expect(logout).toHaveBeenCalledOnce();
   });
 
-  it("does not render the Requester display when no Requester is selected", () => {
+  it("does not render the account block when nobody is signed in", () => {
     renderShell("/tickets");
-    expect(screen.queryByRole("button", { name: /change requester/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /log out/i })).not.toBeInTheDocument();
   });
 
   it("toggles the mobile nav open state and its aria-expanded flag", async () => {
@@ -71,15 +100,17 @@ describe("AppShell", () => {
 
   it("keeps every interactive control reachable by keyboard alone", async () => {
     const user = userEvent.setup();
-    renderShell("/tickets", { currentRequesterName: "Somchai Prasert", onChangeRequester: vi.fn() });
+    renderSignedInShell("/tickets");
+    await screen.findByText("Somchai Prasert");
 
     const brand = screen.getByRole("link", { name: "TokTickIT" });
     const toggle = screen.getByRole("button", { name: /toggle navigation menu/i });
     const myTickets = screen.getByRole("link", { name: /my tickets/i });
     const createTicket = screen.getByRole("link", { name: /create ticket/i });
-    const changeRequester = screen.getByRole("button", { name: /change requester/i });
+    const changePassword = screen.getByRole("link", { name: /change password/i });
+    const logOut = screen.getByRole("button", { name: /log out/i });
 
-    const focusOrder = [brand, toggle, myTickets, createTicket, changeRequester];
+    const focusOrder = [brand, toggle, myTickets, createTicket, changePassword, logOut];
     for (const element of focusOrder) {
       await user.tab();
       expect(element).toHaveFocus();

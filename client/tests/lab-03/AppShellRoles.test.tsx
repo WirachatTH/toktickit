@@ -4,14 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import * as api from "../../src/api.js";
 import { AppRoutes } from "../../src/AppRoutes.js";
-import { AppShell } from "../../src/components/AppShell.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
-import { RequesterProvider } from "../../src/context/RequesterContext.js";
 import { LocationProbe, REQUESTER } from "./authTestUtils.js";
 import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // The app shell and routing for signed-in users (docs/lab-03/ui-spec.md §2):
-// UI-09 to UI-12. The real route table, providers, and shell are rendered;
+// UI-09 to UI-13. The real route table, providers, and shell are rendered;
 // only the network is mocked.
 
 const STAFF: api.AuthUser = { ...REQUESTER, id: 8, name: "Pimchanok Srisuk", email: "pimchanok.srisuk@kmutt.ac.th", role: "IT_STAFF" };
@@ -21,7 +19,6 @@ const EMPTY_LIST: api.TicketListResponse = { data: [], pagination: { page: 1, pa
 beforeEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
-  vi.spyOn(api, "fetchActiveRequesters").mockResolvedValue([]);
   vi.spyOn(api, "checkSystem").mockResolvedValue({ online: true, categories: [] });
   vi.spyOn(api, "fetchTickets").mockResolvedValue(EMPTY_LIST);
   vi.spyOn(api, "fetchCategories").mockResolvedValue([]);
@@ -31,12 +28,10 @@ beforeEach(() => {
 function renderAppAt(path: string) {
   return render(
     <AuthProvider>
-      <RequesterProvider>
-        <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
-          <AppRoutes />
-          <LocationProbe />
-        </MemoryRouter>
-      </RequesterProvider>
+      <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
+        <AppRoutes />
+        <LocationProbe />
+      </MemoryRouter>
     </AuthProvider>,
   );
 }
@@ -70,22 +65,6 @@ describe("UI-09 the app shell for each role", () => {
     expect(within(account).getByRole("link", { name: "Change password" })).toHaveAttribute("href", "/change-password");
     expect(within(account).getByRole("button", { name: "Log out" })).toBeInTheDocument();
     // The Lab 2 Development Requester display is gone for a signed-in user.
-    expect(screen.queryByRole("button", { name: /change requester/i })).not.toBeInTheDocument();
-  });
-
-  it("replaces the Lab 2 Development Requester display, even if a caller still passes it", async () => {
-    signedInAs(REQUESTER);
-    render(
-      <AuthProvider>
-        <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/tickets"]}>
-          <AppShell currentRequesterName="Selected Dev Requester" onChangeRequester={() => {}}>
-            <p>content</p>
-          </AppShell>
-        </MemoryRouter>
-      </AuthProvider>,
-    );
-    await screen.findByRole("group", { name: "Account" });
-    expect(screen.queryByText("Selected Dev Requester")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /change requester/i })).not.toBeInTheDocument();
   });
 
@@ -196,7 +175,7 @@ describe("UI-11 the end of a session", () => {
 
       vi.mocked(api.fetchTickets).mockRestore();
       fetchMock.mockResolvedValueOnce(reply("UNAUTHENTICATED"));
-      await expect(api.fetchTickets(REQUESTER.id)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+      await expect(api.fetchTickets()).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       expect(ended).toHaveBeenCalledTimes(1);
     } finally {
       stop();
@@ -217,6 +196,38 @@ describe("UI-11 the end of a session", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Email or password is incorrect.")).toBeInTheDocument();
     expect(screen.queryByText(/your session has ended/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("UI-13 no Development Requester mechanism is left (FR-13)", () => {
+  const KEY = "tokTickIT.devRequester";
+
+  it("has no selector route, component, Change Requester action, or stored selection", async () => {
+    window.localStorage.setItem(KEY, JSON.stringify({ id: 1, name: "Stale Selection", email: "stale@kmutt.ac.th" }));
+    const reads = vi.spyOn(Storage.prototype, "getItem");
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    signedInAs(REQUESTER);
+
+    // The old selector URL renders nothing of the selector.
+    renderAppAt("/select-requester");
+    await waitFor(() => expect(api.fetchCurrentUser).toHaveBeenCalled());
+    expect(screen.queryByLabelText(/development requester/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/this is not a login screen/i)).not.toBeInTheDocument();
+
+    // The Requester screens run on the signed-in user alone: the stale stored
+    // selection is never read, never shown, and nothing is written for it.
+    renderAppAt("/tickets");
+    await screen.findAllByRole("group", { name: "Account" });
+    expect(screen.queryByText("Stale Selection")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /change requester/i })).not.toBeInTheDocument();
+    expect(reads.mock.calls.filter(([key]) => key === KEY)).toHaveLength(0);
+    expect(writes.mock.calls.filter(([key]) => key === KEY)).toHaveLength(0);
+  });
+
+  it("no longer offers the Development Requester API helpers", () => {
+    const exported = Object.keys(api);
+    expect(exported).not.toContain("fetchActiveRequesters");
+    expect(exported).not.toContain("requesterHeaders");
   });
 });
 

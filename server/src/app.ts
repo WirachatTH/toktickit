@@ -98,10 +98,9 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Lab 2, Issue 4 — reference-data endpoints backing the Development
-// Requester Selector and (later) Create Ticket. See docs/lab-02/api-spec.md
-// §2-3. Neither route requires the X-Dev-Requester-Id header — a Requester
-// hasn't been chosen yet when the Selector loads these.
+// Lab 2, Issue 4 — reference-data endpoints behind Create Ticket and the
+// My Tickets filters. See docs/lab-02/api-spec.md §2-3. They stay public in
+// Lab 3 (D-18): only lookup lists every user sees, nothing about any person.
 // ---------------------------------------------------------------------------
 app.get("/api/systems", async (_req: Request, res: Response) => {
   try {
@@ -116,21 +115,8 @@ app.get("/api/systems", async (_req: Request, res: Response) => {
   }
 });
 
-app.get("/api/requesters", async (_req: Request, res: Response) => {
-  try {
-    // Lab 3: IT Staff and Administrators now share the User table, so the
-    // selector must list Requesters only — otherwise a staff account could be
-    // chosen and act as a Requester until Issue 5 removes the selector.
-    const requesters = await getPrisma().user.findMany({
-      where: { isActive: true, role: "REQUESTER" },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    });
-    res.status(200).json(requesters);
-  } catch (error) {
-    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
-  }
-});
+// Lab 3, Issue 5 — GET /api/requesters (the Development Requester list) is
+// removed with the selector it served (FR-13, SEC-10).
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -353,7 +339,7 @@ function parseOrder(raw: unknown): "asc" | "desc" {
   return raw === "asc" ? "asc" : "desc";
 }
 
-// Same class of bug as parsePage/authenticateRequester's id parsing, found
+// Same class of bug as parsePage and the Lab 2 header's id parsing, found
 // by a peer reviewer within minutes of probing this route: Number.isInteger
 // alone accepts a value like 9999999999 (an ordinary finite integer, just
 // outside Int32 range), which reaches Prisma and throws converting it,
@@ -475,6 +461,13 @@ const ATTACHMENT_NOT_FOUND = { error: { code: "NOT_FOUND", message: "Attachment 
 
 class AttachmentLimitError extends Error {}
 class AlreadyRemovedError extends Error {}
+// Lab 3 BR-70 — no attachment is added to or removed from a CLOSED or
+// CANCELLED ticket; existing ones stay downloadable.
+class TicketClosedError extends Error {}
+const TICKET_CLOSED = {
+  error: { code: "TICKET_CLOSED", message: "This ticket is closed, so its attachments can't be changed." },
+};
+const CLOSED_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
 // Postgres's id columns are Int32. `Number.isFinite(9999999999)` is true —
 // it's a perfectly ordinary finite JS number, just outside Int32 range —
@@ -540,7 +533,14 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
           // all of one Ticket's initial files arrive in a single request;
           // here each add is an independent request, so it needs its own
           // lock.
-          await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE`;
+          const [lockedTicket] = await tx.$queryRaw<{ currentStatus: string }[]>`
+            SELECT "currentStatus" FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE
+          `;
+          // Lab 3 BR-70, read under the lock so a concurrent close can't slip
+          // between the check and the insert (BR-80).
+          if (!lockedTicket || CLOSED_STATUSES.has(lockedTicket.currentStatus)) {
+            throw new TicketClosedError();
+          }
 
           const activeCount = await tx.attachment.count({ where: { ticketId, isRemoved: false } });
           if (activeCount >= MAX_ACTIVE_ATTACHMENTS) {
@@ -558,6 +558,9 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
         return res.status(201).json(serializeAttachment(attachment));
       } catch (transactionError) {
         await Promise.all(writtenPaths.map((p) => fs.unlink(p).catch(() => {})));
+        if (transactionError instanceof TicketClosedError) {
+          return res.status(409).json(TICKET_CLOSED);
+        }
         if (transactionError instanceof AttachmentLimitError) {
           return res
             .status(409)
@@ -651,6 +654,15 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
 
     try {
       const updated = await prisma.$transaction(async (tx) => {
+        // Lab 3 BR-70 / BR-80 — lock the ticket row first and refuse a closed
+        // ticket; the attachment row is locked after it, never before.
+        const [lockedTicket] = await tx.$queryRaw<{ currentStatus: string }[]>`
+          SELECT "currentStatus" FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE
+        `;
+        if (!lockedTicket || CLOSED_STATUSES.has(lockedTicket.currentStatus)) {
+          throw new TicketClosedError();
+        }
+
         // Locks this Attachment row so two concurrent removal requests can't
         // both read isRemoved=false and both "win" the update — that race
         // let the second commit silently overwrite the first request's
@@ -677,6 +689,9 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
         removedReason: updated.removedReason,
       });
     } catch (transactionError) {
+      if (transactionError instanceof TicketClosedError) {
+        return res.status(409).json(TICKET_CLOSED);
+      }
       if (transactionError instanceof AlreadyRemovedError) {
         return res
           .status(409)
@@ -708,6 +723,8 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
       where: accessibleTicketWhere(user, ticketId),
       include: {
         requester: { select: { id: true, name: true, email: true } },
+        // Lab 3 BR-71 — the owner as a Person reference (api-spec §0.6).
+        owner: { select: { id: true, name: true, role: true, isActive: true } },
         category: { select: { id: true, name: true } },
         relatedSystem: { select: { id: true, name: true } },
         // id asc is a stable secondary tiebreaker, same reasoning as the
@@ -736,6 +753,11 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
       description: ticket.description,
       requestedPriority: ticket.requestedPriority,
       currentStatus: ticket.currentStatus,
+      // Lab 3, Issue 5 (api-spec §3.3). Picked field by field, as above: IT
+      // Priority and Internal Notes can never reach a Requester (BR-25, BR-71).
+      owner: ticket.owner,
+      resolutionSummary: ticket.resolutionSummary,
+      requesterResolvedAt: ticket.requesterResolvedAt,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       attachments: ticket.attachments.map((a) => ({

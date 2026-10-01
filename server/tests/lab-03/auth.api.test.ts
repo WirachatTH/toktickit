@@ -258,7 +258,7 @@ describe("Mandatory password change (BR-02) and POST /api/auth/change-password",
       ["post", "/api/tickets/1/comments"],
       ["get", "/api/staff/tickets"],
     ] as const) {
-      const res = await request(app)[method](path).set("Cookie", cookie).set("X-Dev-Requester-Id", String(accounts.mustChange.id));
+      const res = await request(app)[method](path).set("Cookie", cookie);
       expect(res.status, `${method} ${path}`).toBe(403);
       expect(res.body.error.code).toBe("PASSWORD_CHANGE_REQUIRED");
     }
@@ -274,15 +274,15 @@ describe("Mandatory password change (BR-02) and POST /api/auth/change-password",
     expect(changed.body.user.mustChangePassword).toBe(false);
 
     // The gate no longer applies: the route now answers as it would for any
-    // Requester session. (The Lab 2 header sent alongside is ignored since Issue 4.)
-    const after = await request(app).get("/api/tickets").set("Cookie", cookie).set("X-Dev-Requester-Id", String(accounts.mustChange.id));
+    // Requester session.
+    const after = await request(app).get("/api/tickets").set("Cookie", cookie);
     expect(after.status).toBe(200);
     expect((await request(app).post("/api/auth/logout").set("Cookie", cookie)).status).toBe(204);
   });
 
   it("API-12 lets the same session reach normal routes once the password is changed", async () => {
     const cookie = cookieOf(await login(accounts.changer.email, PASSWORD));
-    const blocked = await request(app).get("/api/tickets").set("Cookie", cookie).set("X-Dev-Requester-Id", String(accounts.changer.id));
+    const blocked = await request(app).get("/api/tickets").set("Cookie", cookie);
     expect(blocked.status).toBe(403);
 
     await request(app).post("/api/auth/change-password").set("Cookie", cookie).send({ currentPassword: PASSWORD, newPassword: "Changer-pass-22" });
@@ -290,7 +290,7 @@ describe("Mandatory password change (BR-02) and POST /api/auth/change-password",
     expect(row.mustChangePassword).toBe(false);
     expect(await verifyPassword("Changer-pass-22", row.passwordHash)).toBe(true);
 
-    const open = await request(app).get("/api/tickets").set("Cookie", cookie).set("X-Dev-Requester-Id", String(accounts.changer.id));
+    const open = await request(app).get("/api/tickets").set("Cookie", cookie);
     expect(open.status).toBe(200);
   });
 

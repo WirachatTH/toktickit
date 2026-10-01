@@ -25,7 +25,7 @@ let otherId: number;
 let category: { id: number; name: string };
 let system: { id: number; name: string };
 
-// Lab 3 (REG-08, BR-69): Lab 2's X-Dev-Requester-Id header is replaced by a
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
 // session for the same Requester — only how the test authenticates changes.
 // An id with no session (one that names nobody) sends no cookie at all.
 let sessionCookies = new Map<number, string>();
@@ -113,7 +113,7 @@ describe("GET /api/tickets/:id — ownership (API-19, BR-45)", () => {
     expect(JSON.stringify(res.body)).not.toContain(ticket.ticketNumber);
   });
 
-  it("rejects with no X-Dev-Requester-Id header", async () => {
+  it("rejects a request with no session", async () => {
     const ticket = await createOwnedTicket();
     const res = await request(app).get(`/api/tickets/${ticket.id}`);
     expect(res.status).toBe(401);

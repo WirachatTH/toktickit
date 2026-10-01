@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
+import fs from "node:fs/promises";
+import { storedFilePath } from "../../src/attachmentStorage.js";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
@@ -8,7 +10,8 @@ import { endTestSessions, sessionCookieFor } from "./helpers/sessions.js";
 // Requester regression on the Lab 3 schema (docs/lab-03/tests.md §2.4).
 // Issue 2 adds the rows its schema change makes necessary (REG-04, REG-17);
 // Issue 4 moves the Requester endpoints onto the session (REG-01, REG-02,
-// REG-09); Issue 5 extends this file when the selector itself is removed.
+// REG-09); Issue 5 removes the selector (REG-17 rewritten) and adds REG-03,
+// REG-05 to REG-07.
 //
 // Uses only users and tickets it creates itself, and removes them afterwards
 // (D-22); seeded rows are read, never modified.
@@ -50,6 +53,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await endTestSessions(prisma);
+  const files = await prisma.attachment.findMany({ where: { ticketId: { in: createdTicketIds } }, select: { storedFilename: true } });
+  await Promise.all(files.map((f) => fs.unlink(storedFilePath(f.storedFilename)).catch(() => {})));
   await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
 });
@@ -80,37 +85,23 @@ describe("REG-04 a ticket created through the Lab 2 endpoint on the Lab 3 schema
   });
 });
 
-describe("REG-17 staff accounts cannot act as Requesters through the Lab 2 selector", () => {
-  it("leaves IT Staff and Administrators out of the Development Requester list", async () => {
-    const res = await request(app).get("/api/requesters");
-    expect(res.status).toBe(200);
-    const ids = res.body.map((r: { id: number }) => r.id);
-    expect(ids).toContain(requesterId);
-    expect(ids).not.toContain(staffId);
-    expect(ids).not.toContain(adminId);
-
-    // And every listed account really is a Requester.
-    const roles = await prisma.user.findMany({ where: { id: { in: ids } }, select: { role: true } });
-    expect(new Set(roles.map((r) => r.role))).toEqual(new Set(["REQUESTER"]));
+describe("REG-17 no staff account can act as a Requester", () => {
+  // Rewritten in Issue 5 (BR-69): Lab 3 removes the Development Requester list
+  // and its header, so the Lab 2-era checks on them are replaced by the rule
+  // they protected — a staff account can never act as a Requester.
+  it("has no Development Requester list to pick a staff account from", async () => {
+    for (const cookie of [undefined, cookies.requester, cookies.staff, cookies.admin]) {
+      const res = cookie ? await request(app).get("/api/requesters").set("Cookie", cookie) : await request(app).get("/api/requesters");
+      expect(res.status).toBe(404);
+    }
   });
 
-  it("refuses an IT Staff or Administrator id in the dev header exactly like an unknown one", async () => {
-    for (const id of [staffId, adminId]) {
-      const list = await request(app).get("/api/tickets").set("X-Dev-Requester-Id", String(id));
-      expect(list.status, `GET as ${id}`).toBe(401);
-
-      const create = await request(app)
-        .post("/api/tickets")
-        .set("X-Dev-Requester-Id", String(id))
-        .field("categoryId", String(categoryId))
-        .field("relatedSystemId", String(relatedSystemId))
-        .field("summary", "Must never be created")
-        .field("description", "A staff account must not be able to create a ticket as a Requester.");
-      expect(create.status, `POST as ${id}`).toBe(401);
+  it("refuses a staff session on the Requester endpoints, whatever Requester id the old dev header names", async () => {
+    for (const who of ["staff", "admin"] as const) {
+      const res = await request(app).get("/api/tickets").set("Cookie", cookies[who]).set("X-Dev-Requester-Id", String(requesterId));
+      expect(res.status, who).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
     }
-    const unknown = await request(app).get("/api/tickets").set("X-Dev-Requester-Id", "2147483646");
-    expect(unknown.status).toBe(401);
-    expect(await prisma.ticket.count({ where: { summary: "Must never be created" } })).toBe(0);
   });
 });
 
@@ -180,5 +171,166 @@ describe("REG-09 the Requester ticket endpoints are for Requesters (BR-20)", () 
       expect(created.body.error.code).toBe("FORBIDDEN");
     }
     expect(await prisma.ticket.count({ where: { summary: `REG-09 must never exist ${stamp}` } })).toBe(0);
+  });
+});
+
+async function ticketFor(owner: number, data: Record<string, unknown> = {}) {
+  const ticket = await prisma.ticket.create({
+    data: {
+      ticketNumber: `REG5-${stamp}-${createdTicketIds.length}`,
+      requesterId: owner,
+      categoryId,
+      relatedSystemId,
+      summary: "Requester regression fixture",
+      description: "Created by the Lab 3 requester-regression suite.",
+      itPriority: "HIGH",
+      ...data,
+    },
+  });
+  createdTicketIds.push(ticket.id);
+  return ticket;
+}
+
+// A real PNG header, so the server's content sniffing accepts it.
+const PNG = Buffer.from(
+  "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000000020001e221bc330000000049454e44ae426082",
+  "hex",
+);
+
+describe("REG-03 the Lab 2 attachment lifecycle, through a session (FR-12)", () => {
+  it("creates with an attachment, lists, opens, adds, downloads, and soft-removes exactly as in Lab 2", async () => {
+    let create = request(app).post("/api/tickets").set("Cookie", cookies.requester);
+    for (const [key, value] of Object.entries(ticketFields(`REG-03 lifecycle ${stamp}`))) create = create.field(key, value);
+    const created = await create.attach("attachments", PNG, "first.png");
+    expect(created.status).toBe(201);
+    createdTicketIds.push(created.body.id);
+    expect(created.body.attachments).toHaveLength(1);
+
+    const list = await request(app).get(`/api/tickets?search=${encodeURIComponent(created.body.ticketNumber)}`).set("Cookie", cookies.requester);
+    expect(list.status).toBe(200);
+    expect(list.body.data.map((t: { id: number }) => t.id)).toEqual([created.body.id]);
+    expect(list.body.data[0].attachmentCount).toBe(1);
+
+    const detail = await request(app).get(`/api/tickets/${created.body.id}`).set("Cookie", cookies.requester);
+    expect(detail.status).toBe(200);
+    expect(detail.body.summary).toBe(`REG-03 lifecycle ${stamp}`);
+
+    const added = await request(app).post(`/api/tickets/${created.body.id}/attachments`).set("Cookie", cookies.requester).attach("file", PNG, "second.png");
+    expect(added.status).toBe(201);
+
+    const download = await request(app)
+      .get(`/api/tickets/${created.body.id}/attachments/${added.body.id}/download`)
+      .set("Cookie", cookies.requester)
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => done(null, Buffer.concat(chunks)));
+      });
+    expect(download.status).toBe(200);
+    expect(Buffer.compare(download.body as Buffer, PNG)).toBe(0);
+
+    const removed = await request(app)
+      .patch(`/api/tickets/${created.body.id}/attachments/${added.body.id}/remove`)
+      .set("Cookie", cookies.requester)
+      .send({ reason: "Uploaded the wrong file" });
+    expect(removed.status).toBe(200);
+    expect(removed.body.isRemoved).toBe(true);
+
+    // Removed: no longer downloadable, metadata kept (Lab 2 BR-37).
+    expect((await request(app).get(`/api/tickets/${created.body.id}/attachments/${added.body.id}/download`).set("Cookie", cookies.requester)).status).toBe(404);
+    const metadata = await request(app).get(`/api/tickets/${created.body.id}/attachments/${added.body.id}`).set("Cookie", cookies.requester);
+    expect(metadata.status).toBe(200);
+    expect(metadata.body.isRemoved).toBe(true);
+  });
+});
+
+describe("REG-05 the Requester Ticket Detail payload (BR-71, api-spec §3.3)", () => {
+  it("adds owner, resolution summary, and the appears-resolved time — and never IT Priority or notes", async () => {
+    const unassigned = await ticketFor(requesterId);
+    const open = await request(app).get(`/api/tickets/${unassigned.id}`).set("Cookie", cookies.requester);
+    expect(open.status).toBe(200);
+    expect(open.body.owner).toBeNull();
+    expect(open.body.resolutionSummary).toBeNull();
+    expect(open.body.requesterResolvedAt).toBeNull();
+
+    const resolvedAt = new Date("2026-10-01T09:00:00.000Z");
+    const resolved = await ticketFor(requesterId, {
+      ownerId: staffId,
+      currentStatus: "RESOLVED",
+      resolutionSummary: "Reset the mailbox password and confirmed sign-in.",
+      requesterResolvedAt: resolvedAt,
+    });
+    await prisma.internalNote.create({ data: { ticketId: resolved.id, authorId: staffId, body: "Internal: never show this to the Requester" } });
+    const res = await request(app).get(`/api/tickets/${resolved.id}`).set("Cookie", cookies.requester);
+    expect(res.status).toBe(200);
+    // The owner as a Person reference (api-spec §0.6): no email or anything else.
+    expect(res.body.owner).toEqual({ id: staffId, name: `Regression IT_STAFF ${stamp}`, role: "IT_STAFF", isActive: true });
+    expect(res.body.currentStatus).toBe("RESOLVED");
+    expect(res.body.resolutionSummary).toBe("Reset the mailbox password and confirmed sign-in.");
+    expect(res.body.requesterResolvedAt).toBe(resolvedAt.toISOString());
+
+    const text = JSON.stringify(res.body);
+    expect(res.body).not.toHaveProperty("itPriority");
+    expect(text).not.toMatch(/itPriority|internalNote|noteCount|"notes"/i);
+    expect(text).not.toContain("never show this to the Requester");
+  });
+});
+
+describe("REG-06 attachments on a closed ticket (BR-70)", () => {
+  it("refuses adding or soft-removing on CLOSED and CANCELLED with 409 TICKET_CLOSED, and still downloads", async () => {
+    for (const status of ["CLOSED", "CANCELLED"] as const) {
+      const ticket = await ticketFor(requesterId, { currentStatus: status });
+      const storedFilename = `reg06-${stamp}-${status}.png`;
+      await fs.writeFile(storedFilePath(storedFilename), PNG);
+      const attachment = await prisma.attachment.create({
+        data: { ticketId: ticket.id, originalFilename: "kept.png", storedFilename, mimeType: "image/png", sizeBytes: PNG.length },
+      });
+
+      const add = await request(app).post(`/api/tickets/${ticket.id}/attachments`).set("Cookie", cookies.requester).attach("file", PNG, "late.png");
+      expect(add.status, `add on ${status}`).toBe(409);
+      expect(add.body.error.code).toBe("TICKET_CLOSED");
+
+      const remove = await request(app)
+        .patch(`/api/tickets/${ticket.id}/attachments/${attachment.id}/remove`)
+        .set("Cookie", cookies.requester)
+        .send({ reason: "Trying to change a closed ticket" });
+      expect(remove.status, `remove on ${status}`).toBe(409);
+      expect(remove.body.error.code).toBe("TICKET_CLOSED");
+
+      const download = await request(app).get(`/api/tickets/${ticket.id}/attachments/${attachment.id}/download`).set("Cookie", cookies.requester);
+      expect(download.status, `download on ${status}`).toBe(200);
+
+      expect(await prisma.attachment.count({ where: { ticketId: ticket.id } })).toBe(1);
+      expect((await prisma.attachment.findUniqueOrThrow({ where: { id: attachment.id } })).isRemoved).toBe(false);
+    }
+  });
+
+  it("still lets the Requester add to and remove from a ticket that is not closed", async () => {
+    const ticket = await ticketFor(requesterId, { currentStatus: "IN_PROGRESS" });
+    const add = await request(app).post(`/api/tickets/${ticket.id}/attachments`).set("Cookie", cookies.requester).attach("file", PNG, "fine.png");
+    expect(add.status).toBe(201);
+    const remove = await request(app)
+      .patch(`/api/tickets/${ticket.id}/attachments/${add.body.id}/remove`)
+      .set("Cookie", cookies.requester)
+      .send({ reason: "Not needed after all" });
+    expect(remove.status).toBe(200);
+  });
+});
+
+describe("REG-07 reference data stays public (D-18)", () => {
+  it("answers categories, systems, and health with their Lab 1/Lab 2 shapes, signed out and as every role", async () => {
+    for (const cookie of [undefined, cookies.requester, cookies.staff, cookies.admin]) {
+      const get = (path: string) => (cookie ? request(app).get(path).set("Cookie", cookie) : request(app).get(path));
+      const health = await get("/api/health");
+      expect(health.status).toBe(200);
+      expect(health.body).toEqual({ status: "ok", service: "TokTickIT API" });
+      for (const path of ["/api/categories", "/api/systems"]) {
+        const res = await get(path);
+        expect(res.status, path).toBe(200);
+        expect(res.body.length, path).toBeGreaterThan(0);
+        for (const row of res.body) expect(Object.keys(row).sort(), path).toEqual(["id", "name"]);
+      }
+    }
   });
 });

@@ -1,7 +1,6 @@
-import type { Role } from "../api.js";
+import type { Role, TicketStatus } from "../api.js";
 
 export type Priority = "LOW" | "MEDIUM" | "HIGH";
-export type TicketStatus = "NEW";
 
 const PRIORITY_CLASS: Record<Priority, string> = {
   LOW: "zg-badge--priority-low",
@@ -9,7 +8,9 @@ const PRIORITY_CLASS: Record<Priority, string> = {
   HIGH: "zg-badge--priority-high",
 };
 
-const STATUS_CLASS: Record<TicketStatus, string> = {
+// Lab 2 defined NEW only; the other seven status badges (ui-spec §1.2) arrive
+// with the workflow in Issue 8 and use the visible fallback until then.
+const STATUS_CLASS: Partial<Record<TicketStatus, string>> = {
   NEW: "zg-badge--status-new",
 };
 

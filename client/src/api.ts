@@ -19,31 +19,10 @@ export interface SystemStatus {
 //        then fetch `${API_URL}/api/categories`; if not ok, throw.
 //        return { online: true, categories }.
 // Throwing on failure lets the UI show a single Offline/error state.
-// ---------------------------------------------------------------------------
-// Lab 2, Issue 4 — Development Requester reference data (api-spec.md §3,
-// BR-06/BR-07). The header helper here establishes the one place every
-// later Requester-scoped call (Create Ticket, My Tickets, Ticket Detail,
-// Attachments) builds its X-Dev-Requester-Id header from.
-// ---------------------------------------------------------------------------
-
-export interface Requester {
-  id: number;
-  name: string;
-  email: string;
-}
-
-/** Testing-only identity header (BR-07) — never a substitute for real auth. */
-export function requesterHeaders(requesterId: number): Record<string, string> {
-  return { "X-Dev-Requester-Id": String(requesterId) };
-}
-
-export async function fetchActiveRequesters(): Promise<Requester[]> {
-  const res = await fetch(`${API_URL}/api/requesters`);
-  if (!res.ok) {
-    throw new Error("Unable to load Development Requesters");
-  }
-  return res.json();
-}
+// Lab 3, Issue 5 — every Requester call below is made as the signed-in user:
+// the session cookie travels with the same-origin request, and the server
+// takes the Requester from it (BR-03). Lab 2's Development Requester list and
+// header are gone (FR-13), so no call names a Requester any more.
 
 // ---------------------------------------------------------------------------
 // Lab 2, Issue 5 — Create Ticket (api-spec.md §4, BR-38). Attachments ride
@@ -57,7 +36,16 @@ export interface RelatedSystem {
 }
 
 export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH";
-export type TicketStatus = "NEW";
+// Lab 3 — all eight statuses (api-spec §0.6).
+export type TicketStatus =
+  | "NEW"
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_REQUESTER"
+  | "RESOLVED"
+  | "CLOSED"
+  | "REOPENED"
+  | "CANCELLED";
 
 export interface Attachment {
   id: number;
@@ -165,7 +153,7 @@ export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
   return res.json();
 }
 
-export async function createTicket(requesterId: number, input: NewTicketInput): Promise<Ticket> {
+export async function createTicket(input: NewTicketInput): Promise<Ticket> {
   const formData = new FormData();
   formData.append("categoryId", String(input.categoryId));
   formData.append("relatedSystemId", String(input.relatedSystemId));
@@ -182,7 +170,6 @@ export async function createTicket(requesterId: number, input: NewTicketInput): 
   // multipart boundary itself; setting it manually breaks the request.
   const res = await fetch(`${API_URL}/api/tickets`, {
     method: "POST",
-    headers: requesterHeaders(requesterId),
     body: formData,
   });
 
@@ -236,7 +223,7 @@ export interface TicketListParams {
   page?: number;
 }
 
-export async function fetchTickets(requesterId: number, params: TicketListParams = {}): Promise<TicketListResponse> {
+export async function fetchTickets(params: TicketListParams = {}): Promise<TicketListResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.categoryId) query.set("categoryId", String(params.categoryId));
@@ -246,9 +233,7 @@ export async function fetchTickets(requesterId: number, params: TicketListParams
   if (params.order) query.set("order", params.order);
   if (params.page) query.set("page", String(params.page));
 
-  const res = await fetch(`${API_URL}/api/tickets?${query.toString()}`, {
-    headers: requesterHeaders(requesterId),
-  });
+  const res = await fetch(`${API_URL}/api/tickets?${query.toString()}`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -270,6 +255,14 @@ export interface TicketDetailAttachment {
   removedReason: string | null;
 }
 
+/** A person inside a ticket payload (api-spec §0.6). */
+export interface PersonRef {
+  id: number;
+  name: string;
+  role: Role;
+  isActive: boolean;
+}
+
 export interface TicketDetail {
   id: number;
   ticketNumber: string;
@@ -280,28 +273,27 @@ export interface TicketDetail {
   description: string;
   requestedPriority: RequestedPriority;
   currentStatus: TicketStatus;
+  // Lab 3, Issue 5 (api-spec §3.3). Never IT Priority or notes (BR-71).
+  owner: PersonRef | null;
+  resolutionSummary: string | null;
+  requesterResolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
   attachments: TicketDetailAttachment[];
 }
 
-export async function fetchTicket(requesterId: number, ticketId: number): Promise<TicketDetail> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}`, { headers: requesterHeaders(requesterId) });
+export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
 
-export async function addAttachmentToTicket(
-  requesterId: number,
-  ticketId: number,
-  file: File
-): Promise<TicketDetailAttachment> {
+export async function addAttachmentToTicket(ticketId: number, file: File): Promise<TicketDetailAttachment> {
   const formData = new FormData();
   formData.append("file", file);
 
   const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
     method: "POST",
-    headers: requesterHeaders(requesterId),
     body: formData,
   });
   if (!res.ok) throw await toApiError(res);
@@ -315,15 +307,10 @@ export interface RemovedAttachment {
   removedReason: string;
 }
 
-export async function removeAttachment(
-  requesterId: number,
-  ticketId: number,
-  attachmentId: number,
-  reason: string
-): Promise<RemovedAttachment> {
+export async function removeAttachment(ticketId: number, attachmentId: number, reason: string): Promise<RemovedAttachment> {
   const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/remove`, {
     method: "PATCH",
-    headers: { ...requesterHeaders(requesterId), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
   if (!res.ok) throw await toApiError(res);
@@ -335,10 +322,8 @@ export async function removeAttachment(
 // filename from fetchTicket()'s response, and that header isn't readable
 // from browser JS on a cross-origin response anyway unless the server opts
 // in via Access-Control-Expose-Headers, which it doesn't.
-export async function downloadAttachment(requesterId: number, ticketId: number, attachmentId: number): Promise<Blob> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
-    headers: requesterHeaders(requesterId),
-  });
+export async function downloadAttachment(ticketId: number, attachmentId: number): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`);
   if (!res.ok) throw await toApiError(res);
   return res.blob();
 }

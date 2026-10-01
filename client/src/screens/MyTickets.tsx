@@ -11,7 +11,6 @@ import {
   TicketListItem,
   TicketSortField,
 } from "../api.js";
-import { useRequester } from "../context/RequesterContext.js";
 import { Select } from "../components/Select.js";
 import { TextInput } from "../components/TextInput.js";
 import { Button } from "../components/Button.js";
@@ -59,7 +58,6 @@ function formatDateTime(iso: string): string {
 }
 
 export function MyTickets() {
-  const { requester } = useRequester();
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -100,12 +98,11 @@ export function MyTickets() {
   }, [searchInput]);
 
   useEffect(() => {
-    if (!requester) return;
     let cancelled = false;
     setListState("loading");
     const [sort, order] = sortValue.split(":") as [TicketSortField, SortOrder];
 
-    fetchTickets(requester.id, {
+    fetchTickets({
       search: debouncedSearch || undefined,
       categoryId: categoryId ? Number(categoryId) : undefined,
       relatedSystemId: relatedSystemId ? Number(relatedSystemId) : undefined,
@@ -128,9 +125,7 @@ export function MyTickets() {
     return () => {
       cancelled = true;
     };
-    // requester?.id is the live-reload trigger for AC-10/BR-09 (switching the
-    // selected Requester reloads this list — see UI-09).
-  }, [requester?.id, debouncedSearch, categoryId, relatedSystemId, requestedPriority, sortValue, page, retryToken]);
+  }, [debouncedSearch, categoryId, relatedSystemId, requestedPriority, sortValue, page, retryToken]);
 
   function resetToFirstPage() {
     setPage(1);

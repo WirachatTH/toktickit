@@ -7,7 +7,6 @@ import { ChangePassword } from "./screens/ChangePassword.js";
 import { RequireAuth } from "./components/RequireAuth.js";
 import { AppShell } from "./components/AppShell.js";
 import SystemStatus from "./screens/SystemStatus.js";
-import { RequesterSelector } from "./screens/RequesterSelector.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
@@ -21,9 +20,8 @@ import { ROUTES, SCREEN_ROLES } from "./routes.js";
 
 // Lab 3, Issue 4 — every protected screen is reached through RequireAuth with
 // the roles that may open it (routes.ts SCREEN_ROLES), inside the role-aware
-// shell. The Requester screens take the signed-in user as "the Requester"
-// (RequesterContext); the Lab 2 selector is no longer on their path, and Issue 5
-// removes it.
+// shell. The Requester screens act as the signed-in user; Lab 2's Development
+// Requester selector is gone (Issue 5, FR-13).
 function Protected({ roles, children }: { roles: readonly Role[]; children: ReactNode }) {
   return (
     <RequireAuth roles={roles}>
@@ -59,7 +57,6 @@ function AppRouteTable() {
       <Route path={ROUTES.changePassword} element={<ChangePassword />} />
       {/* Lab 1's System Status page stays public (D-18). */}
       <Route path="/" element={<SystemStatus />} />
-      <Route path={ROUTES.select} element={<RequesterSelector />} />
       <Route
         path={ROUTES.list}
         element={

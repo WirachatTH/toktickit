@@ -1,5 +1,4 @@
 import { BrowserRouter } from "react-router-dom";
-import { RequesterProvider } from "./context/RequesterContext.js";
 import { AuthProvider } from "./context/AuthContext.js";
 import { AppRoutes } from "./AppRoutes.js";
 
@@ -10,11 +9,9 @@ const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } a
 export default function App() {
   return (
     <AuthProvider>
-      <RequesterProvider>
-        <BrowserRouter future={ROUTER_FUTURE}>
-          <AppRoutes />
-        </BrowserRouter>
-      </RequesterProvider>
+      <BrowserRouter future={ROUTER_FUTURE}>
+        <AppRoutes />
+      </BrowserRouter>
     </AuthProvider>
   );
 }
