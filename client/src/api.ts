@@ -446,3 +446,58 @@ export function fetchInternalNotes(ticketId: number): Promise<DiscussionEntry[]>
 export function postInternalNote(ticketId: number, body: string): Promise<DiscussionEntry> {
   return postEntry(`/api/tickets/${ticketId}/internal-notes`, body);
 }
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 7 — the IT Staff Ticket Queue and assignable users (api-spec.md
+// §5.1, §5.3). Query values are sent as the URL has them; the server applies
+// defaults and clamps, and echoes what it applied (BR-66).
+// ---------------------------------------------------------------------------
+
+export type Priority = RequestedPriority;
+
+export interface QueueQuery {
+  search: string;
+  status: "ACTIVE" | "ALL" | TicketStatus;
+  itPriority: Priority | null;
+  categoryId: number | null;
+  owner: "any" | "unassigned" | "me" | number;
+  appearsResolved: boolean;
+  sort: "itPriority" | "createdAt" | "updatedAt" | "ticketNumber" | "status";
+  order: SortOrder;
+  page: number;
+  pageSize: number;
+}
+
+export interface QueueRow {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  requester: PersonRef;
+  category: { id: number; name: string };
+  requestedPriority: Priority;
+  itPriority: Priority;
+  currentStatus: TicketStatus;
+  owner: PersonRef | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QueueResponse {
+  data: QueueRow[];
+  pagination: PaginationMeta;
+  appliedQuery: QueueQuery;
+}
+
+export async function fetchStaffQueue(params: Record<string, string> = {}): Promise<QueueResponse> {
+  const query = new URLSearchParams(params).toString();
+  const res = await apiFetch(query ? `/api/staff/tickets?${query}` : "/api/staff/tickets");
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function fetchAssignableUsers(): Promise<PersonRef[]> {
+  const res = await apiFetch("/api/staff/assignable-users");
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}

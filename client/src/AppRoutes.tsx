@@ -11,6 +11,7 @@ import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { ComingSoon } from "./screens/ComingSoon.js";
+import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
 import { ROUTES, SCREEN_ROLES } from "./routes.js";
 
 // The actual route table the app ships, extracted out of App.tsx so tests
@@ -85,7 +86,7 @@ function AppRouteTable() {
         path={ROUTES.staffQueue}
         element={
           <Protected roles={SCREEN_ROLES.staffQueue}>
-            <ComingSoon title="Ticket Queue" />
+            <StaffTicketQueue />
           </Protected>
         }
       />

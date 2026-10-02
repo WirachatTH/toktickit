@@ -12,8 +12,14 @@ import { LoadingSpinner } from "./LoadingSpinner.js";
 //
 // Bodies are rendered as React text with line breaks preserved — never as
 // HTML — so whatever someone typed is shown exactly as typed (BR-51).
+//
+// The composer opens only once the thread has loaded (so a post never lands in
+// a half-shown or failed thread), closes for good when the server says the
+// ticket was closed meanwhile (409), and keeps keyboard focus across a post
+// (PR #56 review).
 
 export const BODY_MAX = 2000;
+const CLOSED_NOTE = "This ticket is closed — new comments are not accepted.";
 
 export interface DiscussionThreadProps {
   load: () => Promise<DiscussionEntry[]>;
@@ -51,6 +57,7 @@ export function DiscussionThread({
   const setDraft = onDraftChange ?? setOwnDraft;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [closedByServer, setClosedByServer] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,8 +72,10 @@ export function DiscussionThread({
   }, []);
 
   const trimmed = draft.trim();
-  const closed = Boolean(closedNote);
-  const canSubmit = !closed && !busy && trimmed.length > 0 && trimmed.length <= BODY_MAX;
+  const closed = Boolean(closedNote) || closedByServer;
+  const shownClosedNote = closedNote ?? (closedByServer ? CLOSED_NOTE : null);
+  const loaded = entries !== null;
+  const canSubmit = loaded && !closed && !busy && trimmed.length > 0 && trimmed.length <= BODY_MAX;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -80,10 +89,14 @@ export function DiscussionThread({
     } catch (failure) {
       const err = failure instanceof ApiError ? failure : null;
       if (err?.fields?.body) setError(err.fields.body);
-      else if (err?.code === "TICKET_CLOSED") setError("This ticket is closed — new comments are not accepted.");
+      // Closed in the meantime (another tab, another person): stop accepting
+      // posts here too, rather than letting the same 409 repeat.
+      else if (err?.code === "TICKET_CLOSED") setClosedByServer(true);
       else setError("Something went wrong. Please try again.");
     } finally {
       setBusy(false);
+      // The box was read-only while sending; give the keyboard back to it.
+      document.getElementById(fieldId)?.focus();
     }
   }
 
@@ -121,7 +134,8 @@ export function DiscussionThread({
           <TextArea
             id={fieldId}
             value={draft}
-            disabled={closed || busy}
+            disabled={closed || !loaded}
+            readOnly={busy}
             invalid={Boolean(error)}
             aria-describedby={`${fieldId}-count${error ? ` ${fieldId}-error` : ""}`}
             onChange={(e) => {
@@ -138,7 +152,7 @@ export function DiscussionThread({
                   {error}
                 </span>
               )}
-              {closedNote && <span style={{ color: "var(--zg-text-muted)" }}>{closedNote}</span>}
+              {shownClosedNote && <span style={{ color: "var(--zg-text-muted)" }}>{shownClosedNote}</span>}
             </div>
             <span id={`${fieldId}-count`} className="small" style={{ color: trimmed.length > BODY_MAX ? "var(--zg-error-text)" : "var(--zg-text-muted)" }}>
               {draft.length}/{BODY_MAX}

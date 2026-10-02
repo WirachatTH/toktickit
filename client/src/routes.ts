@@ -28,6 +28,11 @@ export const HOME_BY_ROLE: Record<Role, string> = {
   ADMINISTRATOR: ROUTES.adminUsers,
 };
 
+/** IT Staff Ticket Detail for one ticket (its screen arrives in Issue 8). */
+export function staffTicketPath(id: number | string): string {
+  return `/staff/tickets/${id}`;
+}
+
 export function homeFor(role: Role): string {
   return HOME_BY_ROLE[role] ?? ROUTES.list;
 }

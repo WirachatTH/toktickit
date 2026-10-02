@@ -41,17 +41,29 @@ export interface DiscussionPanelProps {
   canPost: boolean;
 }
 
-export function DiscussionPanel({ ticketId, canComment, canPost }: DiscussionPanelProps) {
+// Keyed by ticket, so showing another ticket starts over: both threads reload
+// and both drafts are empty (PR #56 review — the threads load once on mount).
+export function DiscussionPanel(props: DiscussionPanelProps) {
+  return <TicketDiscussion key={props.ticketId} {...props} />;
+}
+
+function TicketDiscussion({ ticketId, canComment, canPost }: DiscussionPanelProps) {
   const baseId = useId();
   const [active, setActive] = useState<Tab>("public");
   const [drafts, setDrafts] = useState<Record<Tab, string>>({ public: "", internal: "" });
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ public: null, internal: null });
   const setDraft = (tab: Tab) => (value: string) => setDrafts((current) => ({ ...current, [tab]: value }));
 
+  // WAI-ARIA tabs: the arrow keys move between the two tabs, Home and End go
+  // to the first and the last (Home/End added after the PR #56 review).
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const next: Tab | null =
+      event.key === "ArrowRight" || event.key === "ArrowLeft" ? (active === "public" ? "internal" : "public")
+        : event.key === "Home" ? "public"
+        : event.key === "End" ? "internal"
+        : null;
+    if (!next) return;
     event.preventDefault();
-    const next: Tab = active === "public" ? "internal" : "public";
     setActive(next);
     tabRefs.current[next]?.focus();
   }

@@ -10,11 +10,10 @@ import { DiscussionThread } from "../components/DiscussionThread.js";
 import { CLOSED_COMMENT_NOTE } from "../components/DiscussionPanel.js";
 import { ROUTES } from "../routes.js";
 
-// Requester Ticket Detail (ui-spec.md §6.5, specification.md BR-45/BR-46,
-// AC-03). Deliberately does NOT render Public Comments, Internal Notes,
-// Actions Taken, or any status-change control — those features don't exist
-// in Lab 2's data model, and BR-46 requires this screen never imply
-// otherwise, regardless of what a Ticket's data looks like (UI-10).
+// Requester Ticket Detail (Lab 2 ui-spec.md §6.5, extended by Lab 3 ui-spec.md
+// §5). It never renders Internal Notes, IT Priority, Actions Taken, or any
+// status-change control, whatever a ticket's data looks like (Lab 3 BR-71; Lab
+// 2 BR-46 also kept out Public Comments, which Lab 3 adds below — BR-68).
 //
 // Lab 3, Issue 5: the ticket is fetched as the signed-in Requester (the server
 // scopes it to them), the header band shows the owner or "Not yet assigned"

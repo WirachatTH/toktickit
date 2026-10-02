@@ -186,3 +186,44 @@ describe("UI-14 the Requester's comments thread and composer (FR-14, FR-15)", ()
     expect(screen.getByText("This ticket is closed — new comments are not accepted.")).toBeInTheDocument();
   });
 });
+
+// Follow-ups from the PR #56 review (Issue 7).
+describe("#56 review: the composer's state", () => {
+  it("closes the composer when the server says the ticket was closed meanwhile (409 TICKET_CLOSED)", async () => {
+    vi.spyOn(api, "postComment").mockRejectedValue(new api.ApiError(409, "TICKET_CLOSED", "This ticket is closed, so new comments are not accepted."));
+    renderDetail(BASE); // loaded as open: canComment true
+    const box = await screen.findByRole("textbox", { name: /add a comment/i });
+    await userEvent.type(box, "One more thing");
+    await userEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    expect(await screen.findByText("This ticket is closed — new comments are not accepted.")).toBeInTheDocument();
+    expect(box).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Post comment" })).toBeDisabled();
+  });
+
+  it("keeps the composer disabled until the thread has loaded, and after the thread fails to load", async () => {
+    let finish: (v: api.DiscussionEntry[]) => void = () => {};
+    vi.mocked(api.fetchComments).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { unmount } = renderDetail(BASE);
+    const box = await screen.findByRole("textbox", { name: /add a comment/i });
+    expect(box).toBeDisabled();
+    finish([]);
+    await waitFor(() => expect(box).toBeEnabled());
+    unmount();
+
+    vi.mocked(api.fetchComments).mockRejectedValue(new Error("down"));
+    renderDetail(BASE);
+    expect(await screen.findByText("Unable to load this thread. Please reload the page.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /add a comment/i })).toBeDisabled();
+  });
+
+  it("keeps keyboard focus in the box after posting", async () => {
+    vi.spyOn(api, "postComment").mockResolvedValue(entry(9, "Thanks!", ME));
+    renderDetail(BASE);
+    const box = await screen.findByRole("textbox", { name: /add a comment/i });
+    await waitFor(() => expect(box).toBeEnabled());
+    await userEvent.type(box, "Thanks!");
+    await userEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    await screen.findByTestId("entry-body");
+    await waitFor(() => expect(box).toHaveFocus());
+  });
+});
