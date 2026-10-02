@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { Badge, RoleBadge } from "../../src/components/Badge.js";
+import { InternalRegion } from "../../src/components/DiscussionPanel.js";
 
 // Zen Green additions for Lab 3 (docs/lab-03/ui-spec.md §1). Issue 4 adds
 // STYLE-05; later issues extend this file with the status badges and the
@@ -65,5 +66,29 @@ describe("STYLE-05 role badges and shared priority badges", () => {
     }
     // No second, IT-only palette exists for a screen to drift to.
     expect(css).not.toMatch(/--(it|requested)-priority/);
+  });
+});
+
+describe("STYLE-03 the Internal region (ui-spec §1.1, §1.6)", () => {
+  it("defines the three --zg-internal-* tokens with the specified values", () => {
+    const root = ruleOf(":root");
+    expect(root).toMatch(/--zg-internal-bg: #eef1f6;/);
+    expect(root).toMatch(/--zg-internal-border: #7c8ba3;/);
+    expect(root).toMatch(/--zg-internal-text: #3d4a5c;/);
+  });
+
+  it("styles the region only through those tokens: tinted background, 4px dashed left edge", () => {
+    const region = ruleOf(".zg-internal-region");
+    expect(region).toMatch(/background: var\(--zg-internal-bg\);/);
+    expect(region).toMatch(/border-left: 4px dashed var\(--zg-internal-border\);/);
+    expect(region).not.toMatch(/#[0-9a-f]{3,6}/);
+    expect(ruleOf(".zg-internal-caption")).toMatch(/color: var\(--zg-internal-text\);/);
+  });
+
+  it("carries its meaning in text, not only colour", () => {
+    render(<InternalRegion>note list</InternalRegion>);
+    const caption = screen.getByText("Internal — not visible to the Requester");
+    expect(caption).toHaveClass("zg-internal-caption");
+    expect(caption.closest(".zg-internal-region")).toHaveTextContent("note list");
   });
 });

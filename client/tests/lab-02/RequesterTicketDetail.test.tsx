@@ -32,6 +32,7 @@ const TICKET: TicketDetail = {
   owner: null,
   resolutionSummary: null,
   requesterResolvedAt: null,
+  canComment: true,
   createdAt: "2026-08-27T09:15:00.000Z",
   updatedAt: "2026-08-27T09:15:00.000Z",
   attachments: [
@@ -61,6 +62,8 @@ function renderScreen(path = "/tickets/42") {
 
 beforeEach(() => {
   window.localStorage.clear();
+  // Lab 3, Issue 6 — the screen now loads its Public Comments too (setup only).
+  vi.spyOn(api, "fetchComments").mockResolvedValue([]);
 });
 
 describe("rendering an owned ticket (UI-10, BR-46)", () => {
@@ -79,17 +82,23 @@ describe("rendering an owned ticket (UI-10, BR-46)", () => {
     expect(screen.getByText("battery_report.pdf")).toBeInTheDocument();
   });
 
-  it("never renders a comment box, internal notes field, or status-change control, regardless of the ticket's data (BR-46)", async () => {
-    vi.spyOn(api, "fetchTicket").mockResolvedValue(TICKET);
+  // REG-14 — Lab 2 BR-46 ("no comment box") is superseded by Lab 3 FR-14/FR-15
+  // (BR-68), so this test is rewritten to the Lab 3 rule (BR-69): the Requester
+  // now has a comment box, and everything else BR-46 kept out stays out.
+  it("REG-14 has a comment box, but never internal notes, IT Priority, Actions Taken, or a status control, regardless of the ticket's data", async () => {
+    vi.spyOn(api, "fetchTicket").mockResolvedValue({ ...TICKET, itPriority: "HIGH", internalNotes: [{ body: "secret" }] } as TicketDetail);
     renderScreen();
     await screen.findByText("TCK-000042");
 
-    expect(screen.queryByText(/public comment/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: /add a comment/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Post comment" })).toBeInTheDocument();
     expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("secret")).not.toBeInTheDocument();
+    expect(screen.queryByText(/IT Priority/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("HIGH")).not.toBeInTheDocument();
     expect(screen.queryByText(/action(s)? taken/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /status/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /change status/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /comment/i })).not.toBeInTheDocument();
   });
 
   it("fetches the ticket by the id in the URL (the server scopes it to the signed-in Requester)", async () => {

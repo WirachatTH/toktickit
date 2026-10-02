@@ -18,6 +18,10 @@
   --zg-warning-bg: #FFF4DE;
   --zg-warning-text: #8A5A00;
   --zg-success-text: #0B7A46;
+  /* Lab 3 (docs/lab-03/ui-spec.md §1.1) — the Internal region only. */
+  --zg-internal-bg: #EEF1F6;
+  --zg-internal-border: #7C8BA3;
+  --zg-internal-text: #3D4A5C;
 }
 
 body {
@@ -538,4 +542,46 @@ textarea.zg-field {
 @media (max-width: 767.98px) {
   .zg-shell-account { padding-top: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.4); }
   .zg-banner-dismiss { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 6 — comment and note threads, the Internal region, and
+   tabs (docs/lab-03/ui-spec.md §1.6, §5, §7.2, §10). Tokens only.
+   --------------------------------------------------------------------- */
+
+.zg-thread { list-style: none; padding: 0; margin: 0; }
+.zg-thread-entry { padding: 0.75rem 0; border-bottom: 1px solid var(--zg-border); }
+.zg-thread-entry:last-child { border-bottom: 0; }
+.zg-thread-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.zg-thread-meta time { color: var(--zg-text-muted); font-size: 0.8125rem; }
+.zg-thread-body { overflow-wrap: anywhere; }
+
+.zg-internal-region {
+  background: var(--zg-internal-bg);
+  border-left: 4px dashed var(--zg-internal-border);
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+}
+.zg-internal-caption {
+  color: var(--zg-internal-text);
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.zg-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--zg-border); overflow-x: auto; }
+.zg-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0.5rem 0.75rem;
+  color: var(--zg-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.zg-tab--active { color: var(--zg-primary); border-bottom-color: var(--zg-primary); }
+.zg-tab:focus-visible { outline: 2px solid var(--zg-secondary); outline-offset: 2px; }
+
+@media (max-width: 767.98px) {
+  .zg-tab { min-height: 44px; }
 }

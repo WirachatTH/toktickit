@@ -115,7 +115,7 @@ that owns the row runs it green.
 | REG-11 | AC-20, BR-47 | Regression | Mark again; mark on `RESOLVED`, `CLOSED`, `CANCELLED` | `409 ALREADY_MARKED`; nothing changes | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-12 | AC-20, BR-05 | Regression | Requester calls the staff status route; sends `status`/`currentStatus` in every Requester body | Status route `403`; the fields are ignored; status never changes | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
 | REG-13 | AC-13 | Regression | Mark another Requester's ticket | `404` | `server/tests/lab-03/requester-regression.api.test.ts` | Planned |
-| REG-14 | AC-18, BR-68, BR-69 | Regression | Lab 2 `RequesterTicketDetail.test.tsx` BR-46 test, rewritten for Lab 3 | Asserts the Lab 3 rule instead: a comment box is present, while internal notes, IT Priority, Actions Taken, and any status control stay absent | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned |
+| REG-14 | AC-18, BR-68, BR-69 | Regression | Lab 2 `RequesterTicketDetail.test.tsx` BR-46 test, rewritten for Lab 3 | Asserts the Lab 3 rule instead: a comment box is present, while internal notes, IT Priority, Actions Taken, and any status control stay absent | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pass |
 | REG-15 | AC-18, D-18 | Regression | Lab 1 suites and the public System Status page with no session | `health.test.ts`, `categories.test.ts`, and `App.test.tsx` pass unchanged; "Check System" reports Online | `server/tests/lab-01/*.test.ts` | Pass |
 | REG-16 | AC-18, BR-69 | Regression | Lab 2 client suites and the Lab 2 E2E journey after the selector is removed | They sign in instead of choosing a Requester and otherwise keep their assertions; selector-only tests (`RequesterSelector`, `RequireRequester`, `RequesterFlowIntegration`) are retired and named in the PR | `client/tests/lab-02/*.test.tsx` | Pass |
 | REG-17 | AC-12, BR-03 | Regression | No staff account can act as a Requester: the Development Requester list, and an IT Staff or Administrator session on the Requester endpoints with the old dev header naming a Requester | The list is gone (`404`, signed out and as every role) and the staff session is refused (`403`) whatever the header names. Rewritten in Issue 5 from the Lab 2-era selector checks (BR-69) | `server/tests/lab-03/requester-regression.api.test.ts` | Pass |
@@ -124,17 +124,17 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-18 | AC-19, FR-15 | API | Requester posts a Public Comment on an own ticket | `201`; author is the session user; listed for the Requester and for IT Staff | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-19 | AC-19, FR-19 | API | IT Staff post a Public Comment on any ticket | `201`; visible to that ticket's Requester | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-20 | AC-21, BR-50 | API | Comment and note bodies: empty, whitespace-only, 1, 2000, 2001 characters | 1 and 2000 accepted; the rest `400` on `fields.body`, nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-21 | AC-23, BR-50 | API | Body carries `authorId` and `createdAt` | Both ignored; server values stored | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-22 | AC-23, BR-51 | API | `PUT`/`PATCH`/`DELETE` on a comment and on a note | `404` — no such routes | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-23 | AC-22, FR-18 | API | IT Staff post an Internal Note | `201`; returned to IT Staff and Administrators | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-24 | AC-22, BR-25 | API | After a note exists, scan every Requester-facing response for that ticket | Note text and any note count absent from all of them | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-25 | BR-52 | API | Public Comment and Internal Note on `CLOSED` and `CANCELLED` tickets | Comment `409 TICKET_CLOSED`; note `201` | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-26 | BR-52 | API | Ticket `updatedAt` before and after a comment or note | Advanced | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-27 | BR-51 | API | Thread ordering and a `<script>` body | Oldest first with id tiebreak; body returned verbatim as text | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-28 | BR-21 | API | Administrator reads comments and notes, then tries to post each | Reads `200`; posts `403` | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
+| API-18 | AC-19, FR-15 | API | Requester posts a Public Comment on an own ticket | `201`; author is the session user; listed for the Requester and for IT Staff | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-19 | AC-19, FR-19 | API | IT Staff post a Public Comment on any ticket | `201`; visible to that ticket's Requester | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-20 | AC-21, BR-50 | API | Comment and note bodies: empty, whitespace-only, 1, 2000, 2001 characters | 1 and 2000 accepted; the rest `400` on `fields.body`, nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-21 | AC-23, BR-50 | API | Body carries `authorId` and `createdAt` | Both ignored; server values stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-22 | AC-23, BR-51 | API | `PUT`/`PATCH`/`DELETE` on a comment and on a note | `404` — no such routes | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-23 | AC-22, FR-18 | API | IT Staff post an Internal Note | `201`; returned to IT Staff and Administrators | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-24 | AC-22, BR-25 | API | After a note exists, scan every Requester-facing response for that ticket | Note text and any note count absent from all of them | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-25 | BR-52 | API | Public Comment and Internal Note on `CLOSED` and `CANCELLED` tickets | Comment `409 TICKET_CLOSED`; note `201` | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-26 | BR-52 | API | Ticket `updatedAt` before and after a comment or note | Advanced | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-27 | BR-51 | API | Thread ordering and a `<script>` body | Oldest first with id tiebreak; body returned verbatim as text | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-28 | BR-21 | API | Administrator reads comments and notes, then tries to post each | Reads `200`; posts `403` | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 
 ### 2.6 API — IT Staff Ticket Queue
 
@@ -239,7 +239,7 @@ that owns the row runs it green.
 | UI-11 | AC-06, AC-08 | UI | Log out; any request answered `401` mid-session | Back to Login; session-ended banner in the second case | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
 | UI-12 | AC-02, BR-02 | UI | Must-change user opens any route | Redirected to Change Password | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
 | UI-13 | FR-13 | UI | Render the app and inspect routes, components, and storage | No selector route or component; the `tokTickIT.devRequester` key is never read or written | `client/tests/lab-03/AppShellRoles.test.tsx` | Pass |
-| UI-14 | AC-19, FR-14 | UI | Requester Ticket Detail comments thread and composer, including a closed ticket | Oldest first with author, role, time; post adds it; empty body blocked; closed ticket disables the composer | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Planned |
+| UI-14 | AC-19, FR-14 | UI | Requester Ticket Detail comments thread and composer, including a closed ticket | Oldest first with author, role, time; post adds it; empty body blocked; closed ticket disables the composer | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Pass |
 | UI-15 | AC-20, BR-47 | UI | Problem appears resolved flow | Confirmation dialog with optional comment; after success the pill and date replace the button | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Planned |
 | UI-16 | BR-71 | UI | Requester detail rendered with a payload that wrongly includes IT Priority and notes | Neither is rendered | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Pass |
 | UI-17 | AC-25, FR-21 | UI | Queue rows | Seven columns; *Unassigned* in italics; appears-resolved pill; "Requested:" sub-line only when priorities differ | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
@@ -249,7 +249,7 @@ that owns the row runs it green.
 | UI-21 | AC-32, FR-25 | UI | IT Staff Ticket Detail layout | Ticket information read-only; controls editable; attachments download only | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-22 | AC-28, BR-31 | UI | Assign to me; server answers `409 STALE_STATE` | Sends `expectedOwnerId`; on conflict shows the banner and reloads | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-23 | AC-31, BR-46 | UI | Status control | Lists only permitted transitions; confirm dialogs with required text; ownerless ticket offers only Cancel with a hint | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
-| UI-24 | AC-24, FR-20 | UI | Public comments and Internal notes tabs | Separate drafts per tab; note composer inside the Internal region with its caption and "Add internal note"; comment button "Post public comment" | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
+| UI-24 | AC-24, FR-20 | UI | Public comments and Internal notes tabs | Separate drafts per tab; note composer inside the Internal region with its caption and "Add internal note"; comment button "Post public comment". Built and tested as the shared `DiscussionPanel` component; Issue 8 mounts it on IT Staff Ticket Detail | `client/tests/lab-03/DiscussionPanel.test.tsx` | Pass |
 | UI-25 | AC-33, FR-30 | UI | IT Staff Ticket Detail as Administrator | No composers or controls; read-only note shown | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-26 | AC-34, FR-31, FR-32 | UI | User Management list | Columns, "You" pill, search and role filter sent as parameters | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
 | UI-27 | AC-35, FR-33 | UI | Create user panel | Field validation; Generate fills a policy-compliant password; success closes the panel and adds the row | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
@@ -264,7 +264,7 @@ that owns the row runs it green.
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | STYLE-01 | AC-44 | UI Style | Status badges for all 8 values | Class and label per ui-spec §1.2; `NEW` identical to Lab 2 | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
 | STYLE-02 | AC-44 | UI Style | Contrast of every badge and Internal-region pair, computed from the CSS | Each ≥ 4.5:1 | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
-| STYLE-03 | AC-24 | UI Style | Internal region | Uses `--zg-internal-*` tokens and carries the caption text | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
+| STYLE-03 | AC-24 | UI Style | Internal region | Uses `--zg-internal-*` tokens and carries the caption text | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 | STYLE-04 | AC-32 | UI Style | Ticket controls vs ticket information | Controls use the editable field class; information uses `zg-field--readonly` | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
 | STYLE-05 | AC-44 | UI Style | Role badges and shared priority badges | Roles outlined/filled per §1.4; Requested and IT Priority of the same value share one class | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 | STYLE-06 | AC-44 | UI Style | Scan new components and CSS for hex literals | None outside the token and badge definitions | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |

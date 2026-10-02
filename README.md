@@ -161,9 +161,10 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–5 are in (contract; users, migration, and seed; sign-in;
-> roles and the app shell; the Lab 2 Requester flows on sign-in). Sections still
-> marked *planned* become true as Issues 6–10 land; each issue updates them. The
+> **Status:** Issues 1–6 are in (contract; users, migration, and seed; sign-in;
+> roles and the app shell; the Lab 2 Requester flows on sign-in; Public Comments
+> and Internal Notes). Sections still marked *planned* become true as Issues 7–10
+> land; each issue updates them. The
 > Lab 2 Development Requester selector, its header, and its list endpoint are
 > gone: the Requester is always the signed-in user.
 
