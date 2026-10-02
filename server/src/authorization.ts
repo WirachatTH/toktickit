@@ -48,10 +48,6 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { method: "POST", path: "/api/auth/change-password", access: { kind: "any", duringPasswordChange: true } },
   { method: "GET", path: "/api/categories", access: PUBLIC },
   { method: "GET", path: "/api/systems", access: PUBLIC },
-  // Lab 2's Development Requester list. It identifies nobody any more — every
-  // Requester endpoint below takes its identity from the session — and Issue 5
-  // removes it with the selector (SEC-10).
-  { method: "GET", path: "/api/requesters", access: PUBLIC },
 
   { method: "POST", path: "/api/tickets", access: roles(R) },
   { method: "GET", path: "/api/tickets", access: roles(R) },

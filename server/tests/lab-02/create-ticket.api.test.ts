@@ -5,6 +5,7 @@ import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
 import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
+import { generateSessionToken, SESSION_COOKIE } from "../../src/session.js";
 import { formatTicketNumber } from "../../src/ticketNumber.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 
@@ -37,7 +38,7 @@ let inactiveSystemId: number;
 
 const createdTicketIds: number[] = [];
 
-// Lab 3 (REG-08, BR-69): Lab 2's X-Dev-Requester-Id header is replaced by a
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
 // session for the same Requester — only how the test authenticates changes.
 let sessionCookies = new Map<number, string>();
 function requesterSession(requesterId: number): Record<string, string> {
@@ -278,18 +279,20 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   });
 });
 
-describe("POST /api/tickets — Requester authentication (testing-only, BR-07/BR-10)", () => {
-  it("rejects a request with no X-Dev-Requester-Id header", async () => {
+// Lab 3 (BR-69): the Lab 2 header checks become the Lab 3 identity rules —
+// no session, a token that names no session, and a deactivated Requester.
+describe("POST /api/tickets — Requester authentication", () => {
+  it("rejects a request with no session", async () => {
     const res = await request(app).post("/api/tickets").field(validBody());
     expect(res.status).toBe(401);
   });
 
-  it("rejects a nonexistent requesterId", async () => {
-    const res = await request(app).post("/api/tickets").set("X-Dev-Requester-Id", "999999").field(validBody());
+  it("rejects a session token that names no session", async () => {
+    const res = await request(app).post("/api/tickets").set("Cookie", `${SESSION_COOKIE}=${generateSessionToken()}`).field(validBody());
     expect(res.status).toBe(401);
   });
 
-  it("rejects an inactive requesterId", async () => {
+  it("rejects a deactivated Requester's session", async () => {
     const res = await request(app)
       .post("/api/tickets")
       .set(requesterSession(inactiveRequesterId))

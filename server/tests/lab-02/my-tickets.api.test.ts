@@ -5,6 +5,7 @@ import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
 import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
+import { generateSessionToken, SESSION_COOKIE } from "../../src/session.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 
 const PNG_BASE = Buffer.from(
@@ -35,7 +36,7 @@ let freshRequesterId: number;
 let edgeCaseRequesterId: number;
 let inactiveRequesterId: number;
 
-// Lab 3 (REG-08, BR-69): Lab 2's X-Dev-Requester-Id header is replaced by a
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
 // session for the same Requester — only how the test authenticates changes.
 // An id with no session (one that names nobody) sends no cookie at all.
 let sessionCookies = new Map<number, string>();
@@ -229,7 +230,7 @@ describe("GET /api/tickets — ownership scoping", () => {
     expect(numbers).not.toContain("TCK-OWNER-B001");
   });
 
-  it("rejects with no X-Dev-Requester-Id header", async () => {
+  it("rejects a request with no session", async () => {
     const res = await request(app).get("/api/tickets");
     expect(res.status).toBe(401);
   });
@@ -670,20 +671,22 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
 
-    it("rejects a non-numeric X-Dev-Requester-Id header with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app).get("/api/tickets").set({ "X-Dev-Requester-Id": "invalid-requester" });
+    // Lab 3 (BR-69): the Lab 2 header-parsing cases become the same checks on
+    // the session cookie — malformed, oversized, and well-formed-but-unknown.
+    it("rejects a malformed session cookie with 401 UNAUTHENTICATED", async () => {
+      const res = await request(app).get("/api/tickets").set("Cookie", `${SESSION_COOKIE}=invalid-requester`);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
 
-    it("rejects an out-of-Int32 X-Dev-Requester-Id header with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app).get("/api/tickets").set({ "X-Dev-Requester-Id": "9999999999" });
+    it("rejects an oversized session cookie with 401 UNAUTHENTICATED", async () => {
+      const res = await request(app).get("/api/tickets").set("Cookie", `${SESSION_COOKIE}=${"9".repeat(4000)}`);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
 
-    it("rejects a non-existent requester ID with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app).get("/api/tickets").set(authHeader(888888));
+    it("rejects a session token that names no session with 401 UNAUTHENTICATED", async () => {
+      const res = await request(app).get("/api/tickets").set("Cookie", `${SESSION_COOKIE}=${generateSessionToken()}`);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });

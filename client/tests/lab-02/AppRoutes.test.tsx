@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoutes } from "../../src/AppRoutes.js";
-import { RequesterProvider } from "../../src/context/RequesterContext.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
 import { ROUTES } from "../../src/routes.js";
 import * as api from "../../src/api.js";
@@ -24,6 +23,8 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 // "redirects to the Selector" cases are rewritten to assert the Lab 3 rule —
 // redirect to Login — and the "renders directly" cases sign a Requester in
 // instead of storing a selection; their assertions are unchanged.
+// Issue 5 removes the selector route itself (FR-13), so the last case keeps
+// only its public System Status half.
 
 const A_REQUESTER = { id: 1, name: "Somchai Prasert", email: "somchai.prasert@kmutt.ac.th" };
 
@@ -33,9 +34,7 @@ function renderAt(path: string) {
   return render(
     <AuthProvider>
       <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
-        <RequesterProvider>
-          <AppRoutes />
-        </RequesterProvider>
+        <AppRoutes />
       </MemoryRouter>
     </AuthProvider>
   );
@@ -50,9 +49,6 @@ const GUARDED_PATHS: Array<[string, string]> = [
 describe("AppRoutes — the real route table, guarded end to end", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    // Selector's own states are covered elsewhere; here only the guard's
-    // decision (redirect vs. render) matters, so keep the fetch fast.
-    vi.spyOn(api, "fetchActiveRequesters").mockResolvedValue([A_REQUESTER]);
     vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
   });
 
@@ -81,10 +77,7 @@ describe("AppRoutes — the real route table, guarded end to end", () => {
     expect(GUARDED_PATHS.map(([label]) => label)).toEqual(["My Tickets", "Create Ticket", "Ticket Detail"]);
   });
 
-  it("still lets the unguarded routes through with no Requester selected", async () => {
-    renderAt(ROUTES.select);
-    expect(await screen.findByText(/this is not a login screen/i)).toBeInTheDocument();
-
+  it("still lets the public System Status page through with nobody signed in", async () => {
     renderAt("/");
     expect(await screen.findByText(/Check System/i)).toBeInTheDocument();
   });

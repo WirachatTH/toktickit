@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, fetchTicket, TicketDetail, TicketDetailAttachment } from "../api.js";
-import { useRequester } from "../context/RequesterContext.js";
 import { Badge } from "../components/Badge.js";
 import { Button } from "../components/Button.js";
 import { LoadingSpinner } from "../components/LoadingSpinner.js";
@@ -14,6 +13,14 @@ import { ROUTES } from "../routes.js";
 // Actions Taken, or any status-change control — those features don't exist
 // in Lab 2's data model, and BR-46 requires this screen never imply
 // otherwise, regardless of what a Ticket's data looks like (UI-10).
+//
+// Lab 3, Issue 5: the ticket is fetched as the signed-in Requester (the server
+// scopes it to them), the header band shows the owner or "Not yet assigned"
+// (BR-71), and a CLOSED or CANCELLED ticket's attachments are download-only
+// (BR-70). Every field is still picked by name, so IT Priority or Internal
+// Notes in a payload could never be rendered (UI-16).
+
+const CLOSED_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
 type LoadState = "loading" | "loaded" | "not-found" | "failure";
 
@@ -29,7 +36,6 @@ function formatDate(iso: string): string {
 
 export function RequesterTicketDetail() {
   const { id } = useParams();
-  const { requester } = useRequester();
   const navigate = useNavigate();
 
   const [state, setState] = useState<LoadState>("loading");
@@ -37,10 +43,10 @@ export function RequesterTicketDetail() {
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
-    if (!requester || !id) return;
+    if (!id) return;
     let cancelled = false;
     setState("loading");
-    fetchTicket(requester.id, Number(id))
+    fetchTicket(Number(id))
       .then((data) => {
         if (cancelled) return;
         setTicket(data);
@@ -61,7 +67,7 @@ export function RequesterTicketDetail() {
     return () => {
       cancelled = true;
     };
-  }, [requester?.id, id, retryToken]);
+  }, [id, retryToken]);
 
   function handleAttachmentsChange(attachments: TicketDetailAttachment[]) {
     setTicket((current) => (current ? { ...current, attachments } : current));
@@ -97,7 +103,7 @@ export function RequesterTicketDetail() {
     );
   }
 
-  if (!ticket || !requester) return null;
+  if (!ticket) return null;
 
   return (
     <div>
@@ -110,6 +116,10 @@ export function RequesterTicketDetail() {
           <Badge kind="status" value={ticket.currentStatus} />
           <Badge kind="priority" value={ticket.requestedPriority} />
         </div>
+        <p className="mb-0 mt-2" data-testid="ticket-owner">
+          <span className="zg-label d-inline me-1">Owner:</span>
+          {ticket.owner ? ticket.owner.name : <em style={{ color: "var(--zg-text-muted)" }}>Not yet assigned</em>}
+        </p>
       </div>
 
       <div className="zg-card mb-4">
@@ -143,7 +153,7 @@ export function RequesterTicketDetail() {
       </div>
 
       <AttachmentSection
-        requesterId={requester.id}
+        locked={CLOSED_STATUSES.has(ticket.currentStatus)}
         ticketId={ticket.id}
         attachments={ticket.attachments}
         onAttachmentsChange={handleAttachmentsChange}

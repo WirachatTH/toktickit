@@ -11,7 +11,7 @@ import { getPrisma } from "../../src/prisma.js";
 import { hashSessionToken, SESSION_COOKIE } from "../../src/session.js";
 import { endTestSessions, sessionCookieFor } from "./helpers/sessions.js";
 
-// SEC-01 to SEC-09, SEC-12, SEC-13 — the authorization layer and safe errors
+// SEC-01 to SEC-10, SEC-12, SEC-13 — the authorization layer and safe errors
 // (docs/lab-03/specification.md BR-20 to BR-27, api-spec.md §0.2, §0.3, §0.5, §7).
 //
 // The matrix below is written out here from api-spec §7 on purpose, not read
@@ -40,8 +40,6 @@ const MATRIX: Row[] = [
   { method: "POST", path: "/api/auth/change-password", who: "any", duringPasswordChange: true },
   { method: "GET", path: "/api/categories", who: "public" },
   { method: "GET", path: "/api/systems", who: "public" },
-  // Lab 2's Development Requester list stays public until Issue 5 removes it (SEC-10).
-  { method: "GET", path: "/api/requesters", who: "public" },
   { method: "POST", path: "/api/tickets", who: [R] },
   { method: "GET", path: "/api/tickets", who: [R] },
   { method: "GET", path: "/api/tickets/:t", who: [R] },
@@ -285,6 +283,17 @@ describe("cross-site requests (BR-26)", () => {
   });
 });
 
+describe("the Lab 2 Development Requester list is gone (FR-13)", () => {
+  it("SEC-10 answers GET /api/requesters with 404, signed out and as every role, with no user data", async () => {
+    for (const [who, cookie] of [["no session", undefined], ["requester", cookies.requester], ["staff", cookies.staff], ["admin", cookies.admin]] as const) {
+      const pending = request(app).get("/api/requesters");
+      const res = await send(`requesters ${who}`, cookie ? pending.set("Cookie", cookie) : pending);
+      expectBareError(res, 404, "NOT_FOUND", who);
+      expect(res.text, who).not.toContain("@kmutt.ac.th");
+    }
+  });
+});
+
 describe("guard order (BR-22)", () => {
   it("SEC-07 says 'sign in' before 'not allowed', and 'change your password' before both", async () => {
     // No session on a route the caller's role could never use: 401, not 403.
@@ -423,7 +432,6 @@ describe("no secrets leave the server (BR-06, BR-15)", () => {
     const issued = (login.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith(`${SESSION_COOKIE}=`))!;
     cookies.other = issued.split(";")[0];
     await send("me", request(app).get("/api/auth/me").set("Cookie", cookies.staff));
-    await send("requesters", request(app).get("/api/requesters"));
     expect(seen.length).toBeGreaterThan(100);
 
     const tokens = Object.values(cookies).map((c) => c.slice(SESSION_COOKIE.length + 1));

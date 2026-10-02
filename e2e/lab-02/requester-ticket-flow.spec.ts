@@ -26,7 +26,7 @@ const SCREENSHOT_DIRS = {
   ticketDetail: path.join(path.dirname(fileURLToPath(import.meta.url)), "../../artifacts/lab-02/screenshots/ticket-detail"),
 };
 
-// AppShell collapses "My Tickets" / "Create Ticket" / "Change Requester"
+// AppShell collapses "My Tickets" / "Create Ticket" / "Log out"
 // behind a "Menu" toggle below 768px (ui-spec.md §6.1) — real bug found on
 // the very first mobile run of this spec: clicking a nav link/button
 // directly timed out because it's hidden until Menu is tapped.
@@ -42,6 +42,11 @@ const SCREENSHOT_DIRS = {
 // (desktop/tablet, where every nav control is always visible).
 async function clickNavControl(page: Page, role: "link" | "button", name: string): Promise<void> {
   const target = page.getByRole(role, { name });
+  // isVisible() does not wait: make sure the shell has rendered the control at
+  // all before deciding it is hidden behind the mobile menu (same race as in
+  // signInAsRequester below). includeHidden, because a role locator otherwise
+  // skips exactly the collapsed-menu controls this has to find on mobile.
+  await expect(page.getByRole(role, { name, includeHidden: true })).toBeAttached();
   if (!(await target.isVisible())) {
     await page.getByRole("button", { name: "Toggle navigation menu" }).click();
   }
@@ -80,15 +85,20 @@ function ticketRowLocator(page: Page, breakpoint: string, ticketNumber: string) 
 const REQUESTER_ACCOUNTS = ["somchai.prasert@kmutt.ac.th", "napassorn.chaiyasit@kmutt.ac.th"];
 const DEV_PASSWORD = "TokTickIT-dev-2026";
 
-async function selectRequester(page: Page, index: number): Promise<string> {
+async function signInAsRequester(page: Page, index: number): Promise<string> {
   await page.goto("/tickets");
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel(/^Email/).fill(REQUESTER_ACCOUNTS[index]);
   await page.getByLabel(/^Password/).fill(DEV_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tickets$/);
-  // The shell's account block holds the signed-in Requester's name.
+  // The shell's account block holds the signed-in Requester's name. Wait for it
+  // to exist first: isVisible() does not wait, and right after the URL changes
+  // the shell may not have rendered yet — on desktop that sent this helper to
+  // click the (hidden) mobile Menu toggle until the test timed out (~1 run in 16).
+  // includeHidden: on mobile the block is inside the collapsed menu.
   const account = page.getByRole("group", { name: "Account" });
+  await expect(page.getByRole("group", { name: "Account", includeHidden: true })).toBeAttached();
   if (!(await account.isVisible())) await page.getByRole("button", { name: "Toggle navigation menu" }).click();
   const name = (await account.locator(".zg-shell-account-name").textContent())!.trim();
   if (await page.getByRole("button", { name: "Toggle navigation menu" }).isVisible()) {
@@ -97,7 +107,7 @@ async function selectRequester(page: Page, index: number): Promise<string> {
   return name;
 }
 
-async function changeRequester(page: Page): Promise<void> {
+async function logOut(page: Page): Promise<void> {
   await clickNavControl(page, "button", "Log out");
   await expect(page).toHaveURL(/\/login$/);
 }
@@ -109,7 +119,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const breakpoint = testInfo.project.name; // "desktop" | "tablet" | "mobile"
 
     // --- Select Requester A ---
-    const requesterAName = await selectRequester(page, 0);
+    const requesterAName = await signInAsRequester(page, 0);
 
     // --- Create a ticket with an attachment ---
     await clickNavControl(page, "link", "Create Ticket");
@@ -195,8 +205,8 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const ownedTicketUrl = page.url();
 
     // --- Switch Requester (AC-10) ---
-    await changeRequester(page);
-    const requesterBName = await selectRequester(page, 1);
+    await logOut(page);
+    const requesterBName = await signInAsRequester(page, 1);
     expect(requesterBName).not.toBe(requesterAName);
 
     // Requester A's ticket must not appear in Requester B's list.

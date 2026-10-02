@@ -7,10 +7,6 @@ import { homeFor, NAV_BY_ROLE, ROUTES } from "../routes.js";
 import type { FromState } from "./RequireAuth.js";
 
 export interface AppShellProps {
-  /** Lab 2: name of the selected Development Requester, shown only when nobody is signed in. */
-  currentRequesterName?: string | null;
-  /** Lab 2: the Change Requester action, shown only when nobody is signed in. */
-  onChangeRequester?: () => void;
   children: ReactNode;
 }
 
@@ -22,10 +18,9 @@ const navLinkClassName = ({ isActive }: { isActive: boolean }) =>
 //
 // Lab 3, Issue 4: for a signed-in user the shell shows exactly the
 // destinations of their role, their name and role badge, Change password and
-// Log out, and the forbidden callout when a guard sent them home. With nobody
-// signed in it renders as in Lab 2 (the Development Requester display), which
-// is what the Lab 2 component tests still exercise until Issue 5 retires it.
-export function AppShell({ currentRequesterName, onChangeRequester, children }: AppShellProps) {
+// Log out, and the forbidden callout when a guard sent them home. It replaces
+// Lab 2's Development Requester display, which Issue 5 removed (FR-09, FR-13).
+export function AppShell({ children }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -77,7 +72,7 @@ export function AppShell({ currentRequesterName, onChangeRequester, children }: 
               </NavLink>
             ))}
 
-            {user ? (
+            {user && (
               <div className="zg-shell-account" role="group" aria-label="Account">
                 <span className="zg-shell-account-name">{user.name}</span>
                 <RoleBadge role={user.role} />
@@ -88,17 +83,6 @@ export function AppShell({ currentRequesterName, onChangeRequester, children }: 
                   Log out
                 </Button>
               </div>
-            ) : (
-              <>
-                {currentRequesterName && (
-                  <span className="zg-shell-requester ms-md-3">{currentRequesterName}</span>
-                )}
-                {onChangeRequester && (
-                  <Button variant="tertiary" onClick={onChangeRequester} className="zg-shell-requester">
-                    Change Requester
-                  </Button>
-                )}
-              </>
             )}
           </nav>
         </div>

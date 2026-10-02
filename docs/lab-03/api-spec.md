@@ -527,9 +527,7 @@ No user-delete endpoint exists (BR-59).
 | `PATCH` | `/api/admin/users/:id` | yes | Administrator |
 | `POST` | `/api/admin/users/:id/initial-password` | yes | Administrator |
 
-29 routes. Removed from Lab 2: `GET /api/requesters`. (Until Issue 5 removes the
-selector, that list is still served as a public route; it no longer identifies
-anyone, because every Requester endpoint takes the Requester from the session.)
+29 routes. Removed from Lab 2: `GET /api/requesters` (`404`, like any unlisted route).
 
 ## 8. Status code summary
 

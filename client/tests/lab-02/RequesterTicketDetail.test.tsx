@@ -3,7 +3,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { RequesterTicketDetail } from "../../src/screens/RequesterTicketDetail.js";
-import { RequesterProvider } from "../../src/context/RequesterContext.js";
 import * as api from "../../src/api.js";
 import { ApiError, TicketDetail } from "../../src/api.js";
 import { ROUTES } from "../../src/routes.js";
@@ -13,8 +12,11 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 // BR-45/BR-46, AC-03). Attachment add/download/remove *interactions* are
 // covered in AttachmentSection.test.tsx (UI-12/13/14) — this file covers
 // the screen itself: what's shown, what's safely absent, and ownership.
-
-const REQUESTER = { id: 3, name: "Somchai Prasert", email: "somchai.prasert@kmutt.ac.th" };
+//
+// Lab 3, Issue 5 (BR-69): the Development Requester is gone (FR-13). Setup no
+// longer stores a selection; the screen acts as the signed-in user, and the API
+// calls no longer carry a Requester id (the server takes it from the session),
+// so the assertions on those call arguments drop the id. Named in the PR.
 
 const TICKET: TicketDetail = {
   id: 42,
@@ -26,6 +28,10 @@ const TICKET: TicketDetail = {
   description: "Battery drops from 100% to 20% within an hour of unplugging the charger.",
   requestedPriority: "MEDIUM",
   currentStatus: "NEW",
+  // Lab 3 fields the payload now always carries (api-spec §3.3) — fixture only.
+  owner: null,
+  resolutionSummary: null,
+  requesterResolvedAt: null,
   createdAt: "2026-08-27T09:15:00.000Z",
   updatedAt: "2026-08-27T09:15:00.000Z",
   attachments: [
@@ -43,15 +49,12 @@ const TICKET: TicketDetail = {
 };
 
 function renderScreen(path = "/tickets/42") {
-  window.localStorage.setItem("tokTickIT.devRequester", JSON.stringify(REQUESTER));
   return render(
     <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
-      <RequesterProvider>
-        <Routes>
-          <Route path={ROUTES.detailPattern} element={<RequesterTicketDetail />} />
-          <Route path={ROUTES.list} element={<p>My Tickets screen placeholder</p>} />
-        </Routes>
-      </RequesterProvider>
+      <Routes>
+        <Route path={ROUTES.detailPattern} element={<RequesterTicketDetail />} />
+        <Route path={ROUTES.list} element={<p>My Tickets screen placeholder</p>} />
+      </Routes>
     </MemoryRouter>
   );
 }
@@ -89,11 +92,11 @@ describe("rendering an owned ticket (UI-10, BR-46)", () => {
     expect(screen.queryByRole("textbox", { name: /comment/i })).not.toBeInTheDocument();
   });
 
-  it("fetches the ticket scoped to the current Requester and the id in the URL", async () => {
+  it("fetches the ticket by the id in the URL (the server scopes it to the signed-in Requester)", async () => {
     const fetchSpy = vi.spyOn(api, "fetchTicket").mockResolvedValue(TICKET);
     renderScreen("/tickets/42");
     await screen.findByText("TCK-000042");
-    expect(fetchSpy).toHaveBeenCalledWith(REQUESTER.id, 42);
+    expect(fetchSpy).toHaveBeenCalledWith(42);
   });
 
   it("offers a link back to My Tickets", async () => {

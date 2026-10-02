@@ -3,9 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { MyTickets } from "../../src/screens/MyTickets.js";
-import { RequesterProvider, useRequester } from "../../src/context/RequesterContext.js";
 import * as api from "../../src/api.js";
-import type { Requester, TicketListItem, TicketListResponse } from "../../src/api.js";
+import type { TicketListItem, TicketListResponse } from "../../src/api.js";
 import { ROUTES } from "../../src/routes.js";
 import { ROUTER_FUTURE } from "./routerFuture.js";
 
@@ -20,15 +19,17 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 // findByText/getByText, which throws on more than one match. Likewise
 // "Create Ticket" appears both in the page header and, in the empty state,
 // as the CTA — getAllByRole is used there for the same reason.
+//
+// Lab 3, Issue 5 (BR-69): the Development Requester is gone (FR-13). Setup no
+// longer stores a selection; the screen acts as the signed-in user, and the API
+// calls no longer carry a Requester id (the server takes it from the session),
+// so the assertions on those call arguments drop the id. Named in the PR.
 
 const CATEGORIES = [
   { id: 1, name: "Hardware" },
   { id: 2, name: "Software" },
 ];
 const SYSTEMS = [{ id: 1, name: "Corporate Laptop" }];
-
-const REQUESTER_A: Requester = { id: 3, name: "Somchai Prasert", email: "somchai.prasert@kmutt.ac.th" };
-const REQUESTER_B: Requester = { id: 4, name: "Napassorn Chaiyasit", email: "napassorn.chaiyasit@kmutt.ac.th" };
 
 const TICKET_A: TicketListItem = {
   id: 1,
@@ -60,16 +61,13 @@ function paginatedResponse(data: TicketListItem[]): TicketListResponse {
   return { data, pagination: { page: 1, pageSize: 10, totalItems: data.length, totalPages: data.length > 0 ? 1 : 0 } };
 }
 
-function renderScreen(requester: Requester = REQUESTER_A) {
-  window.localStorage.setItem("tokTickIT.devRequester", JSON.stringify(requester));
+function renderScreen() {
   return render(
     <MemoryRouter future={ROUTER_FUTURE} initialEntries={[ROUTES.list]}>
-      <RequesterProvider>
-        <Routes>
-          <Route path={ROUTES.list} element={<MyTickets />} />
-          <Route path={ROUTES.detailPattern} element={<p>Ticket Detail screen placeholder</p>} />
-        </Routes>
-      </RequesterProvider>
+      <Routes>
+        <Route path={ROUTES.list} element={<MyTickets />} />
+        <Route path={ROUTES.detailPattern} element={<p>Ticket Detail screen placeholder</p>} />
+      </Routes>
     </MemoryRouter>
   );
 }
@@ -81,12 +79,12 @@ beforeEach(() => {
 });
 
 describe("loading and rendering the list", () => {
-  it("requests the list scoped to the current Requester and renders it", async () => {
+  it("requests the signed-in Requester's list (the server scopes it) and renders it", async () => {
     const fetchSpy = vi.spyOn(api, "fetchTickets").mockResolvedValue(paginatedResponse([TICKET_A]));
     renderScreen();
 
     await waitFor(async () => expect((await screen.findAllByText("TCK-000001")).length).toBeGreaterThan(0));
-    expect(fetchSpy).toHaveBeenCalledWith(REQUESTER_A.id, expect.any(Object));
+    expect(fetchSpy).toHaveBeenCalledWith(expect.any(Object));
   });
 
   it("renders both the desktop table and the mobile card list in the DOM — the CSS breakpoint (not jsdom) decides which is visible (RESP-01)", async () => {
@@ -137,7 +135,7 @@ describe("empty state — zero tickets ever (UI-07, BR-43)", () => {
 
 describe("no-results state — a filter narrows an existing list to zero (UI-08, BR-44)", () => {
   it("shows the no-results state once a filter matches nothing, and Clear Filters restores the list", async () => {
-    vi.spyOn(api, "fetchTickets").mockImplementation(async (_requesterId, params = {}) => {
+    vi.spyOn(api, "fetchTickets").mockImplementation(async (params = {}) => {
       if (params.categoryId === 2) return paginatedResponse([]);
       return paginatedResponse([TICKET_A]);
     });
@@ -157,39 +155,9 @@ describe("no-results state — a filter narrows an existing list to zero (UI-08,
   });
 });
 
-describe("switching the selected Requester reloads the list live (UI-09, AC-10, BR-09)", () => {
-  function SwitchRequesterButton({ to }: { to: Requester }) {
-    const { selectRequester } = useRequester();
-    return (
-      <button type="button" onClick={() => selectRequester(to)}>
-        test-switch-requester
-      </button>
-    );
-  }
-
-  it("drops Requester A's tickets and loads Requester B's as soon as the selection changes", async () => {
-    vi.spyOn(api, "fetchTickets").mockImplementation(async (requesterId) =>
-      requesterId === REQUESTER_A.id ? paginatedResponse([TICKET_A]) : paginatedResponse([TICKET_B])
-    );
-
-    window.localStorage.setItem("tokTickIT.devRequester", JSON.stringify(REQUESTER_A));
-    render(
-      <MemoryRouter future={ROUTER_FUTURE}>
-        <RequesterProvider>
-          <SwitchRequesterButton to={REQUESTER_B} />
-          <MyTickets />
-        </RequesterProvider>
-      </MemoryRouter>
-    );
-
-    await screen.findAllByText("TCK-000001");
-
-    await userEvent.click(screen.getByRole("button", { name: "test-switch-requester" }));
-
-    await waitFor(() => expect(screen.getAllByText("TCK-000002").length).toBeGreaterThan(0));
-    expect(screen.queryAllByText("TCK-000001")).toHaveLength(0);
-  });
-});
+// Lab 3, Issue 5 (BR-69): "switching the selected Requester reloads the list
+// live" is retired with the selector (Lab 2 BR-09, superseded). Signing in as
+// another Requester is a new session, covered by the E2E journey (AC-10).
 
 describe("search, filters, sort, and pagination interactions on MyTickets screen", () => {
   it("debounces search input and sends search parameter to the API", async () => {
@@ -204,7 +172,6 @@ describe("search, filters, sort, and pagination interactions on MyTickets screen
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith(
-        REQUESTER_A.id,
         expect.objectContaining({ search: "battery", page: 1 })
       );
     });
@@ -219,13 +186,11 @@ describe("search, filters, sort, and pagination interactions on MyTickets screen
 
     await userEvent.selectOptions(screen.getByLabelText(/^related system$/i), "1");
     expect(fetchSpy).toHaveBeenCalledWith(
-      REQUESTER_A.id,
       expect.objectContaining({ relatedSystemId: 1, page: 1 })
     );
 
     await userEvent.selectOptions(screen.getByLabelText(/^priority$/i), "HIGH");
     expect(fetchSpy).toHaveBeenCalledWith(
-      REQUESTER_A.id,
       expect.objectContaining({ requestedPriority: "HIGH", page: 1 })
     );
   });
@@ -239,7 +204,6 @@ describe("search, filters, sort, and pagination interactions on MyTickets screen
 
     await userEvent.selectOptions(screen.getByLabelText(/^sort$/i), "requestedPriority:desc");
     expect(fetchSpy).toHaveBeenCalledWith(
-      REQUESTER_A.id,
       expect.objectContaining({ sort: "requestedPriority", order: "desc", page: 1 })
     );
   });
@@ -265,7 +229,6 @@ describe("search, filters, sort, and pagination interactions on MyTickets screen
 
     await userEvent.click(nextButton);
     expect(fetchSpy).toHaveBeenCalledWith(
-      REQUESTER_A.id,
       expect.objectContaining({ page: 2 })
     );
   });

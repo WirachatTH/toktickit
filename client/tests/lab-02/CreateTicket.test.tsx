@@ -3,13 +3,18 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { CreateTicket } from "../../src/screens/CreateTicket.js";
-import { RequesterProvider } from "../../src/context/RequesterContext.js";
+import { AuthProvider } from "../../src/context/AuthContext.js";
 import * as api from "../../src/api.js";
 import type { Ticket } from "../../src/api.js";
 import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // Issue 5 — Create Ticket (ui-spec.md §6.3, specification.md AC-01/AC-04/
 // AC-05/AC-06/AC-07/AC-15).
+//
+// Lab 3, Issue 5 (BR-69): the Development Requester is gone (FR-13). Setup no
+// longer stores a selection; the screen acts as the signed-in user, and the API
+// calls no longer carry a Requester id (the server takes it from the session),
+// so the assertions on those call arguments drop the id. Named in the PR.
 
 const CATEGORIES = [{ id: 1, name: "Hardware" }];
 const SYSTEMS = [{ id: 1, name: "Corporate Laptop" }];
@@ -31,13 +36,13 @@ const VALID_TICKET_RESPONSE: Ticket = {
 };
 
 function renderScreen() {
-  window.localStorage.setItem("tokTickIT.devRequester", JSON.stringify(REQUESTER));
+  vi.spyOn(api, "fetchCurrentUser").mockResolvedValue({ ...REQUESTER, role: "REQUESTER", isActive: true, mustChangePassword: false });
   return render(
-    <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/tickets/new"]}>
-      <RequesterProvider>
+    <AuthProvider>
+      <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/tickets/new"]}>
         <CreateTicket />
-      </RequesterProvider>
-    </MemoryRouter>
+      </MemoryRouter>
+    </AuthProvider>
   );
 }
 
@@ -73,10 +78,11 @@ describe("reference data comes from the database", () => {
 });
 
 describe("the read-only, system-generated fields", () => {
-  it("shows Ticket Number and Ticket Date as not-yet-generated, and Requester pre-filled from the current selection", async () => {
+  it("shows Ticket Number and Ticket Date as not-yet-generated, and Requester pre-filled with the signed-in user", async () => {
     renderScreen();
     expect(screen.getByLabelText(/ticket number/i)).toHaveValue("Generated after submission");
-    expect(screen.getByLabelText(/requester/i)).toHaveValue(REQUESTER.name);
+    // The signed-in user arrives from /api/auth/me, so wait for it (rewritten, BR-69).
+    await waitFor(() => expect(screen.getByLabelText(/requester/i)).toHaveValue(REQUESTER.name));
     expect(screen.getByLabelText(/ticket number/i)).toHaveClass("zg-field--readonly");
   });
 });
@@ -118,7 +124,6 @@ describe("submission", () => {
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
     expect(createSpy).toHaveBeenCalledWith(
-      REQUESTER.id,
       expect.objectContaining({
         categoryId: 1,
         relatedSystemId: 1,
@@ -249,7 +254,7 @@ describe("attachments on the Create Ticket form", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /submit ticket/i }));
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy.mock.calls[0][1].attachments).toEqual([]);
+    expect(createSpy.mock.calls[0][0].attachments).toEqual([]);
   });
 
   it("rejects a disallowed file type client-side without blocking the rest of the form", async () => {
@@ -292,7 +297,7 @@ describe("attachments on the Create Ticket form", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /submit ticket/i }));
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy.mock.calls[0][1].attachments).toHaveLength(1);
-    expect(createSpy.mock.calls[0][1].attachments![0].name).toBe("photo.png");
+    expect(createSpy.mock.calls[0][0].attachments).toHaveLength(1);
+    expect(createSpy.mock.calls[0][0].attachments![0].name).toBe("photo.png");
   });
 });
