@@ -4,6 +4,15 @@
 // development and in the Docker E2E setup alike. VITE_API_URL is retired.
 const API_URL = "";
 
+// Every request goes through apiFetch, which always sends the session cookie
+// (credentials: "include"). Same-origin requests send it anyway, but the
+// option makes that explicit and keeps every call working if the client is
+// ever served from a different origin than the API (PR #55 review). The
+// server's CORS config already allows credentials for CLIENT_ORIGINS.
+export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_URL}${path}`, { ...init, credentials: "include" });
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -20,8 +29,8 @@ export interface SystemStatus {
 //        return { online: true, categories }.
 // Throwing on failure lets the UI show a single Offline/error state.
 // Lab 3, Issue 5 — every Requester call below is made as the signed-in user:
-// the session cookie travels with the same-origin request, and the server
-// takes the Requester from it (BR-03). Lab 2's Development Requester list and
+// apiFetch sends the session cookie with it, and the server takes the
+// Requester from that session (BR-03). Lab 2's Development Requester list and
 // header are gone (FR-13), so no call names a Requester any more.
 
 // ---------------------------------------------------------------------------
@@ -142,13 +151,13 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const res = await fetch(`${API_URL}/api/categories`);
+  const res = await apiFetch(`/api/categories`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
 
 export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
-  const res = await fetch(`${API_URL}/api/systems`);
+  const res = await apiFetch(`/api/systems`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -168,7 +177,7 @@ export async function createTicket(input: NewTicketInput): Promise<Ticket> {
 
   // No Content-Type header here on purpose — the browser sets the
   // multipart boundary itself; setting it manually breaks the request.
-  const res = await fetch(`${API_URL}/api/tickets`, {
+  const res = await apiFetch(`/api/tickets`, {
     method: "POST",
     body: formData,
   });
@@ -233,7 +242,7 @@ export async function fetchTickets(params: TicketListParams = {}): Promise<Ticke
   if (params.order) query.set("order", params.order);
   if (params.page) query.set("page", String(params.page));
 
-  const res = await fetch(`${API_URL}/api/tickets?${query.toString()}`);
+  const res = await apiFetch(`/api/tickets?${query.toString()}`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -283,7 +292,7 @@ export interface TicketDetail {
 }
 
 export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}`);
+  const res = await apiFetch(`/api/tickets/${ticketId}`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -292,7 +301,7 @@ export async function addAttachmentToTicket(ticketId: number, file: File): Promi
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments`, {
     method: "POST",
     body: formData,
   });
@@ -308,7 +317,7 @@ export interface RemovedAttachment {
 }
 
 export async function removeAttachment(ticketId: number, attachmentId: number, reason: string): Promise<RemovedAttachment> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/remove`, {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}/remove`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
@@ -323,18 +332,18 @@ export async function removeAttachment(ticketId: number, attachmentId: number, r
 // from browser JS on a cross-origin response anyway unless the server opts
 // in via Access-Control-Expose-Headers, which it doesn't.
 export async function downloadAttachment(ticketId: number, attachmentId: number): Promise<Blob> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`);
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`);
   if (!res.ok) throw await toApiError(res);
   return res.blob();
 }
 
 export async function checkSystem(): Promise<SystemStatus> {
-  const healthRes = await fetch(`${API_URL}/api/health`);
+  const healthRes = await apiFetch(`/api/health`);
   if (!healthRes.ok) {
     throw new Error("Unable to connect to TokTickIT API");
   }
   
-  const categoriesRes = await fetch(`${API_URL}/api/categories`);
+  const categoriesRes = await apiFetch(`/api/categories`);
   if (!categoriesRes.ok) {
     throw new Error("Unable to fetch categories");
   }
@@ -363,9 +372,8 @@ export interface AuthUser {
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export async function login(email: string, password: string): Promise<AuthUser> {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+  const res = await apiFetch(`/api/auth/login`, {
     method: "POST",
-    credentials: "include",
     headers: JSON_HEADERS,
     body: JSON.stringify({ email, password }),
   });
@@ -374,22 +382,21 @@ export async function login(email: string, password: string): Promise<AuthUser> 
 }
 
 export async function logout(): Promise<void> {
-  const res = await fetch(`${API_URL}/api/auth/logout`, { method: "POST", credentials: "include" });
+  const res = await apiFetch(`/api/auth/logout`, { method: "POST" });
   if (!res.ok) throw await toApiError(res);
 }
 
 /** The signed-in user, or null when there is no session (401). */
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
-  const res = await fetch(`${API_URL}/api/auth/me`, { credentials: "include" });
+  const res = await apiFetch(`/api/auth/me`);
   if (res.status === 401) return null;
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).user;
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthUser> {
-  const res = await fetch(`${API_URL}/api/auth/change-password`, {
+  const res = await apiFetch(`/api/auth/change-password`, {
     method: "POST",
-    credentials: "include",
     headers: JSON_HEADERS,
     body: JSON.stringify({ currentPassword, newPassword }),
   });
