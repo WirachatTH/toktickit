@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ApiError, fetchTicket, TicketDetail, TicketDetailAttachment } from "../api.js";
+import { ApiError, fetchComments, fetchTicket, postComment, TicketDetail, TicketDetailAttachment } from "../api.js";
 import { Badge } from "../components/Badge.js";
 import { Button } from "../components/Button.js";
 import { LoadingSpinner } from "../components/LoadingSpinner.js";
 import { ErrorState } from "../components/ErrorState.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
+import { DiscussionThread } from "../components/DiscussionThread.js";
+import { CLOSED_COMMENT_NOTE } from "../components/DiscussionPanel.js";
 import { ROUTES } from "../routes.js";
 
 // Requester Ticket Detail (ui-spec.md §6.5, specification.md BR-45/BR-46,
@@ -19,6 +21,10 @@ import { ROUTES } from "../routes.js";
 // (BR-71), and a CLOSED or CANCELLED ticket's attachments are download-only
 // (BR-70). Every field is still picked by name, so IT Priority or Internal
 // Notes in a payload could never be rendered (UI-16).
+//
+// Lab 3, Issue 6: a Comments card below Attachments — the ticket's Public
+// Comments and a composer, disabled on a closed ticket (FR-14, FR-15, BR-52).
+// Internal Notes have no place on this screen at all (BR-04).
 
 const CLOSED_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
@@ -158,6 +164,24 @@ export function RequesterTicketDetail() {
         attachments={ticket.attachments}
         onAttachmentsChange={handleAttachmentsChange}
       />
+
+      <section className="zg-card mt-4" aria-labelledby="comments-heading">
+        <h2 id="comments-heading" className="h5 mb-1">
+          Comments
+        </h2>
+        <p className="small mb-3" style={{ color: "var(--zg-text-muted)" }}>
+          Visible to you and IT Staff
+        </p>
+        <DiscussionThread
+          key={ticket.id}
+          load={() => fetchComments(ticket.id)}
+          post={(body) => postComment(ticket.id, body)}
+          emptyText="No comments yet."
+          composerLabel="Add a comment"
+          submitLabel="Post comment"
+          closedNote={ticket.canComment ? null : CLOSED_COMMENT_NOTE}
+        />
+      </section>
     </div>
   );
 }

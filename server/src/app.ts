@@ -17,6 +17,8 @@ import {
   buildAttachmentContentDisposition,
 } from "./attachmentPersistence.js";
 import { attachSession, authRouter } from "./auth.js";
+import { registerDiscussionRoutes } from "./discussion.js";
+import { isClosedStatus } from "./ticketStatus.js";
 import {
   accessibleTicketWhere,
   authorize,
@@ -467,7 +469,6 @@ class TicketClosedError extends Error {}
 const TICKET_CLOSED = {
   error: { code: "TICKET_CLOSED", message: "This ticket is closed, so its attachments can't be changed." },
 };
-const CLOSED_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
 // Postgres's id columns are Int32. `Number.isFinite(9999999999)` is true —
 // it's a perfectly ordinary finite JS number, just outside Int32 range —
@@ -538,7 +539,7 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
           `;
           // Lab 3 BR-70, read under the lock so a concurrent close can't slip
           // between the check and the insert (BR-80).
-          if (!lockedTicket || CLOSED_STATUSES.has(lockedTicket.currentStatus)) {
+          if (!lockedTicket || isClosedStatus(lockedTicket.currentStatus)) {
             throw new TicketClosedError();
           }
 
@@ -659,7 +660,7 @@ app.patch("/api/tickets/:ticketId/attachments/:attachmentId/remove", async (req:
         const [lockedTicket] = await tx.$queryRaw<{ currentStatus: string }[]>`
           SELECT "currentStatus" FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE
         `;
-        if (!lockedTicket || CLOSED_STATUSES.has(lockedTicket.currentStatus)) {
+        if (!lockedTicket || isClosedStatus(lockedTicket.currentStatus)) {
           throw new TicketClosedError();
         }
 
@@ -758,6 +759,8 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
       owner: ticket.owner,
       resolutionSummary: ticket.resolutionSummary,
       requesterResolvedAt: ticket.requesterResolvedAt,
+      // Lab 3, Issue 6 — whether the Comments composer accepts a post (BR-52).
+      canComment: !isClosedStatus(ticket.currentStatus),
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       attachments: ticket.attachments.map((a) => ({
@@ -776,6 +779,9 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
   }
 });
 // ---------------------------------------------------------------------------
+
+// Lab 3, Issue 6 — Public Comments and Internal Notes (discussion.ts).
+registerDiscussionRoutes(app);
 
 // Lab 3, Issue 4 — the end of the chain (§6.2). A classified route whose
 // handler a later issue adds answers 404 until then; an error that escaped a

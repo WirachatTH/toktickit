@@ -30,6 +30,10 @@ const CALLS: [string, () => Promise<unknown>][] = [
   ["addAttachmentToTicket", () => api.addAttachmentToTicket(42, new File(["x"], "x.png", { type: "image/png" }))],
   ["removeAttachment", () => api.removeAttachment(42, 7, "Wrong file")],
   ["downloadAttachment", () => api.downloadAttachment(42, 7)],
+  ["fetchComments", () => api.fetchComments(42)],
+  ["postComment", () => api.postComment(42, "Hello")],
+  ["fetchInternalNotes", () => api.fetchInternalNotes(42)],
+  ["postInternalNote", () => api.postInternalNote(42, "Hello")],
   ["checkSystem", () => api.checkSystem()],
   ["login", () => api.login("a@kmutt.ac.th", "pw")],
   ["logout", () => api.logout()],
@@ -50,7 +54,7 @@ describe("every API call carries the session cookie (PR #55 review)", () => {
 
   it("covers every exported request function", () => {
     const exported = Object.entries(api)
-      .filter(([name, value]) => typeof value === "function" && name !== "ApiError" && name !== "onSessionEnded" && name !== "apiFetch")
+      .filter(([name, value]) => typeof value === "function" && name !== "ApiError" && name !== "onSessionEnded")
       .map(([name]) => name)
       .sort();
     expect(exported).toEqual(CALLS.map(([name]) => name).sort());

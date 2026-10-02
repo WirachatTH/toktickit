@@ -9,7 +9,7 @@ const API_URL = "";
 // option makes that explicit and keeps every call working if the client is
 // ever served from a different origin than the API (PR #55 review). The
 // server's CORS config already allows credentials for CLIENT_ORIGINS.
-export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${API_URL}${path}`, { ...init, credentials: "include" });
 }
 
@@ -151,13 +151,13 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const res = await apiFetch(`/api/categories`);
+  const res = await apiFetch("/api/categories");
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
 
 export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
-  const res = await apiFetch(`/api/systems`);
+  const res = await apiFetch("/api/systems");
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -177,7 +177,7 @@ export async function createTicket(input: NewTicketInput): Promise<Ticket> {
 
   // No Content-Type header here on purpose — the browser sets the
   // multipart boundary itself; setting it manually breaks the request.
-  const res = await apiFetch(`/api/tickets`, {
+  const res = await apiFetch("/api/tickets", {
     method: "POST",
     body: formData,
   });
@@ -286,6 +286,8 @@ export interface TicketDetail {
   owner: PersonRef | null;
   resolutionSummary: string | null;
   requesterResolvedAt: string | null;
+  /** Lab 3, Issue 6 — false on a CLOSED or CANCELLED ticket (BR-52). */
+  canComment: boolean;
   createdAt: string;
   updatedAt: string;
   attachments: TicketDetailAttachment[];
@@ -338,12 +340,12 @@ export async function downloadAttachment(ticketId: number, attachmentId: number)
 }
 
 export async function checkSystem(): Promise<SystemStatus> {
-  const healthRes = await apiFetch(`/api/health`);
+  const healthRes = await apiFetch("/api/health");
   if (!healthRes.ok) {
     throw new Error("Unable to connect to TokTickIT API");
   }
   
-  const categoriesRes = await apiFetch(`/api/categories`);
+  const categoriesRes = await apiFetch("/api/categories");
   if (!categoriesRes.ok) {
     throw new Error("Unable to fetch categories");
   }
@@ -372,7 +374,7 @@ export interface AuthUser {
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export async function login(email: string, password: string): Promise<AuthUser> {
-  const res = await apiFetch(`/api/auth/login`, {
+  const res = await apiFetch("/api/auth/login", {
     method: "POST",
     headers: JSON_HEADERS,
     body: JSON.stringify({ email, password }),
@@ -382,24 +384,65 @@ export async function login(email: string, password: string): Promise<AuthUser> 
 }
 
 export async function logout(): Promise<void> {
-  const res = await apiFetch(`/api/auth/logout`, { method: "POST" });
+  const res = await apiFetch("/api/auth/logout", { method: "POST" });
   if (!res.ok) throw await toApiError(res);
 }
 
 /** The signed-in user, or null when there is no session (401). */
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
-  const res = await apiFetch(`/api/auth/me`);
+  const res = await apiFetch("/api/auth/me");
   if (res.status === 401) return null;
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).user;
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthUser> {
-  const res = await apiFetch(`/api/auth/change-password`, {
+  const res = await apiFetch("/api/auth/change-password", {
     method: "POST",
     headers: JSON_HEADERS,
     body: JSON.stringify({ currentPassword, newPassword }),
   });
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).user;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 6 — Public Comments and Internal Notes (api-spec.md §4). Two
+// endpoints each, no edit or delete (BR-51). The server sets the author and
+// the time; only the body is sent.
+// ---------------------------------------------------------------------------
+
+export interface DiscussionEntry {
+  id: number;
+  body: string;
+  createdAt: string;
+  author: PersonRef;
+}
+
+async function listEntries(path: string): Promise<DiscussionEntry[]> {
+  const res = await apiFetch(path);
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+async function postEntry(path: string, body: string): Promise<DiscussionEntry> {
+  const res = await apiFetch(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ body }) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export function fetchComments(ticketId: number): Promise<DiscussionEntry[]> {
+  return listEntries(`/api/tickets/${ticketId}/comments`);
+}
+
+export function postComment(ticketId: number, body: string): Promise<DiscussionEntry> {
+  return postEntry(`/api/tickets/${ticketId}/comments`, body);
+}
+
+export function fetchInternalNotes(ticketId: number): Promise<DiscussionEntry[]> {
+  return listEntries(`/api/tickets/${ticketId}/internal-notes`);
+}
+
+export function postInternalNote(ticketId: number, body: string): Promise<DiscussionEntry> {
+  return postEntry(`/api/tickets/${ticketId}/internal-notes`, body);
 }

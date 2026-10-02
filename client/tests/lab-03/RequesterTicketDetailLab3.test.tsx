@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as api from "../../src/api.js";
 import type { TicketDetail } from "../../src/api.js";
@@ -9,7 +10,7 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 
 // The Requester Ticket Detail in Lab 3 (docs/lab-03/ui-spec.md §5). Issue 5
 // adds UI-16 plus the owner line (BR-71) and the closed-ticket attachment rule
-// (BR-70); Issues 6 and 8 extend this file with comments (UI-14) and "Problem
+// (BR-70); Issue 6 adds the comments thread (UI-14); Issue 8 adds "Problem
 // appears resolved" (UI-15).
 
 const BASE: TicketDetail = {
@@ -25,6 +26,7 @@ const BASE: TicketDetail = {
   owner: null,
   resolutionSummary: null,
   requesterResolvedAt: null,
+  canComment: true,
   createdAt: "2026-10-01T09:15:00.000Z",
   updatedAt: "2026-10-01T09:15:00.000Z",
   attachments: [
@@ -54,6 +56,7 @@ function renderDetail(ticket: TicketDetail | Record<string, unknown>) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.spyOn(api, "fetchComments").mockResolvedValue([]);
 });
 
 describe("UI-16 what the Requester detail never shows (BR-71)", () => {
@@ -106,5 +109,80 @@ describe("attachments on a closed ticket (BR-70)", () => {
     expect(screen.getByRole("button", { name: "Add Attachment" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
     expect(screen.queryByText("Attachments can't be changed on a closed ticket.")).not.toBeInTheDocument();
+  });
+});
+
+const STAFF = { id: 8, name: "Pimchanok Srisuk", role: "IT_STAFF" as const, isActive: true };
+const ME = { id: 3, name: "Somchai Prasert", role: "REQUESTER" as const, isActive: true };
+const entry = (id: number, body: string, author: api.PersonRef = STAFF, createdAt = "2026-10-01T10:00:00.000Z") => ({ id, body, createdAt, author });
+
+describe("UI-14 the Requester's comments thread and composer (FR-14, FR-15)", () => {
+  it("shows the thread oldest first, each with author, role badge, and time, under 'Visible to you and IT Staff'", async () => {
+    vi.mocked(api.fetchComments).mockResolvedValue([
+      entry(1, "Could you restart it?", STAFF, "2026-10-01T10:00:00.000Z"),
+      entry(2, "Restarted — still broken.", ME, "2026-10-01T11:00:00.000Z"),
+    ]);
+    renderDetail(BASE);
+    const card = (await screen.findByRole("heading", { name: "Comments" })).closest("section")!;
+    expect(within(card).getByText("Visible to you and IT Staff")).toBeInTheDocument();
+    const items = await within(card).findAllByRole("listitem");
+    expect(items.map((li) => within(li).getByTestId("entry-body").textContent)).toEqual(["Could you restart it?", "Restarted — still broken."]);
+    expect(within(items[0]).getByText("Pimchanok Srisuk")).toBeInTheDocument();
+    expect(within(items[0]).getByText("IT Staff")).toHaveClass("zg-badge--role-it-staff");
+    expect(within(items[0]).getByRole("time")).toHaveAttribute("datetime", "2026-10-01T10:00:00.000Z");
+    expect(api.fetchComments).toHaveBeenCalledWith(42);
+  });
+
+  it("says so when there are no comments yet", async () => {
+    renderDetail(BASE);
+    expect(await screen.findByText("No comments yet.")).toBeInTheDocument();
+  });
+
+  it("posts a comment, adds it to the thread, and clears the box; Post is blocked while the box is blank", async () => {
+    const posted = entry(9, "Line one\nLine two", ME);
+    const post = vi.spyOn(api, "postComment").mockResolvedValue(posted);
+    renderDetail(BASE);
+    const box = await screen.findByRole("textbox", { name: /add a comment/i });
+    const button = screen.getByRole("button", { name: "Post comment" });
+    expect(button).toBeDisabled();
+    await userEvent.type(box, "   ");
+    expect(button).toBeDisabled();
+    await userEvent.clear(box);
+    await userEvent.type(box, "Line one{Shift>}{Enter}{/Shift}Line two");
+    expect(screen.getByText("17/2000")).toBeInTheDocument();
+    await userEvent.click(button);
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith(42, "Line one\nLine two"));
+    const body = await screen.findByTestId("entry-body");
+    expect(body.textContent).toBe("Line one\nLine two");
+    expect(body).toHaveStyle({ whiteSpace: "pre-wrap" });
+    expect(box).toHaveValue("");
+  });
+
+  it("shows a server rejection below the box and keeps the text", async () => {
+    vi.spyOn(api, "postComment").mockRejectedValue(new api.ApiError(400, "VALIDATION_ERROR", "x", { body: "Keep it to 2000 characters or fewer." }));
+    renderDetail(BASE);
+    const box = await screen.findByRole("textbox", { name: /add a comment/i });
+    await userEvent.type(box, "Hello");
+    await userEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    expect(await screen.findByText("Keep it to 2000 characters or fewer.")).toBeInTheDocument();
+    expect(box).toHaveValue("Hello");
+  });
+
+  it("renders a body with HTML in it as text, never as markup (BR-51)", async () => {
+    const unsafe = `<img src=x onerror="alert(1)"><script>alert("x")</script>`;
+    vi.mocked(api.fetchComments).mockResolvedValue([entry(1, unsafe)]);
+    const { container } = renderDetail(BASE);
+    expect((await screen.findByTestId("entry-body")).textContent).toBe(unsafe);
+    expect(container.querySelector("img[src='x'], script")).toBeNull();
+  });
+
+  it.each(["CLOSED", "CANCELLED"] as const)("on a %s ticket the thread stays readable and the composer is disabled with the closed note", async (status) => {
+    vi.mocked(api.fetchComments).mockResolvedValue([entry(1, "Earlier reply")]);
+    renderDetail({ ...BASE, currentStatus: status, canComment: false });
+    expect(await screen.findByText("Earlier reply")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /add a comment/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Post comment" })).toBeDisabled();
+    expect(screen.getByText("This ticket is closed — new comments are not accepted.")).toBeInTheDocument();
   });
 });
