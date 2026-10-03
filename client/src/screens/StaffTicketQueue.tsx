@@ -131,8 +131,13 @@ export function StaffTicketQueue() {
           const lastPage = toParams(res.appliedQuery);
           delete lastPage.page;
           if (res.pagination.totalPages > 1) lastPage.page = String(res.pagination.totalPages);
-          setSearchParams(lastPage, { replace: true });
-          return;
+          // Already there: the rows and the count disagreed (tickets changed
+          // between the two queries). Navigating would change nothing and leave
+          // the skeleton up for good, so show the page with a Retry instead.
+          if (new URLSearchParams(lastPage).toString() !== paramsKey) {
+            setSearchParams(lastPage, { replace: true });
+            return;
+          }
         }
         setResult(res);
         setState("loaded");
@@ -155,7 +160,13 @@ export function StaffTicketQueue() {
   useEffect(() => {
     const trimmed = searchInput.trim();
     if (trimmed === (params.search ?? "")) return;
-    const timer = setTimeout(() => update({ search: trimmed }), SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => {
+      // Clear filters empties this box too, which starts this timer. By the
+      // time it fires the URL already has no search, and pushing it again would
+      // add a second history entry for one click (PR #57 review 2).
+      if (trimmed === (latestParams.current.search ?? "")) return;
+      update({ search: trimmed });
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
@@ -177,9 +188,9 @@ export function StaffTicketQueue() {
   const sortValue = `${params.sort ?? DEFAULTS.sort}:${params.order ?? DEFAULTS.order}`;
   const rows = result?.data ?? [];
   const pagination = result?.pagination;
-  // Empty and no-results are about the whole queue, not this page (BR-67).
-  // With the jump to the last page above this equals "no rows", but it states
-  // the rule directly (PR #57 review).
+  // Empty and no-results are about the whole queue, not this page (BR-67): an
+  // empty page while tickets exist is either a jump to the last page or, if the
+  // rows and the count disagreed, the "changed while loading" notice below.
   const nothingMatches = state === "loaded" && (pagination?.totalItems ?? 0) === 0;
 
   function filterControls(prefix: string) {
@@ -349,6 +360,13 @@ export function StaffTicketQueue() {
             action={<Button variant="tertiary" onClick={clearFilters}>Clear filters</Button>}
           />
         </div>
+      )}
+
+      {state === "loaded" && rows.length === 0 && !nothingMatches && (
+        <ErrorState
+          message="The queue changed while it was loading."
+          action={<Button variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>Retry</Button>}
+        />
       )}
 
       {state === "loaded" && rows.length > 0 && (

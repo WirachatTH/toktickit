@@ -232,6 +232,18 @@ describe("UI-18 search, filters, sort, pagination, and the URL (FR-22, ui-spec Â
     await waitFor(() => expect(screen.getByTestId("search").textContent).toBe("?owner=me&search=zzzz"));
   });
 
+  it("keeps a filter changed while a search is still waiting to be sent", async () => {
+    echoQueue([row({ id: 1 })]);
+    renderQueue();
+    await waitFor(() => expect(lastParams()).toEqual({}));
+    // Type, then change Status before the 300 ms search delay is over.
+    await userEvent.type(screen.getAllByLabelText(/search/i)[0], "wifi", { delay: null });
+    await userEvent.selectOptions(screen.getAllByLabelText("Status")[0], "ALL");
+    await new Promise((r) => setTimeout(r, 600));
+    await waitFor(() => expect(lastParams()).toEqual({ status: "ALL", search: "wifi" }));
+    expect(screen.getAllByLabelText("Status")[0]).toHaveValue("ALL");
+  });
+
   it("shows 'Showing 11â€“20 of 35' and moves with Prev and Next", async () => {
     echoQueue([row({ id: 11 })], 35);
     renderQueue(STAFF, "/staff/queue?page=2");
