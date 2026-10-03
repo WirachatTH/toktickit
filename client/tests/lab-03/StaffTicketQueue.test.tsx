@@ -126,8 +126,8 @@ describe("UI-17 queue rows (FR-21, ui-spec §6.2)", () => {
     expect(within(third).getByTitle(/2026/)).toBeInTheDocument();
   });
 
-  // PR #57 review: a card was a div with role="link", so Space scrolled the page.
-  it("makes each small-screen card a real link to the ticket, so Space and Enter behave like a link", async () => {
+  // PR #57 review: a card was a div with role="link" and its own key handling.
+  it("makes each small-screen card a real link to the ticket, opened with Enter like any link", async () => {
     echoQueue([row({ id: 7, summary: "Printer jam" })]);
     renderQueue();
     const cards = await screen.findByTestId("queue-cards");

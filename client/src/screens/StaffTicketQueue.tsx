@@ -415,8 +415,8 @@ export function StaffTicketQueue() {
 
           <div className="d-md-none" data-testid="queue-cards">
             {rows.map((t) => (
-              // A real link (PR #57 review): Enter opens it, Space no longer scrolls
-              // the page, and it can be opened in a new tab like any link.
+              // A real link (PR #57 review): Enter opens it, and it can be opened
+              // in a new tab like any link. (Space scrolls, as it does for links.)
               <Link key={t.id} to={staffTicketPath(t.id)} className="zg-ticket-card zg-ticket-card--link">
                 <div className="d-flex justify-content-between align-items-start gap-2">
                   <strong>{t.ticketNumber}</strong>

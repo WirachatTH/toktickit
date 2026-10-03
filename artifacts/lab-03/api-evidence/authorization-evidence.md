@@ -1,11 +1,12 @@
 # Lab 3 — direct-API authorization evidence (PDF Part 7)
 
-Captured 2026-10-03T19:26:21Z against the local Docker stack through the Vite /api proxy,
+Captured 2026-10-03T20:01:33Z against the local Docker stack through the Vite /api proxy,
 with the seeded local-development accounts (README). Each request is sent straight to the API,
 bypassing the UI, by a role BR-20 does not grant; the server answers 403 FORBIDDEN and changes nothing.
-Ticket 4029 is a seeded IN_PROGRESS ticket.
+Ticket 4029 is an IN_PROGRESS ticket owned by user 82, picked from the queue by the script
+(artifacts/lab-03/api-evidence/capture-authorization-evidence.sh).
 
-Sign-ins: requester=200 staff=200 admin=200 (HTTP status of each login)
+Signed in as: Requester somchai.prasert (id 1), IT Staff chanon.rattanakorn, Administrator siriporn.boonmee (id 86).
 
 ## Baseline: the right role is let in
 
@@ -31,7 +32,7 @@ HTTP 403
 {"error":{"code":"FORBIDDEN","message":"You don't have permission to do that."}}
 
 
-### Requester reassigns the ticket
+### Requester reassigns the ticket to themselves
 $ curl -X PATCH /api/staff/tickets/4029/owner -b <requester session> -H 'Content-Type: application/json' -d '{"ownerId":1,"expectedOwnerId":82,"expectedStatus":"IN_PROGRESS"}'
 HTTP 403
 {"error":{"code":"FORBIDDEN","message":"You don't have permission to do that."}}
@@ -69,7 +70,7 @@ HTTP 403
 
 ## Administrator → IT Staff ticket changes (BR-21)
 
-### Administrator reassigns the ticket
+### Administrator assigns the ticket to themselves
 $ curl -X PATCH /api/staff/tickets/4029/owner -b <admin session> -H 'Content-Type: application/json' -d '{"ownerId":86,"expectedOwnerId":82,"expectedStatus":"IN_PROGRESS"}'
 HTTP 403
 {"error":{"code":"FORBIDDEN","message":"You don't have permission to do that."}}
