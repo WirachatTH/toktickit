@@ -6,6 +6,7 @@ import {
   apiAs,
   bp,
   expectNoHorizontalOverflow,
+  expectTableFits,
   logOut,
   openNav,
   shot,
@@ -48,6 +49,7 @@ async function expectQueueLayout(page: Page, info: TestInfo) {
     await expect(page.getByTestId("queue-table")).toBeVisible();
     const visible = await headers.evaluateAll((ths) => ths.filter((th) => (th as HTMLElement).offsetParent !== null).map((th) => th.textContent!.trim()));
     expect(visible).toEqual(bp(info) === "desktop" ? ["Ticket", "Summary", "Category", "Priority", "Status", "Owner", "Updated"] : ["Ticket", "Summary", "Priority", "Status", "Owner", "Updated"]);
+    await expectTableFits(page, "queue-table", "Ticket Queue");
   }
   await expectNoHorizontalOverflow(page, "Ticket Queue");
 }
@@ -100,6 +102,7 @@ test.describe("the staff ticket flow", () => {
     await page.getByLabel("Add a comment").fill(requesterComment);
     await page.getByRole("button", { name: "Post comment" }).click();
     await expect(page.getByTestId("entry-body").filter({ hasText: requesterComment })).toBeVisible();
+    await expectNoHorizontalOverflow(page, "Requester Ticket Detail");
     await shot(page, info, "requester-regression", "ticket-detail-comments");
 
     await page.getByRole("button", { name: "Problem appears resolved" }).click();
@@ -175,6 +178,7 @@ test.describe("the staff ticket flow", () => {
     const resolveDialog = page.getByRole("dialog", { name: "Resolve this ticket?" });
     await expect(resolveDialog.getByRole("button", { name: "Resolve ticket" })).toBeDisabled();
     await resolveDialog.getByLabel("Resolution summary").fill(resolution);
+    await expect(resolveDialog.getByRole("button", { name: "Resolve ticket" })).toBeEnabled();
     await shot(page, info, "staff-ticket-detail", "status-confirm");
     await resolveDialog.getByRole("button", { name: "Resolve ticket" }).click();
     await expect(controls.getByText("RESOLVED", { exact: true })).toBeVisible();

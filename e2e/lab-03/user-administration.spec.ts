@@ -7,6 +7,7 @@ import {
   createUser,
   expectFocusVisible,
   expectNoHorizontalOverflow,
+  expectTableFits,
   focused,
   runEmail,
   shot,
@@ -25,9 +26,17 @@ async function expectListLayout(page: Page, info: TestInfo) {
   if (isMobile(info)) {
     await expect(page.getByTestId("users-cards")).toBeVisible();
     await expect(page.getByTestId("users-table")).toBeHidden();
+    // No email is cut off: each card shows the whole address.
+    const clipped = await page.getByTestId("users-cards").evaluate((cards) =>
+      Array.from(cards.querySelectorAll<HTMLElement>(".zg-user-card__email"))
+        .filter((el) => el.scrollWidth > el.clientWidth + 1)
+        .map((el) => el.textContent),
+    );
+    expect(clipped, "emails cut off in the cards").toEqual([]);
   } else {
     await expect(page.getByTestId("users-table")).toBeVisible();
     await expect(page.getByTestId("users-cards")).toBeHidden();
+    await expectTableFits(page, "users-table", "User Management");
   }
   await expectNoHorizontalOverflow(page, "User Management");
 }
@@ -67,6 +76,16 @@ test.describe("user administration", () => {
     await expect(list(page, info).getByText("Pimchanok Srisuk")).toBeVisible();
     await expect(list(page, info).getByText(ACCOUNTS.admin.name)).toHaveCount(0);
     await shot(page, info, "user-management", "search");
+
+    // A very long address must show whole and must not widen the table: set up
+    // through the API, since it's the data under test, not the create flow.
+    const admin = await apiAs(ACCOUNTS.admin.email);
+    const long = runEmail(info, "averylongmailboxnamewithoutanynaturalbreakpointsatall");
+    await createUser(admin, { name: `E2E Long Email ${bp(info)}`, email: long });
+    await admin.dispose();
+    await page.getByLabel("Search").fill(long);
+    await expect(list(page, info).getByText(`E2E Long Email ${bp(info)}`)).toBeVisible();
+    await expectListLayout(page, info);
 
     await page.getByLabel("Search").fill("");
     await page.getByLabel("Role", { exact: true }).selectOption("IT_STAFF");
@@ -219,7 +238,10 @@ test.describe("user administration", () => {
     await page.getByLabel(/^Password/).press("Enter");
     await expect(page).toHaveURL(/\/staff\/queue$/);
 
-    // The queue toolbar, in reading order.
+    // The queue toolbar, in reading order. With a filter set, so Clear filters
+    // is enabled (it is disabled, and skipped by Tab, when there is nothing to clear).
+    await page.goto("/staff/queue?status=ALL&itPriority=HIGH");
+    await expect(page.getByTestId("queue-table")).toBeVisible();
     await page.locator("#queue-search").focus();
     const toolbar = [await focused(page)];
     for (let i = 0; i < 7; i++) {
@@ -232,15 +254,18 @@ test.describe("user administration", () => {
     // The detail tabs: arrow keys move the selection and the focus (ui-spec §10).
     await page.getByTestId("queue-table").locator("tbody a").first().click();
     const publicTab = page.getByRole("tab", { name: "Public comments" });
+    // Focused from code after a mouse click, so the ring is checked after the
+    // arrow keys move focus (the browser shows :focus-visible for keyboard moves).
     await publicTab.focus();
-    await expectFocusVisible(page, "Discussion tabs");
     await page.keyboard.press("ArrowRight");
     const internalTab = page.getByRole("tab", { name: "Internal notes" });
     await expect(internalTab).toBeFocused();
     await expect(internalTab).toHaveAttribute("aria-selected", "true");
+    await expectFocusVisible(page, "Discussion tabs");
     await page.keyboard.press("ArrowLeft");
     await expect(publicTab).toBeFocused();
     await expect(publicTab).toHaveAttribute("aria-selected", "true");
+    await expectFocusVisible(page, "Discussion tabs");
 
     // The side panel: opened from the keyboard, traps Tab, closes on Escape,
     // and gives focus back to Create user (ui-spec §1.8).

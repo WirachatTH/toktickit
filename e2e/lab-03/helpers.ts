@@ -39,10 +39,15 @@ export function runEmail(info: TestInfo, label: string): string {
 export const bp = (info: TestInfo) => info.project.name as "desktop" | "tablet" | "mobile";
 
 // ui-spec §13: artifacts/lab-03/screenshots/<folder>/<breakpoint>-<state>.png
+// The whole page, except while a dialog or side panel is open: those are fixed
+// to the viewport, so a full-page capture would show the page running on below them.
 export async function shot(page: Page, info: TestInfo, folder: string, state: string): Promise<void> {
   const dir = path.join(SCREENSHOTS, folder);
   fs.mkdirSync(dir, { recursive: true });
-  await page.screenshot({ path: path.join(dir, `${bp(info)}-${state}.png`), fullPage: true });
+  const modal = (await page.getByRole("dialog").count()) > 0;
+  // From the top, so sticky parts (the Ticket controls panel) sit where they start.
+  if (!modal) await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: path.join(dir, `${bp(info)}-${state}.png`), fullPage: !modal });
 }
 
 export async function signIn(page: Page, email: string, password = DEV_PASSWORD): Promise<void> {
@@ -126,4 +131,14 @@ export async function expectFocusVisible(page: Page, where: string): Promise<voi
     return { outline: s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0, ring: s.boxShadow !== "none" };
   });
   expect(style.outline || style.ring, `${where}: ${await focused(page)} shows a focus indicator`).toBe(true);
+}
+
+// A table that fits its container: no sideways scrolling inside the card
+// either (the page-level check can't see a table-responsive wrapper scrolling).
+export async function expectTableFits(page: Page, testId: string, where: string): Promise<void> {
+  const { table, box } = await page.getByTestId(testId).evaluate((el) => ({
+    table: el.scrollWidth,
+    box: (el.parentElement as HTMLElement).clientWidth,
+  }));
+  expect(table, `${where}: the table is wider than its container`).toBeLessThanOrEqual(box);
 }

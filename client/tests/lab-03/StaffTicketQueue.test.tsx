@@ -323,13 +323,13 @@ describe("UI-18 pagination window and reloading (ui-spec §6.2, PR #57 review)",
 
     // Still the old rows — no skeleton swapped in — but dimmed and busy.
     const results = screen.getByTestId("queue-results");
-    expect(within(results).getByText("Old row")).toBeInTheDocument();
+    expect(within(within(results).getByTestId("queue-table")).getByText("Old row")).toBeInTheDocument();
     expect(results).toHaveAttribute("aria-busy", "true");
     expect(results).toHaveClass("zg-queue-results--reloading");
     expect(screen.queryByRole("status", { name: "Loading tickets" })).not.toBeInTheDocument();
 
     release(reply([row({ id: 2, summary: "New row" })], { status: "ALL" }));
-    expect(await within(screen.getByTestId("queue-results")).findByText("New row")).toBeInTheDocument();
+    expect(await within(screen.getByTestId("queue-table")).findByText("New row")).toBeInTheDocument();
     expect(screen.queryByText("Old row")).not.toBeInTheDocument();
     expect(screen.getByTestId("queue-results")).toHaveAttribute("aria-busy", "false");
     expect(screen.getByTestId("queue-results")).not.toHaveClass("zg-queue-results--reloading");
