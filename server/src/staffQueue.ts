@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { sessionUser } from "./authorization.js";
 import { parseQueueQuery, queueOrderBy, queueWhere } from "./queueQuery.js";
@@ -32,7 +33,11 @@ async function listQueue(req: Request, res: Response, next: NextFunction) {
     const prisma = getPrisma();
     const query = parseQueueQuery(req.query as Record<string, unknown>);
     const where = queueWhere(query, sessionUser(req).id);
-    const [data, totalItems] = await Promise.all([
+    // One snapshot for both reads, so the total always matches the rows (a
+    // ticket closed between two separate queries made them disagree — PR #57
+    // review). Read committed would still give each statement its own
+    // snapshot; repeatable read gives the transaction one.
+    const [data, totalItems] = await prisma.$transaction([
       prisma.ticket.findMany({
         where,
         select: QUEUE_ROW,
@@ -41,7 +46,7 @@ async function listQueue(req: Request, res: Response, next: NextFunction) {
         take: query.pageSize,
       }),
       prisma.ticket.count({ where }),
-    ]);
+    ], { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
     res.set("Cache-Control", "no-store");
     return res.status(200).json({
       data,

@@ -56,8 +56,14 @@ function positiveId(raw: unknown): number | undefined {
   return Number.isSafeInteger(n) && n > 0 && n <= INT32_MAX ? n : undefined;
 }
 
+// Page values are plain digits, like ids: Number() alone would also read
+// "1e1", "0x10", or " 3" (PR #57 review).
+const DIGITS = /^\d+$/;
+
 function pageOf(raw: unknown): number {
-  const n = Number(text(raw));
+  const value = text(raw);
+  if (value === undefined || !DIGITS.test(value)) return DEFAULT_QUEUE_QUERY.page;
+  const n = Number(value);
   if (!Number.isSafeInteger(n) || n < 1) return DEFAULT_QUEUE_QUERY.page;
   return Math.min(n, MAX_PAGE);
 }
@@ -65,10 +71,8 @@ function pageOf(raw: unknown): number {
 // BR-65 — a numeric page size is clamped into 1–50; anything else is the default.
 function pageSizeOf(raw: unknown): number {
   const value = text(raw);
-  if (value === undefined || value.trim() === "") return DEFAULT_QUEUE_QUERY.pageSize;
-  const n = Number(value);
-  if (!Number.isInteger(n)) return DEFAULT_QUEUE_QUERY.pageSize;
-  return Math.min(Math.max(n, 1), 50);
+  if (value === undefined || !DIGITS.test(value)) return DEFAULT_QUEUE_QUERY.pageSize;
+  return Math.min(Math.max(Number(value), 1), 50);
 }
 
 export function parseQueueQuery(raw: Record<string, unknown>): QueueQuery {
