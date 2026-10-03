@@ -184,6 +184,31 @@ describe("UI-18 search, filters, sort, pagination, and the URL (FR-22, ui-spec �
     ]);
   });
 
+  // PR #57 review: Clear filters straight after a search put the other filters
+  // back (the delayed search wrote a stale copy of the URL).
+  it("clears every filter, not just the search, when Clear filters follows a search", async () => {
+    echoQueue([]);
+    renderQueue(STAFF, "/staff/queue?owner=me");
+    await waitFor(() => expect(lastParams()).toEqual({ owner: "me" }));
+    await userEvent.type(screen.getAllByLabelText(/search/i)[0], "zzzz");
+    await waitFor(() => expect(lastParams()).toEqual({ owner: "me", search: "zzzz" }));
+
+    for (const button of [() => screen.getAllByRole("button", { name: "Clear filters" })[0], () => within(screen.getByTestId("queue-no-results")).getByRole("button", { name: "Clear filters" })]) {
+      await waitFor(() => expect(lastParams()).toMatchObject({ owner: "me" }));
+      await userEvent.click(button());
+      await waitFor(() => expect(lastParams()).toEqual({}));
+      // Wait out the search delay: nothing may put the old filters back.
+      await new Promise((r) => setTimeout(r, 500));
+      expect(lastParams()).toEqual({});
+      expect(screen.getByTestId("search").textContent).toBe("");
+      expect(screen.getAllByLabelText("Owner")[0]).toHaveValue("any");
+      // Set up the same state again for the second Clear button.
+      await userEvent.selectOptions(screen.getAllByLabelText("Owner")[0], "me");
+      await userEvent.type(screen.getAllByLabelText(/search/i)[0], "zzzz");
+      await waitFor(() => expect(lastParams()).toEqual({ owner: "me", search: "zzzz" }));
+    }
+  });
+
   it("shows 'Showing 11–20 of 35' and moves with Prev and Next", async () => {
     echoQueue([row({ id: 11 })], 35);
     renderQueue(STAFF, "/staff/queue?page=2");
@@ -210,6 +235,26 @@ describe("UI-19 empty, no-results, and failure are distinct (FR-23, AC-27)", () 
     expect(screen.queryByText(/the queue is clear/i)).toBeNull();
     await userEvent.click(within(screen.getByTestId("queue-no-results")).getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(lastParams()).toEqual({}));
+  });
+
+  // PR #57 review: an empty page past the end was read as "nothing at all".
+  it("takes a page past the end to the last page, instead of saying the queue is clear", async () => {
+    const all = Array.from({ length: 14 }, (_, i) => row({ id: i + 1 }));
+    vi.spyOn(api, "fetchStaffQueue").mockImplementation(async (params) => {
+      const page = Number((params as Record<string, string>).page ?? 1);
+      const owner = (params as Record<string, string>).owner;
+      const data = all.slice((page - 1) * 10, page * 10);
+      return reply(data, { page, ...(owner ? { owner: owner as "me" } : {}) }, 14);
+    });
+    for (const path of ["/staff/queue?page=99", "/staff/queue?page=99&owner=me"]) {
+      const { unmount } = renderQueue(STAFF, path);
+      await waitFor(() => expect(lastParams().page).toBe("2"));
+      expect(await screen.findByText("Showing 11–14 of 14")).toBeInTheDocument();
+      expect(screen.queryByText(/the queue is clear/i)).toBeNull();
+      expect(screen.queryByText("No tickets match your search or filters.")).toBeNull();
+      expect(within(table()).getAllByRole("row")).toHaveLength(5);
+      unmount();
+    }
   });
 
   it("shows a failure banner with Retry, which loads again", async () => {
