@@ -161,10 +161,11 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–7 are in (contract; users, migration, and seed; sign-in;
+> **Status:** Issues 1–8 are in (contract; users, migration, and seed; sign-in;
 > roles and the app shell; the Lab 2 Requester flows on sign-in; Public Comments
-> and Internal Notes; the IT Staff Ticket Queue). Sections still marked *planned*
-> become true as Issues 8–10 land; each issue updates them. The
+> and Internal Notes; the IT Staff Ticket Queue; the ticket workflow and IT Staff
+> Ticket Detail). Sections still marked *planned* become true as Issues 9–10 land;
+> each issue updates them. The
 > Lab 2 Development Requester selector, its header, and its list endpoint are
 > gone: the Requester is always the signed-in user.
 
@@ -233,8 +234,9 @@ docker-compose up -d client
 - Each role lands on its own home and sees only the screens it may open:
   Requester → *My Tickets* and *Create Ticket*; IT Staff → *Ticket Queue*;
   Administrator → *User Management* and *Ticket Queue*. The Ticket Queue is live
-  (Administrators see it read-only); User Management is a placeholder until Issue 9,
-  and a queue row's detail screen arrives in Issue 8.
+  (Administrators see it read-only), and each row opens IT Staff Ticket Detail, where
+  IT Staff claim, assign, prioritise, and move tickets through the workflow. User
+  Management is a placeholder until Issue 9.
 - Opening a screen your role may not use takes you to your home with "You don't
   have access to that page." The server refuses the same requests (`403`) whatever
   the screen shows.

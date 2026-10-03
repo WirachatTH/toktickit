@@ -15,6 +15,8 @@ import { Modal } from "./Modal.js";
 export interface AttachmentSectionProps {
   /** Lab 3 BR-70 — a CLOSED or CANCELLED ticket: no add or remove, download only. */
   locked?: boolean;
+  /** Lab 3 FR-29 — IT Staff and Administrators only download; they never add or remove. */
+  downloadOnly?: boolean;
   ticketId: number;
   attachments: TicketDetailAttachment[];
   onAttachmentsChange: (attachments: TicketDetailAttachment[]) => void;
@@ -42,7 +44,8 @@ function safeMessage(error: unknown, fallback: string): string {
 // from RequesterTicketDetail per the planned test file split
 // (`AttachmentSection.test.tsx` — UI-12/UI-13/UI-14) — this owns everything
 // attachment-shaped; the screen owns only the read-only ticket info.
-export function AttachmentSection({ locked = false, ticketId, attachments, onAttachmentsChange }: AttachmentSectionProps) {
+export function AttachmentSection({ locked = false, downloadOnly = false, ticketId, attachments, onAttachmentsChange }: AttachmentSectionProps) {
+  const canChange = !locked && !downloadOnly;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState(false);
@@ -147,7 +150,7 @@ export function AttachmentSection({ locked = false, ticketId, attachments, onAtt
     <div className="zg-card">
       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h2 className="h5 mb-0">Attachments</h2>
-        {!locked && (
+        {canChange && (
           <>
             <span title={atLimit ? `A Ticket may have at most ${MAX_ACTIVE_ATTACHMENTS} active attachments.` : undefined}>
               <Button
@@ -212,7 +215,7 @@ export function AttachmentSection({ locked = false, ticketId, attachments, onAtt
                 >
                   Download
                 </Button>
-                {!locked && (
+                {canChange && (
                   <Button variant="destructive" onClick={(e) => openRemoveModal(a, e.currentTarget)}>
                     Remove
                   </Button>

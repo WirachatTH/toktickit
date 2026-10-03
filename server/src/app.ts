@@ -19,6 +19,8 @@ import {
 import { attachSession, authRouter } from "./auth.js";
 import { registerDiscussionRoutes } from "./discussion.js";
 import { registerStaffQueueRoutes } from "./staffQueue.js";
+import { registerStaffTicketRoutes } from "./staffTicket.js";
+import { canMarkAppearsResolved } from "./ticketWorkflow.js";
 import { isClosedStatus } from "./ticketStatus.js";
 import {
   accessibleTicketWhere,
@@ -762,6 +764,8 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
       requesterResolvedAt: ticket.requesterResolvedAt,
       // Lab 3, Issue 6 — whether the Comments composer accepts a post (BR-52).
       canComment: !isClosedStatus(ticket.currentStatus),
+      // Lab 3, Issue 8 — whether "Problem appears resolved" is offered (BR-47).
+      canMarkAppearsResolved: canMarkAppearsResolved(ticket.currentStatus, ticket.requesterResolvedAt),
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       attachments: ticket.attachments.map((a) => ({
@@ -786,6 +790,9 @@ registerDiscussionRoutes(app);
 
 // Lab 3, Issue 7 — the IT Staff Ticket Queue and assignable users (staffQueue.ts).
 registerStaffQueueRoutes(app);
+
+// Lab 3, Issue 8 — IT Staff Ticket Detail and the workflow (staffTicket.ts).
+registerStaffTicketRoutes(app);
 
 // Lab 3, Issue 4 — the end of the chain (§6.2). A classified route whose
 // handler a later issue adds answers 404 until then; an error that escaped a

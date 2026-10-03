@@ -340,7 +340,7 @@ const markResolved = (ticket: number, body: object = {}, cookie = cookies.reques
 
 describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
   it("REG-10 records the time on an own IN_PROGRESS ticket, with or without a comment, and never changes the status", async () => {
-    const plain = await ticketFor(requesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId });
+    const plain = (await ticketFor(requesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId })).id;
     expect((await request(app).get(`/api/tickets/${plain}`).set("Cookie", cookies.requester)).body.canMarkAppearsResolved).toBe(true);
     const before = Date.now();
     const res = await markResolved(plain);
@@ -353,7 +353,7 @@ describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
     expect(await prisma.publicComment.count({ where: { ticketId: plain } })).toBe(0);
     expect((await request(app).get(`/api/tickets/${plain}`).set("Cookie", cookies.requester)).body.canMarkAppearsResolved).toBe(false);
 
-    const withComment = await ticketFor(requesterId, { currentStatus: "WAITING_FOR_REQUESTER", ownerId: staffId });
+    const withComment = (await ticketFor(requesterId, { currentStatus: "WAITING_FOR_REQUESTER", ownerId: staffId })).id;
     const res2 = await markResolved(withComment, { comment: "  Works again after the update.  " });
     expect(res2.status).toBe(200);
     expect(res2.body.comment).toMatchObject({ body: "Works again after the update.", author: { id: requesterId, role: "REQUESTER" } });
@@ -361,7 +361,7 @@ describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
     expect(comments.map((c) => [c.authorId, c.body])).toEqual([[requesterId, "Works again after the update."]]);
 
     // A comment over 2000 characters is refused, and nothing is recorded.
-    const tooLong = await ticketFor(requesterId, { currentStatus: "OPEN", ownerId: staffId });
+    const tooLong = (await ticketFor(requesterId, { currentStatus: "OPEN", ownerId: staffId })).id;
     const refused = await markResolved(tooLong, { comment: "c".repeat(2001) });
     expect(refused.status).toBe(400);
     expect(refused.body.error.fields.comment).toBeTruthy();
@@ -369,13 +369,13 @@ describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
   });
 
   it("REG-11 refuses marking again, and marking a RESOLVED, CLOSED, or CANCELLED ticket, with 409 ALREADY_MARKED", async () => {
-    const marked = await ticketFor(requesterId, { currentStatus: "OPEN", ownerId: staffId, requesterResolvedAt: new Date("2026-10-01T00:00:00Z") });
+    const marked = (await ticketFor(requesterId, { currentStatus: "OPEN", ownerId: staffId, requesterResolvedAt: new Date("2026-10-01T00:00:00Z") })).id;
     const again = await markResolved(marked, { comment: "Still fine" });
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("ALREADY_MARKED");
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: marked } })).requesterResolvedAt?.toISOString()).toBe("2026-10-01T00:00:00.000Z");
     for (const status of ["RESOLVED", "CLOSED", "CANCELLED"] as const) {
-      const id = await ticketFor(requesterId, { currentStatus: status, ownerId: staffId });
+      const id = (await ticketFor(requesterId, { currentStatus: status, ownerId: staffId })).id;
       const res = await markResolved(id, { comment: "Done?" });
       expect(res.status, status).toBe(409);
       expect(res.body.error.code).toBe("ALREADY_MARKED");
@@ -385,13 +385,13 @@ describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
     }
     // NEW and REOPENED are allowed (BR-47).
     for (const status of ["NEW", "REOPENED"] as const) {
-      const id = await ticketFor(requesterId, { currentStatus: status, ownerId: status === "NEW" ? null : staffId });
+      const id = (await ticketFor(requesterId, { currentStatus: status, ownerId: status === "NEW" ? null : staffId })).id;
       expect((await markResolved(id)).status, status).toBe(200);
     }
   });
 
   it("REG-12 gives a Requester no way to change status: the staff route is 403, and status fields in their bodies are ignored", async () => {
-    const id = await ticketFor(requesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId });
+    const id = (await ticketFor(requesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId })).id;
     for (const status of ["RESOLVED", "CLOSED"] as const) {
       const res = await request(app)
         .patch(`/api/staff/tickets/${id}/status`)
@@ -405,7 +405,7 @@ describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
   });
 
   it("REG-13 answers another Requester's ticket with 404, exactly like a missing one", async () => {
-    const theirs = await ticketFor(otherRequesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId });
+    const theirs = (await ticketFor(otherRequesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId })).id;
     const res = await markResolved(theirs);
     const missing = await markResolved(2_000_000_000);
     expect(res.status).toBe(404);

@@ -288,6 +288,8 @@ export interface TicketDetail {
   requesterResolvedAt: string | null;
   /** Lab 3, Issue 6 — false on a CLOSED or CANCELLED ticket (BR-52). */
   canComment: boolean;
+  /** Lab 3, Issue 8 — whether "Problem appears resolved" is offered (BR-47). */
+  canMarkAppearsResolved: boolean;
   createdAt: string;
   updatedAt: string;
   attachments: TicketDetailAttachment[];
@@ -500,4 +502,69 @@ export async function fetchAssignableUsers(): Promise<PersonRef[]> {
   const res = await apiFetch("/api/staff/assignable-users");
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).data;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 8 — IT Staff Ticket Detail, the workflow, and the Requester's
+// "Problem appears resolved" (api-spec.md §3.7, §5.2, §5.4 to §5.6). Every
+// change states what the screen showed (expectedStatus / expectedOwnerId), so
+// a change made meanwhile by someone else is refused, not overwritten.
+// ---------------------------------------------------------------------------
+
+export interface StaffTicketDetail {
+  id: number;
+  ticketNumber: string;
+  requester: { id: number; name: string; email: string; isActive: boolean };
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string };
+  summary: string;
+  description: string;
+  requestedPriority: Priority;
+  itPriority: Priority;
+  currentStatus: TicketStatus;
+  owner: PersonRef | null;
+  resolutionSummary: string | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments: TicketDetailAttachment[];
+  permittedTransitions: TicketStatus[];
+  capabilities: { canAssign: boolean; canChangePriority: boolean; canChangeStatus: boolean; canPostComment: boolean; canPostNote: boolean };
+}
+
+async function patchStaffTicket(ticketId: number, what: string, body: object): Promise<StaffTicketDetail> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/${what}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(body) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function fetchStaffTicket(ticketId: number): Promise<StaffTicketDetail> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}`);
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export function changeOwner(ticketId: number, body: { ownerId: number | null; expectedOwnerId: number | null; expectedStatus: TicketStatus }) {
+  return patchStaffTicket(ticketId, "owner", body);
+}
+
+export function changeItPriority(ticketId: number, body: { itPriority: Priority; expectedStatus: TicketStatus }) {
+  return patchStaffTicket(ticketId, "it-priority", body);
+}
+
+export function changeStatus(
+  ticketId: number,
+  body: { status: TicketStatus; expectedStatus: TicketStatus; expectedOwnerId: number | null; resolutionSummary?: string; reason?: string },
+) {
+  return patchStaffTicket(ticketId, "status", body);
+}
+
+export async function markAppearsResolved(ticketId: number, comment?: string): Promise<{ requesterResolvedAt: string; comment: DiscussionEntry | null }> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/appears-resolved`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(comment ? { comment } : {}),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
 }

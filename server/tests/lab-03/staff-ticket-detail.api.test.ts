@@ -472,7 +472,9 @@ describe("races: every change is checked against the locked row (BR-80)", () => 
     const png = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000000020001e221bc330000000049454e44ae426082", "hex");
     const actions: [string, (id: number) => request.Test, (id: number) => Promise<boolean>][] = [
       ["comment", (id) => request(app).post(`/api/tickets/${id}/comments`).set("Cookie", cookies.requester).send({ body: "One more detail" }), async (id) => (await prisma.publicComment.count({ where: { ticketId: id, authorId: users.requester } })) > 0],
-      ["appears resolved", (id) => request(app).post(`/api/tickets/${id}/appears-resolved`).set("Cookie", cookies.requester).send({}), async (id) => (await row(id)).requesterResolvedAt !== null],
+      // The signal is cleared by any later status change (BR-48), so after a
+      // successful mark the cancellation must have come second and cleared it.
+      ["appears resolved", (id) => request(app).post(`/api/tickets/${id}/appears-resolved`).set("Cookie", cookies.requester).send({}), async () => true],
       ["attachment", (id) => request(app).post(`/api/tickets/${id}/attachments`).set("Cookie", cookies.requester).attach("file", png, "late.png"), async (id) => (await prisma.attachment.count({ where: { ticketId: id } })) > 0],
     ];
     for (const [label, act, landed] of actions) {
@@ -484,13 +486,15 @@ describe("races: every change is checked against the locked row (BR-80)", () => 
         // Cancellation always wins or loses cleanly; the other change is either
         // in (it committed first) or refused with 409 — never in after a refusal.
         expect(cancel.status, `${label} run ${i}`).toBe(200);
-        if (other.status === 409) expect(await landed(id), `${label} run ${i}`).toBe(false);
-        else {
+        if (other.status === 409) {
+          if (label === "appears resolved") expect((await row(id)).requesterResolvedAt, `${label} run ${i}`).toBeNull();
+          else expect(await landed(id), `${label} run ${i}`).toBe(false);
+        } else {
           expect([200, 201], `${label} run ${i}`).toContain(other.status);
           expect(await landed(id), `${label} run ${i}`).toBe(true);
         }
-        // Either way, the ticket ended cancelled.
-        expect((await row(id)).currentStatus).toBe("CANCELLED");
+        // Either way, the ticket ended cancelled, with no signal left on it.
+        expect(await row(id)).toMatchObject({ currentStatus: "CANCELLED", requesterResolvedAt: null });
       }
     }
   });
