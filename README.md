@@ -161,13 +161,14 @@ Ticket Queue, IT Staff Ticket Detail, and a minimal User Management screen. The
 engineering contract lives in `docs/lab-03/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–9 are in (contract; users, migration, and seed; sign-in;
+> **Status:** Issues 1–10 are in (contract; users, migration, and seed; sign-in;
 > roles and the app shell; the Lab 2 Requester flows on sign-in; Public Comments
 > and Internal Notes; the IT Staff Ticket Queue; the ticket workflow and IT Staff
-> Ticket Detail; Administrator User Management). Sections still marked *planned* become true as Issue 10 lands;
-> each issue updates them. The
-> Lab 2 Development Requester selector, its header, and its list endpoint are
-> gone: the Requester is always the signed-in user.
+> Ticket Detail; Administrator User Management; responsive QA and the Lab 3
+> end-to-end suites). Every planned test in `docs/lab-03/tests.md` now passes;
+> Issue 11 re-runs them on `main` for the release. The Lab 2 Development
+> Requester selector, its header, and its list endpoint are gone: the Requester
+> is always the signed-in user.
 
 ### Applying the Lab 3 migration and seed
 Back up first if your database holds anything you care about — the migration is
@@ -255,5 +256,13 @@ docker-compose up -d client
 ```bash
 docker-compose exec server npm test               # server/tests/lab-01..03
 docker-compose exec client npm test               # client/tests/lab-01..03
-docker-compose exec client npx playwright test    # e2e/lab-02..03, three viewports
+docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..03, three viewports
 ```
+- The Playwright suites sign in with the local development accounts above and
+  create their own tickets and users, which `e2e/globalTeardown.ts` removes when
+  the run ends. One worker is the reliable setting on a modest machine; the
+  default (three Chromiums beside the dev server in one container) can time out.
+- `npx playwright test lab-03/` runs only the Lab 3 suites. Lab 3 screenshots land
+  in `artifacts/lab-03/screenshots/`; the Lab 2 journey also rewrites
+  `artifacts/lab-02/screenshots/`, so `git checkout artifacts/lab-02` afterwards
+  if you don't mean to update the Lab 2 evidence.

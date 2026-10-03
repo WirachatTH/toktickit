@@ -263,38 +263,38 @@ that owns the row runs it green.
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | STYLE-01 | AC-44 | UI Style | Status badges for all 8 values | Class and label per ui-spec §1.2; `NEW` identical to Lab 2 | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
-| STYLE-02 | AC-44 | UI Style | Contrast of every badge and Internal-region pair, computed from the CSS | Each ≥ 4.5:1 | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
+| STYLE-02 | AC-44 | UI Style | Contrast of every badge and Internal-region pair, computed from the CSS | Each ≥ 4.5:1 | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 | STYLE-03 | AC-24 | UI Style | Internal region | Uses `--zg-internal-*` tokens and carries the caption text | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 | STYLE-04 | AC-32 | UI Style | Ticket controls vs ticket information | Controls use the editable field class; information uses `zg-field--readonly` | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 | STYLE-05 | AC-44 | UI Style | Role badges and shared priority badges | Roles outlined/filled per §1.4; Requested and IT Priority of the same value share one class | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
-| STYLE-06 | AC-44 | UI Style | Scan new components and CSS for hex literals | None outside the token and badge definitions | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Planned |
+| STYLE-06 | AC-44 | UI Style | Scan new components and CSS for hex literals | None outside the token and badge definitions | `client/tests/lab-03/ZenGreenLab3.test.tsx` | Pass |
 
 ### 2.12 Responsive
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| RESP-01 | AC-27, AC-44 | Responsive | Queue at desktop, tablet, mobile | 7-column table, 6-column table, cards; no horizontal scroll | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| RESP-02 | AC-44 | Responsive | IT Staff Ticket Detail at the three widths | Controls beside main on desktop, above it otherwise; no overflow | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| RESP-03 | AC-44 | Responsive | User Management at the three widths | Table + side panel on desktop; full-screen panel on tablet and mobile; cards on mobile | `e2e/lab-03/user-administration.spec.ts` | Planned |
-| RESP-04 | AC-44 | Responsive | Login and Change Password at the three widths | No overflow; mobile touch targets ≥ 44px | `e2e/lab-03/authentication.spec.ts` | Planned |
-| RESP-05 | AC-15, AC-44 | Responsive | Shell on mobile | Hamburger holds the role's links, the user block, and both actions | `e2e/lab-03/authentication.spec.ts` | Planned |
-| RESP-06 | AC-44 | Responsive | Keyboard-only pass through Login, queue filters, detail tabs, side panel | Logical order; focus always visible; dialogs trap and restore focus | `e2e/lab-03/user-administration.spec.ts` | Planned |
+| RESP-01 | AC-27, AC-44 | Responsive | Queue at desktop, tablet, mobile | 7-column table, 6-column table, cards; no horizontal scroll | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| RESP-02 | AC-44 | Responsive | IT Staff Ticket Detail at the three widths | Controls beside main on desktop, above it otherwise; no overflow | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| RESP-03 | AC-44 | Responsive | User Management at the three widths | Table + side panel on desktop; full-screen panel on tablet and mobile; cards on mobile | `e2e/lab-03/user-administration.spec.ts` | Pass |
+| RESP-04 | AC-44 | Responsive | Login and Change Password at the three widths | No overflow; mobile touch targets ≥ 44px | `e2e/lab-03/authentication.spec.ts` | Pass |
+| RESP-05 | AC-15, AC-44 | Responsive | Shell on mobile | Hamburger holds the role's links, the user block, and both actions | `e2e/lab-03/authentication.spec.ts` | Pass |
+| RESP-06 | AC-44 | Responsive | Keyboard-only pass through Login, queue filters, detail tabs, side panel | Logical order; focus always visible; dialogs trap and restore focus | `e2e/lab-03/user-administration.spec.ts` | Pass |
 
 ### 2.13 End-to-end
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| E2E-01 | AC-01, AC-06 | E2E | Requester signs in, sees name and role, signs out, opens a protected URL | Login screen shown after sign-out | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-02 | AC-02, AC-35 | E2E | Administrator API creates a fresh user; that user signs in | Forced to Change Password; lands on home after a valid change | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-03 | AC-03, AC-04 | E2E | Wrong password for this run's fresh user, then an inactive account created for this run | Each shows its own message; per-run emails keep repeated runs from throttling a shared account | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-04 | AC-17, AC-19, AC-20 | E2E | Requester creates a ticket with an attachment, finds it, comments, marks appears resolved | Each step visible in the UI | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-05 | AC-25, AC-28 | E2E | IT Staff filter the queue to unassigned and claim a `NEW` ticket | Ticket shows them as owner and `OPEN` | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-06 | AC-30, AC-31 | E2E | IT Staff raise IT Priority, move to In Progress, then Resolved with a summary | Requester sees the status and the resolution summary | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-07 | AC-22, AC-24 | E2E | IT Staff add an Internal Note and a Public Comment | Requester sees the comment only | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-08 | AC-33 | E2E | Administrator opens the queue and a ticket | Everything readable; no operational control | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-09 | AC-34, AC-36 | E2E | Administrator searches, filters by role, creates a user, retries with a duplicate email | User appears; duplicate refused on the Email field | `e2e/lab-03/user-administration.spec.ts` | Planned |
-| E2E-10 | AC-37, AC-38, AC-39 | E2E | Administrator deactivates a user, sets another's initial password, opens own account | Deactivated user cannot sign in; the other is forced to change; own Role/Active disabled | `e2e/lab-03/user-administration.spec.ts` | Planned |
-| E2E-11 | AC-15, AC-41 | E2E | Requester opens `/admin/users`; the admin API is called with their session | Forbidden callout; API `403` | `e2e/lab-03/user-administration.spec.ts` | Planned |
+| E2E-01 | AC-01, AC-06 | E2E | Requester signs in, sees name and role, signs out, opens a protected URL | Login screen shown after sign-out | `e2e/lab-03/authentication.spec.ts` | Pass |
+| E2E-02 | AC-02, AC-35 | E2E | Administrator API creates a fresh user; that user signs in | Forced to Change Password; lands on home after a valid change | `e2e/lab-03/authentication.spec.ts` | Pass |
+| E2E-03 | AC-03, AC-04 | E2E | Wrong password for this run's fresh user, then an inactive account created for this run | Each shows its own message; per-run emails keep repeated runs from throttling a shared account | `e2e/lab-03/authentication.spec.ts` | Pass |
+| E2E-04 | AC-17, AC-19, AC-20 | E2E | Requester creates a ticket with an attachment, finds it, comments, marks appears resolved | Each step visible in the UI | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-05 | AC-25, AC-28 | E2E | IT Staff filter the queue to unassigned and claim a `NEW` ticket | Ticket shows them as owner and `OPEN` | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-06 | AC-30, AC-31 | E2E | IT Staff raise IT Priority, move to In Progress, then Resolved with a summary | Requester sees the status and the resolution summary | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-07 | AC-22, AC-24 | E2E | IT Staff add an Internal Note and a Public Comment | Requester sees the comment only | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-08 | AC-33 | E2E | Administrator opens the queue and a ticket | Everything readable; no operational control | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-09 | AC-34, AC-36 | E2E | Administrator searches, filters by role, creates a user, retries with a duplicate email | User appears; duplicate refused on the Email field | `e2e/lab-03/user-administration.spec.ts` | Pass |
+| E2E-10 | AC-37, AC-38, AC-39 | E2E | Administrator deactivates a user, sets another's initial password, opens own account | Deactivated user cannot sign in; the other is forced to change; own Role/Active disabled | `e2e/lab-03/user-administration.spec.ts` | Pass |
+| E2E-11 | AC-15, AC-41 | E2E | Requester opens `/admin/users`; the admin API is called with their session | Forbidden callout; API `403` | `e2e/lab-03/user-administration.spec.ts` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -374,17 +374,25 @@ Filled in per issue against `ui-spec.md` §12; evidence under `artifacts/lab-03/
 
 | Check | Login / Change Password | Requester Ticket Detail | Ticket Queue | IT Staff Ticket Detail | User Management |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| Only `--zg-*` tokens and badge classes used | Pending | Pending | Pending | Pending | Pending |
-| Role navigation correct for each role | Pending | Pending | Pending | Pending | Pending |
-| Badges consistent (status, priority, role) | Pending | Pending | Pending | Pending | Pending |
-| Editable vs read-only distinct | Pending | Pending | Pending | Pending | Pending |
-| Public Comments vs Internal Notes distinct | Pending | Pending | Pending | Pending | Pending |
-| Validation below fields; conflicts beside their control | Pending | Pending | Pending | Pending | Pending |
-| Focus visible on every control | Pending | Pending | Pending | Pending | Pending |
-| No clipping / overlap / horizontal overflow — desktop | Pending | Pending | Pending | Pending | Pending |
-| No clipping / overlap / horizontal overflow — tablet | Pending | Pending | Pending | Pending | Pending |
-| No clipping / overlap / horizontal overflow — mobile | Pending | Pending | Pending | Pending | Pending |
-| Administrator read-only views show no operational control | Pending | Pending | Pending | Pending | Pending |
+| Only `--zg-*` tokens and badge classes used | Pass — STYLE-06 | Pass — STYLE-06 | Pass — STYLE-06 | Pass — STYLE-06 | Pass — STYLE-06 |
+| Role navigation correct for each role | Pass — E2E-01, RESP-05, `shell-*` | Pass — E2E-01 (Requester shell) | Pass — E2E-01 (IT Staff, Administrator) | Pass — E2E-01 (IT Staff, Administrator) | Pass — E2E-01 (Administrator) |
+| Badges consistent (status, priority, role) | Pass — role badge in the shell (STYLE-05) | Pass — STYLE-01, STYLE-02 | Pass — STYLE-01, STYLE-02, `staff-queue/*` | Pass — STYLE-01, STYLE-02, `staff-ticket-detail/*` | Pass — STYLE-05, `user-management/*-list` |
+| Editable vs read-only distinct | n/a | Pass — STYLE-04 (Lab 2 read-only fields) | n/a | Pass — STYLE-04, `staff-ticket-detail/*-view` | Pass — disabled own-account controls, `self-restriction` |
+| Public Comments vs Internal Notes distinct | n/a | Pass — notes never shown (E2E-07) | n/a | Pass — STYLE-03, `internal-notes` vs `public-comments` | n/a |
+| Validation below fields; conflicts beside their control | Pass — `login-invalid`, `change-password-rules` | Pass — UI-14, UI-15 | n/a | Pass — `stale-conflict`, `status-confirm` | Pass — `create-validation`, `duplicate-email`, `last-administrator` |
+| Focus visible on every control | Pass — RESP-06 (keyboard pass) | Pass — shared field, button, tab rules (not walked by RESP-06) | Pass — RESP-06 (toolbar) | Pass — RESP-06 (tabs) | Pass — RESP-06 (side panel) |
+| No clipping / overlap / horizontal overflow — desktop | Pass — RESP-04, `authentication/desktop-*` | Pass — E2E-04, `requester-regression/desktop-*` | Pass — RESP-01, `staff-queue/desktop-*` | Pass — RESP-02, `staff-ticket-detail/desktop-*` | Pass — RESP-03, `user-management/desktop-*` |
+| No clipping / overlap / horizontal overflow — tablet | Pass — RESP-04, `authentication/tablet-*` | Pass — E2E-04, `requester-regression/tablet-*` | Pass — RESP-01, `staff-queue/tablet-*` | Pass — RESP-02, `staff-ticket-detail/tablet-*` | Pass — RESP-03, `user-management/tablet-*` |
+| No clipping / overlap / horizontal overflow — mobile | Pass — RESP-04, `authentication/mobile-*` | Pass — E2E-04, `requester-regression/mobile-*` | Pass — RESP-01, `staff-queue/mobile-*` | Pass — RESP-02, `staff-ticket-detail/mobile-*` | Pass — RESP-03, `user-management/mobile-*` |
+| Administrator read-only views show no operational control | n/a | n/a | Pass — E2E-08, `admin-read-only` | Pass — E2E-08, `admin-read-only` | n/a |
+
+Checked by the Issue 10 suites at desktop (1280px), tablet (834px), and mobile (375px), and by
+looking at the screenshots. The overflow checks cover the page and, for tables, the table inside
+its card. Two states can't be produced on the shared development database without changing it, so
+their responses are stubbed in the browser for the screenshot only: `staff-queue/*-empty` and
+`*-failure`, and `user-management/*-last-administrator` (API-70 tests the rule itself). The lock icon
+in the Internal region shows as a box in the screenshots because the container's Chromium has no
+emoji font; the caption text carries the meaning.
 
 ## 5. Test Commands
 
@@ -423,7 +431,10 @@ output recorded here as the Part 3 evidence (labsheet §14).
   dropping a policy row in the mutation pass (it then answers `404` and SEC-03/SEC-13 fail), not by
   a runtime probe.
 - **Cross-browser coverage** stays at Playwright's Chromium projects, as in Lab 2.
-- **E2E-created users remain** in the development database (no user-delete endpoint exists, BR-59).
-  Each run uses unique emails so runs never collide; `npx prisma migrate reset` clears them.
+- **E2E-created users and tickets are removed by the suite's own teardown** (`e2e/globalTeardown.ts`),
+  straight from the database by their E2E prefixes, since no delete endpoint exists (BR-36, BR-59).
+  Each run uses unique emails, so runs never collide or trip the per-email throttle.
+- **RESP-06's keyboard pass runs at desktop only.** Focus order doesn't depend on the width, and the
+  queue's filters are a sheet on mobile; tablet and mobile report it as skipped.
 - **Race tests (API-45, API-70, API-74 to API-77, API-82) fire two requests at once.** They prove the locks
   serialise the pair; they are run several times before a PR to rule out a lucky ordering.
