@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { Badge, RoleBadge } from "../../src/components/Badge.js";
 import { InternalRegion } from "../../src/components/DiscussionPanel.js";
+import { TextInput } from "../../src/components/TextInput.js";
+import { Select } from "../../src/components/Select.js";
 
 // Zen Green additions for Lab 3 (docs/lab-03/ui-spec.md §1). Issue 4 adds
 // STYLE-05; later issues extend this file with the status badges and the
@@ -90,5 +92,48 @@ describe("STYLE-03 the Internal region (ui-spec §1.1, §1.6)", () => {
     const caption = screen.getByText("Internal — not visible to the Requester");
     expect(caption).toHaveClass("zg-internal-caption");
     expect(caption.closest(".zg-internal-region")).toHaveTextContent("note list");
+  });
+});
+
+describe("STYLE-01 status badges for all eight statuses (ui-spec §1.2)", () => {
+  const TABLE: [string, string, string, string][] = [
+    ["NEW", "zg-badge--status-new", "#eaf6ef", "#0b7a46"],
+    ["OPEN", "zg-badge--status-open", "#e3f1f4", "#1e5f6e"],
+    ["IN_PROGRESS", "zg-badge--status-in-progress", "#e6eefa", "#23508c"],
+    ["WAITING_FOR_REQUESTER", "zg-badge--status-waiting-for-requester", "#f3ecfa", "#5e3a87"],
+    ["RESOLVED", "zg-badge--status-resolved", "#dff3e4", "#12612f"],
+    ["CLOSED", "zg-badge--status-closed", "#eceeed", "#3f4a44"],
+    ["REOPENED", "zg-badge--status-reopened", "#fcefe6", "#9a4a12"],
+    ["CANCELLED", "zg-badge--status-cancelled", "#f1f1f1", "#5b5b5b"],
+  ];
+
+  it.each(TABLE)("%s has its own class, the value with spaces as its label, and the §1.2 colours", (value, cls, bg, fg) => {
+    render(<Badge kind="status" value={value as "NEW"} />);
+    const badge = screen.getByText(value.replace(/_/g, " "));
+    expect(badge).toHaveClass("zg-badge", cls);
+    const rule = ruleOf(`.${cls}`);
+    expect(rule).toContain(`background: ${bg};`);
+    expect(rule).toContain(`color: ${fg};`);
+  });
+
+  it("renders NEW exactly as in Lab 2", () => {
+    render(<Badge kind="status" value="NEW" />);
+    expect(screen.getByText("NEW").className).toBe("zg-badge zg-badge--status-new");
+  });
+});
+
+describe("STYLE-04 editable controls vs read-only ticket information (ui-spec §1.7)", () => {
+  it("gives read-only fields the read-only class and editable controls the plain field class", () => {
+    render(
+      <>
+        <TextInput aria-label="info" readOnly value="Hardware" onChange={() => {}} />
+        <Select aria-label="control" value="A" onChange={() => {}}><option value="A">A</option></Select>
+      </>,
+    );
+    expect(screen.getByLabelText("info")).toHaveClass("zg-field", "zg-field--readonly");
+    expect(screen.getByLabelText("control")).toHaveClass("zg-field");
+    expect(screen.getByLabelText("control")).not.toHaveClass("zg-field--readonly");
+    // The read-only look comes from the shared token, never an ad hoc colour.
+    expect(css).toMatch(/\.zg-field--readonly,\s*\.zg-field--readonly:focus-visible\s*\{[^}]*background: var\(--zg-readonly-bg\);/);
   });
 });

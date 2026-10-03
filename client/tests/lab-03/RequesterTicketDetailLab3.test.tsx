@@ -27,6 +27,7 @@ const BASE: TicketDetail = {
   resolutionSummary: null,
   requesterResolvedAt: null,
   canComment: true,
+  canMarkAppearsResolved: true,
   createdAt: "2026-10-01T09:15:00.000Z",
   updatedAt: "2026-10-01T09:15:00.000Z",
   attachments: [
@@ -225,5 +226,51 @@ describe("#56 review: the composer's state", () => {
     await userEvent.click(screen.getByRole("button", { name: "Post comment" }));
     await screen.findByTestId("entry-body");
     await waitFor(() => expect(box).toHaveFocus());
+  });
+});
+
+describe("UI-15 'Problem appears resolved' (BR-05, BR-47, ui-spec §5)", () => {
+  it("asks for confirmation with an optional comment, then shows the pill and the date instead of the button", async () => {
+    const mark = vi.spyOn(api, "markAppearsResolved").mockResolvedValue({
+      requesterResolvedAt: "2026-10-03T09:12:00.000Z",
+      comment: entry(9, "Works after the update.", ME),
+    });
+    renderDetail(BASE);
+    await userEvent.click(await screen.findByRole("button", { name: "Problem appears resolved" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Let IT Staff know the problem appears to be resolved? They will confirm and close the ticket.")).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText(/comment/i), "Works after the update.");
+    expect(within(dialog).getByText("23/2000")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+
+    expect(mark).toHaveBeenCalledWith(42, "Works after the update.");
+    expect(await screen.findByText("Requester: appears resolved")).toBeInTheDocument();
+    expect(screen.getByText(/You told IT Staff this appears resolved on/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Problem appears resolved" })).toBeNull();
+    // The optional comment joins the thread.
+    expect(await screen.findByText("Works after the update.", { selector: "[data-testid='entry-body']" })).toBeInTheDocument();
+  });
+
+  it("sends no comment when the box is left empty, and Cancel closes the dialog without sending", async () => {
+    const mark = vi.spyOn(api, "markAppearsResolved").mockResolvedValue({ requesterResolvedAt: "2026-10-03T09:12:00.000Z", comment: null });
+    renderDetail(BASE);
+    await userEvent.click(await screen.findByRole("button", { name: "Problem appears resolved" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mark).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Problem appears resolved" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Confirm" }));
+    expect(mark).toHaveBeenCalledWith(42, undefined);
+  });
+
+  it("shows the pill and date, and no button, when already marked or not allowed", async () => {
+    const { unmount } = renderDetail({ ...BASE, requesterResolvedAt: "2026-10-02T08:00:00.000Z", canMarkAppearsResolved: false });
+    expect(await screen.findByText("Requester: appears resolved")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Problem appears resolved" })).toBeNull();
+    unmount();
+    renderDetail({ ...BASE, currentStatus: "RESOLVED", canMarkAppearsResolved: false });
+    await screen.findByText("TCK-000042");
+    expect(screen.queryByRole("button", { name: "Problem appears resolved" })).toBeNull();
+    expect(screen.queryByText("Requester: appears resolved")).toBeNull();
   });
 });

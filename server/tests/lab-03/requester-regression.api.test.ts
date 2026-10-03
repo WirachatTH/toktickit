@@ -11,7 +11,7 @@ import { endTestSessions, sessionCookieFor } from "./helpers/sessions.js";
 // Issue 2 adds the rows its schema change makes necessary (REG-04, REG-17);
 // Issue 4 moves the Requester endpoints onto the session (REG-01, REG-02,
 // REG-09); Issue 5 removes the selector (REG-17 rewritten) and adds REG-03,
-// REG-05 to REG-07.
+// REG-05 to REG-07; Issue 8 adds "Problem appears resolved" (REG-10 to REG-13).
 //
 // Uses only users and tickets it creates itself, and removes them afterwards
 // (D-22); seeded rows are read, never modified.
@@ -332,5 +332,84 @@ describe("REG-07 reference data stays public (D-18)", () => {
         for (const row of res.body) expect(Object.keys(row).sort(), path).toEqual(["id", "name"]);
       }
     }
+  });
+});
+
+const markResolved = (ticket: number, body: object = {}, cookie = cookies.requester) =>
+  request(app).post(`/api/tickets/${ticket}/appears-resolved`).set("Cookie", cookie).send(body);
+
+describe("REG-10 to REG-13 'Problem appears resolved' (BR-05, BR-47)", () => {
+  it("REG-10 records the time on an own IN_PROGRESS ticket, with or without a comment, and never changes the status", async () => {
+    const plain = await ticketFor(requesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId });
+    expect((await request(app).get(`/api/tickets/${plain}`).set("Cookie", cookies.requester)).body.canMarkAppearsResolved).toBe(true);
+    const before = Date.now();
+    const res = await markResolved(plain);
+    expect(res.status).toBe(200);
+    expect(res.body.comment).toBeNull();
+    expect(new Date(res.body.requesterResolvedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
+    const stored = await prisma.ticket.findUniqueOrThrow({ where: { id: plain } });
+    expect(stored.currentStatus).toBe("IN_PROGRESS");
+    expect(stored.requesterResolvedAt).not.toBeNull();
+    expect(await prisma.publicComment.count({ where: { ticketId: plain } })).toBe(0);
+    expect((await request(app).get(`/api/tickets/${plain}`).set("Cookie", cookies.requester)).body.canMarkAppearsResolved).toBe(false);
+
+    const withComment = await ticketFor(requesterId, { currentStatus: "WAITING_FOR_REQUESTER", ownerId: staffId });
+    const res2 = await markResolved(withComment, { comment: "  Works again after the update.  " });
+    expect(res2.status).toBe(200);
+    expect(res2.body.comment).toMatchObject({ body: "Works again after the update.", author: { id: requesterId, role: "REQUESTER" } });
+    const comments = await prisma.publicComment.findMany({ where: { ticketId: withComment } });
+    expect(comments.map((c) => [c.authorId, c.body])).toEqual([[requesterId, "Works again after the update."]]);
+
+    // A comment over 2000 characters is refused, and nothing is recorded.
+    const tooLong = await ticketFor(requesterId, { currentStatus: "OPEN", ownerId: staffId });
+    const refused = await markResolved(tooLong, { comment: "c".repeat(2001) });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error.fields.comment).toBeTruthy();
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: tooLong } })).requesterResolvedAt).toBeNull();
+  });
+
+  it("REG-11 refuses marking again, and marking a RESOLVED, CLOSED, or CANCELLED ticket, with 409 ALREADY_MARKED", async () => {
+    const marked = await ticketFor(requesterId, { currentStatus: "OPEN", ownerId: staffId, requesterResolvedAt: new Date("2026-10-01T00:00:00Z") });
+    const again = await markResolved(marked, { comment: "Still fine" });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe("ALREADY_MARKED");
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: marked } })).requesterResolvedAt?.toISOString()).toBe("2026-10-01T00:00:00.000Z");
+    for (const status of ["RESOLVED", "CLOSED", "CANCELLED"] as const) {
+      const id = await ticketFor(requesterId, { currentStatus: status, ownerId: staffId });
+      const res = await markResolved(id, { comment: "Done?" });
+      expect(res.status, status).toBe(409);
+      expect(res.body.error.code).toBe("ALREADY_MARKED");
+      expect(await prisma.ticket.findUniqueOrThrow({ where: { id } })).toMatchObject({ requesterResolvedAt: null, currentStatus: status });
+      expect(await prisma.publicComment.count({ where: { ticketId: id } })).toBe(0);
+      expect((await request(app).get(`/api/tickets/${id}`).set("Cookie", cookies.requester)).body.canMarkAppearsResolved).toBe(false);
+    }
+    // NEW and REOPENED are allowed (BR-47).
+    for (const status of ["NEW", "REOPENED"] as const) {
+      const id = await ticketFor(requesterId, { currentStatus: status, ownerId: status === "NEW" ? null : staffId });
+      expect((await markResolved(id)).status, status).toBe(200);
+    }
+  });
+
+  it("REG-12 gives a Requester no way to change status: the staff route is 403, and status fields in their bodies are ignored", async () => {
+    const id = await ticketFor(requesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId });
+    for (const status of ["RESOLVED", "CLOSED"] as const) {
+      const res = await request(app)
+        .patch(`/api/staff/tickets/${id}/status`)
+        .set("Cookie", cookies.requester)
+        .send({ status, expectedStatus: "IN_PROGRESS", expectedOwnerId: staffId, resolutionSummary: "I fixed it myself, honestly." });
+      expect(res.status, status).toBe(403);
+    }
+    expect((await markResolved(id, { comment: "Looks resolved", status: "CLOSED", currentStatus: "RESOLVED" })).status).toBe(200);
+    expect((await request(app).post(`/api/tickets/${id}/comments`).set("Cookie", cookies.requester).send({ body: "Closing it", status: "CLOSED", currentStatus: "CLOSED" })).status).toBe(201);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).currentStatus).toBe("IN_PROGRESS");
+  });
+
+  it("REG-13 answers another Requester's ticket with 404, exactly like a missing one", async () => {
+    const theirs = await ticketFor(otherRequesterId, { currentStatus: "IN_PROGRESS", ownerId: staffId });
+    const res = await markResolved(theirs);
+    const missing = await markResolved(2_000_000_000);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual(missing.body);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: theirs } })).requesterResolvedAt).toBeNull();
   });
 });
