@@ -79,6 +79,24 @@ function readParams(searchParams: URLSearchParams): Record<string, string> {
   return out;
 }
 
+// The page numbers to show (PR #57 review): every page up to seven; beyond
+// that the first, the last, and the pages either side of the current one,
+// with "gap" where pages are skipped — unless the gap is a single page, which
+// is shown instead, since a marker would take the same room.
+export function pageWindow(current: number, total: number): (number | "gap")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = [...new Set([1, current - 1, current, current + 1, total])].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  let previous = 0;
+  for (const n of pages) {
+    if (n - previous === 2) out.push(previous + 1);
+    else if (n - previous > 2) out.push("gap");
+    out.push(n);
+    previous = n;
+  }
+  return out;
+}
+
 function relativeTime(iso: string): string {
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
   if (minutes < 1) return "just now";
@@ -186,12 +204,17 @@ export function StaffTicketQueue() {
   const applied = result?.appliedQuery;
   const hasFilters = applied ? FILTER_KEYS.some((k) => String(toParams(applied)[k] ?? "") !== "") : Object.keys(params).some((k) => (FILTER_KEYS as readonly string[]).includes(k));
   const sortValue = `${params.sort ?? DEFAULTS.sort}:${params.order ?? DEFAULTS.order}`;
-  const rows = result?.data ?? [];
-  const pagination = result?.pagination;
+  // What is on screen: the latest answer, kept — dimmed — while the next one
+  // loads (PR #57 review), so a filter change doesn't flash a skeleton. The
+  // skeleton is only for the first load, when there is nothing to keep.
+  const shown = state === "failure" ? null : result;
+  const reloading = state === "loading" && shown !== null;
+  const rows = shown?.data ?? [];
+  const pagination = shown?.pagination;
   // Empty and no-results are about the whole queue, not this page (BR-67): an
   // empty page while tickets exist is either a jump to the last page or, if the
   // rows and the count disagreed, the "changed while loading" notice below.
-  const nothingMatches = state === "loaded" && (pagination?.totalItems ?? 0) === 0;
+  const nothingMatches = shown !== null && (pagination?.totalItems ?? 0) === 0;
 
   function filterControls(prefix: string) {
     return (
@@ -334,7 +357,7 @@ export function StaffTicketQueue() {
         )}
       </div>
 
-      {state === "loading" && (
+      {state === "loading" && !shown && (
         <div aria-busy="true" role="status" aria-label="Loading tickets">
           {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="zg-skeleton-row" />
@@ -349,6 +372,8 @@ export function StaffTicketQueue() {
         />
       )}
 
+      {shown && (
+      <div data-testid="queue-results" aria-busy={reloading} className={reloading ? "zg-queue-results--reloading" : undefined}>
       {nothingMatches && !hasFilters && (
         <EmptyState message="The queue is clear — there are no active tickets." />
       )}
@@ -362,17 +387,17 @@ export function StaffTicketQueue() {
         </div>
       )}
 
-      {state === "loaded" && rows.length === 0 && !nothingMatches && (
+      {rows.length === 0 && !nothingMatches && (
         <ErrorState
           message="The queue changed while it was loading."
           action={<Button variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>Retry</Button>}
         />
       )}
 
-      {state === "loaded" && rows.length > 0 && (
+      {rows.length > 0 && (
         <>
           <div className="d-none d-md-block table-responsive">
-            <table className="table zg-ticket-table" data-testid="queue-table">
+            <table className="table zg-ticket-table zg-queue-table" data-testid="queue-table">
               <thead>
                 <tr>
                   <th scope="col">Ticket</th>
@@ -439,12 +464,16 @@ export function StaffTicketQueue() {
                 Prev
               </Button>
               <span className="d-md-none">Page {pagination.page} of {Math.max(pagination.totalPages, 1)}</span>
-              <span className="d-none d-md-flex gap-1">
-                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((n) => (
-                  <Button key={n} variant={n === pagination.page ? "primary" : "tertiary"} aria-current={n === pagination.page || undefined} onClick={() => update({ page: String(n) }, true)}>
-                    {n}
-                  </Button>
-                ))}
+              <span className="d-none d-md-flex gap-1" data-testid="page-numbers">
+                {pageWindow(pagination.page, pagination.totalPages).map((n, i) =>
+                  n === "gap" ? (
+                    <span key={`gap-${i}`} className="zg-pagination__gap" aria-hidden="true">…</span>
+                  ) : (
+                    <Button key={n} variant={n === pagination.page ? "primary" : "tertiary"} aria-current={n === pagination.page || undefined} onClick={() => update({ page: String(n) }, true)}>
+                      {n}
+                    </Button>
+                  ),
+                )}
               </span>
               <Button variant="secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => update({ page: String(pagination.page + 1) }, true)}>
                 Next
@@ -455,6 +484,8 @@ export function StaffTicketQueue() {
             </nav>
           )}
         </>
+      )}
+      </div>
       )}
     </div>
   );

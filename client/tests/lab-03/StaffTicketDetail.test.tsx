@@ -220,3 +220,23 @@ describe("UI-25 the Administrator's view (FR-30, BR-21)", () => {
     expect(screen.queryByRole("button", { name: /post public comment|add internal note/i })).toBeNull();
   });
 });
+
+// Issue 10 — RESP-06 at component level (ui-spec §10): a dialog gives focus back
+// to the control that opened it.
+describe("RESP-06 the status confirmation returns focus (ui-spec §10)", () => {
+  it("puts focus back on Update status when the confirmation is kept as is, or closed with Escape", async () => {
+    renderDetail(ticket());
+    await userEvent.selectOptions(await within(await screen.findByRole("region", { name: "Ticket controls" })).findByLabelText("New status"), "RESOLVED");
+    const update = within(controls()).getByRole("button", { name: "Update status" });
+    await userEvent.click(update);
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Keep as is" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(update).toHaveFocus();
+
+    await userEvent.click(update);
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(update).toHaveFocus();
+  });
+});
