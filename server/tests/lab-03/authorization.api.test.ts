@@ -348,7 +348,9 @@ describe("safe errors (§6.2, api-spec §0.4–§0.5)", () => {
       ["unsupported charset", request(app).patch(`/api/tickets/${ownTicket}/attachments/${ownAttachment}/remove`).set("Cookie", cookies.requester).set("Content-Type", "application/json; charset=klingon").send("{}"), 415, "UNSUPPORTED_MEDIA_TYPE"],
       ["unknown API route", request(app).get("/api/no-such-thing").set("Cookie", cookies.requester), 404, "NOT_FOUND"],
       ["unknown method on a known path", request(app).delete("/api/tickets").set("Cookie", cookies.requester), 404, "NOT_FOUND"],
-      ["granted route not built yet", request(app).get("/api/staff/tickets").set("Cookie", cookies.staff), 404, "NOT_FOUND"],
+      // Issue 7 built the queue, so this uses the IT Staff detail route, whose
+      // handler arrives in Issue 8 (then the Administrator routes, Issue 9).
+      ["granted route not built yet", request(app).get(`/api/staff/tickets/${ownTicket}`).set("Cookie", cookies.staff), 404, "NOT_FOUND"],
     ];
     for (const [label, pending, status, code] of cases) {
       const res = await send(label, pending);

@@ -90,3 +90,32 @@ describe("UI-24 Public comments and Internal notes stay distinct (AC-24)", () =>
     expect(within(panelOf(/internal notes/i)).getByRole("textbox")).toBeEnabled();
   });
 });
+
+// Follow-ups from the PR #56 review (Issue 7).
+describe("#56 review: tabs and ticket changes", () => {
+  it("moves to the first and last tab with Home and End", async () => {
+    render(<DiscussionPanel ticketId={42} canComment canPost />);
+    tab(/public comments/i).focus();
+    await userEvent.keyboard("{End}");
+    expect(tab(/internal notes/i)).toHaveAttribute("aria-selected", "true");
+    expect(tab(/internal notes/i)).toHaveFocus();
+    await userEvent.keyboard("{Home}");
+    expect(tab(/public comments/i)).toHaveAttribute("aria-selected", "true");
+    expect(tab(/public comments/i)).toHaveFocus();
+  });
+
+  it("reloads both threads and starts fresh drafts when it is shown for another ticket", async () => {
+    const { rerender } = render(<DiscussionPanel ticketId={42} canComment canPost />);
+    await within(panelOf(/public comments/i)).findByText("Public reply");
+    await userEvent.type(within(panelOf(/public comments/i)).getByRole("textbox"), "draft for 42");
+
+    vi.mocked(api.fetchComments).mockResolvedValue([entry(5, "Reply on ticket 43")]);
+    vi.mocked(api.fetchInternalNotes).mockResolvedValue([entry(6, "Note on ticket 43")]);
+    rerender(<DiscussionPanel ticketId={43} canComment canPost />);
+    expect(await within(panelOf(/public comments/i)).findByText("Reply on ticket 43")).toBeInTheDocument();
+    expect(within(panelOf(/public comments/i)).queryByText("Public reply")).toBeNull();
+    expect(within(panelOf(/public comments/i)).getByRole("textbox")).toHaveValue("");
+    expect(api.fetchComments).toHaveBeenLastCalledWith(43);
+    expect(api.fetchInternalNotes).toHaveBeenLastCalledWith(43);
+  });
+});

@@ -34,6 +34,8 @@ const CALLS: [string, () => Promise<unknown>][] = [
   ["postComment", () => api.postComment(42, "Hello")],
   ["fetchInternalNotes", () => api.fetchInternalNotes(42)],
   ["postInternalNote", () => api.postInternalNote(42, "Hello")],
+  ["fetchStaffQueue", () => api.fetchStaffQueue({ status: "ALL", page: "2" })],
+  ["fetchAssignableUsers", () => api.fetchAssignableUsers()],
   ["checkSystem", () => api.checkSystem()],
   ["login", () => api.login("a@kmutt.ac.th", "pw")],
   ["logout", () => api.logout()],

@@ -55,8 +55,8 @@ that owns the row runs it green.
 | UNIT-07 | AC-31, BR-41 | Unit | Transition table: every (from, to) pair of the 8×8 status grid | Exactly the BR-41 pairs are permitted; same-status and terminal sources never are | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-08 | AC-31, BR-42 | Unit | Owner requirement per target status | Only `CANCELLED` is permitted without an owner | `server/tests/lab-03/transitions.test.ts` | Planned |
 | UNIT-09 | AC-31, BR-44, BR-45 | Unit | Required text per target and its bounds (summary 10–2000, reason 10–1000, trimmed) | `RESOLVED` needs a summary, `CANCELLED`/`REOPENED` a reason; boundary values accepted, one past rejected | `server/tests/lab-03/transitions.test.ts` | Planned |
-| UNIT-10 | AC-26, BR-62, BR-65, BR-66 | Unit | Queue query normalisation: unknown enums, non-numeric ids, page ≤0, page size 0/51 | Each replaced by its default or clamped; result object equals the echoed `appliedQuery` | `server/tests/lab-03/queue-query.test.ts` | Planned |
-| UNIT-11 | AC-25, BR-63, BR-64 | Unit | Queue ordering builder for the default and every `sort`/`order` pair | `itPriority` (either direction) → then `createdAt` asc, `id` asc; every other field → then `id` in the same direction; no `sort` builds exactly the same order as `sort=itPriority&order=desc` | `server/tests/lab-03/queue-query.test.ts` | Planned |
+| UNIT-10 | AC-26, BR-62, BR-65, BR-66 | Unit | Queue query normalisation: unknown enums, non-numeric ids, page ≤0, page size 0/51 | Each replaced by its default or clamped; result object equals the echoed `appliedQuery` | `server/tests/lab-03/queue-query.test.ts` | Pass |
+| UNIT-11 | AC-25, BR-63, BR-64 | Unit | Queue ordering builder for the default and every `sort`/`order` pair | `itPriority` (either direction) → then `createdAt` asc, `id` asc; every other field → then `id` in the same direction; no `sort` builds exactly the same order as `sort=itPriority&order=desc` | `server/tests/lab-03/queue-query.test.ts` | Pass |
 
 ### 2.2 API — authentication
 
@@ -140,18 +140,18 @@ that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-29 | AC-25, BR-62, BR-63 | API | `GET /api/staff/tickets` with no parameters | Only non-terminal tickets; IT Priority desc then oldest first; correct pagination metadata | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-30 | AC-26, BR-61 | API | Search by Ticket Number prefix, Summary substring, Requester name; mixed case; whitespace only | Matching tickets only; whitespace-only = no search | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-31 | AC-26, BR-62 | API | `status` = `ALL`, each single status, `ACTIVE` | Exact status sets | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-32 | AC-26, BR-62 | API | IT Priority and Category filters, combined with search | AND of all conditions | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-33 | AC-26, BR-62 | API | `owner` = `any`, `unassigned`, `me`, a user id | Correct subsets | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-34 | AC-26, BR-62 | API | `appearsResolved=true` | Only flagged tickets | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-35 | AC-26, BR-63 | API | Each sort field in both directions | Correct order; status by lifecycle order, priority LOW<MEDIUM<HIGH | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-36 | BR-64 | API | Many tickets with identical sort values, paged through | No ticket repeated or skipped across pages | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-37 | AC-26, BR-66 | API | Invalid enum, id, page, and page size values | `200` with defaults/clamped values; `appliedQuery` shows them | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-38 | BR-67 | API | A page past the last | Empty `data`, correct totals | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-39 | AC-33, FR-30 | API | Administrator and Requester request the queue | Administrator `200`; Requester `403` | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-40 | FR-21 | API | Shape of one queue row | Requester, Category, both priorities, status, owner with `isActive`, signal, dates; no description or notes | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
+| API-29 | AC-25, BR-62, BR-63 | API | `GET /api/staff/tickets` with no parameters | Only non-terminal tickets; IT Priority desc then oldest first; correct pagination metadata | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-30 | AC-26, BR-61 | API | Search by Ticket Number prefix, Summary substring, Requester name; mixed case; whitespace only | Matching tickets only; whitespace-only = no search | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-31 | AC-26, BR-62 | API | `status` = `ALL`, each single status, `ACTIVE` | Exact status sets | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-32 | AC-26, BR-62 | API | IT Priority and Category filters, combined with search | AND of all conditions | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-33 | AC-26, BR-62 | API | `owner` = `any`, `unassigned`, `me`, a user id | Correct subsets | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-34 | AC-26, BR-62 | API | `appearsResolved=true` | Only flagged tickets | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-35 | AC-26, BR-63 | API | Each sort field in both directions | Correct order; status by lifecycle order, priority LOW<MEDIUM<HIGH | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-36 | BR-64 | API | Many tickets with identical sort values, paged through | No ticket repeated or skipped across pages | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-37 | AC-26, BR-66 | API | Invalid enum, id, page, and page size values | `200` with defaults/clamped values; `appliedQuery` shows them | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-38 | BR-67 | API | A page past the last | Empty `data`, correct totals | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-39 | AC-33, FR-30 | API | Administrator and Requester request the queue | Administrator `200`; Requester `403` | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-40 | FR-21 | API | Shape of one queue row | Requester, Category, both priorities, status, owner with `isActive`, signal, dates; no description or notes | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
 
 ### 2.7 API — IT Staff Ticket Detail
 
@@ -175,7 +175,7 @@ that owns the row runs it green.
 | API-56 | AC-31, BR-44 | API | `RESOLVED` with no, short, long, and valid summary; then `REOPENED` | Invalid `400`; valid stored and visible to the Requester; `REOPENED` clears it | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-57 | AC-31, BR-45 | API | `CANCELLED` and `REOPENED` with and without a reason | Without → `400`, unchanged; with → status changes and the reason is a Public Comment by the actor, in one transaction | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-58 | BR-48 | API | Any transition on a flagged ticket | `requesterResolvedAt` cleared | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
-| API-59 | FR-26, BR-21, BR-29 | API | `GET /api/staff/assignable-users` as IT Staff, Administrator, and Requester | IT Staff and Administrator `200`: only active IT Staff and Administrators, by name; Requester `403` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| API-59 | FR-26, BR-21, BR-29 | API | `GET /api/staff/assignable-users` as IT Staff, Administrator, and Requester | IT Staff and Administrator `200`: only active IT Staff and Administrators, by name; Requester `403` | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
 
 ### 2.8 API — Administrator user management
 
@@ -184,7 +184,7 @@ that owns the row runs it green.
 | API-73 | AC-05, BR-14 | API | While one email is throttled, another account signs in from the same client | The other account signs in normally — the throttle is per email, not global | `server/tests/lab-03/auth.api.test.ts` | Pass |
 | API-80 | BR-17 | API | User with two expired sessions logs in | Both expired rows are deleted; the new session works | `server/tests/lab-03/auth.api.test.ts` | Pass |
 | API-83 | AC-05, BR-14 | API | 20 wrong passwords for one email at once; then 19 wrong plus the correct one at once | Exactly 5 evaluated (`401`) and 15 refused (`429`); in the mixed burst at most 5 are evaluated and a session exists only if the correct one was among them | `server/tests/lab-03/auth.api.test.ts` | Pass |
-| API-79 | AC-26, BR-64 | API | Request page 1 with no parameters, rebuild the URL from its `appliedQuery`, request pages 1–3 with that URL | Identical page 1, and pages 1–3 match the default-order pages with no repeats or gaps | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
+| API-79 | AC-26, BR-64 | API | Request page 1 with no parameters, rebuild the URL from its `appliedQuery`, request pages 1–3 with that URL | Identical page 1, and pages 1–3 match the default-order pages with no repeats or gaps | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
 | API-74 | AC-28, BR-31, BR-80 | API | Race: claim a `NEW` ticket (`expectedStatus: NEW`) while another request cancels it | Never a `CANCELLED` ticket that is `OPEN` or owned; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-75 | AC-31, BR-43, BR-80 | API | Race: unassign an `OPEN` ticket while another request moves it to `IN_PROGRESS` | Never an ownerless `IN_PROGRESS` ticket; the later request gets `409` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-76 | BR-52, BR-47, BR-70, BR-80 | API | Race: post a Public Comment, mark appears resolved, and add an attachment while another request closes or cancels the ticket | No comment, signal, or attachment is ever added to a ticket that was already terminal when it committed | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
@@ -242,10 +242,10 @@ that owns the row runs it green.
 | UI-14 | AC-19, FR-14 | UI | Requester Ticket Detail comments thread and composer, including a closed ticket | Oldest first with author, role, time; post adds it; empty body blocked; closed ticket disables the composer | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Pass |
 | UI-15 | AC-20, BR-47 | UI | Problem appears resolved flow | Confirmation dialog with optional comment; after success the pill and date replace the button | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Planned |
 | UI-16 | BR-71 | UI | Requester detail rendered with a payload that wrongly includes IT Priority and notes | Neither is rendered | `client/tests/lab-03/RequesterTicketDetailLab3.test.tsx` | Pass |
-| UI-17 | AC-25, FR-21 | UI | Queue rows | Seven columns; *Unassigned* in italics; appears-resolved pill; "Requested:" sub-line only when priorities differ | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
-| UI-18 | AC-26, FR-22 | UI | Search, each filter, sort, Clear filters | Request parameters and URL query updated; page resets to 1; Clear restores defaults | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
-| UI-19 | AC-27, FR-23 | UI | Empty, no-results, and failure responses | Three distinct messages; Retry on failure | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
-| UI-20 | AC-33 | UI | Queue as Administrator | Read-only pill shown | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
+| UI-17 | AC-25, FR-21 | UI | Queue rows | Seven columns; *Unassigned* in italics; appears-resolved pill; "Requested:" sub-line only when priorities differ | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
+| UI-18 | AC-26, FR-22 | UI | Search, each filter, sort, Clear filters | Request parameters and URL query updated; page resets to 1; Clear restores defaults | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
+| UI-19 | AC-27, FR-23 | UI | Empty, no-results, and failure responses | Three distinct messages; Retry on failure | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
+| UI-20 | AC-33 | UI | Queue as Administrator | Read-only pill shown | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
 | UI-21 | AC-32, FR-25 | UI | IT Staff Ticket Detail layout | Ticket information read-only; controls editable; attachments download only | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-22 | AC-28, BR-31 | UI | Assign to me; server answers `409 STALE_STATE` | Sends `expectedOwnerId`; on conflict shows the banner and reloads | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-23 | AC-31, BR-46 | UI | Status control | Lists only permitted transitions; confirm dialogs with required text; ownerless ticket offers only Cancel with a hint | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
@@ -359,8 +359,8 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 4 — Authorization Layer & Role-Based App Shell | SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, SEC-12, SEC-13, REG-01, REG-02, REG-08, REG-09, REG-15, UI-09, UI-10, UI-11, STYLE-05 | 20 |
 | 5 — Requester Regression on Authenticated Identity | SEC-10, REG-03, REG-05, REG-06, REG-07, REG-16, UI-13, UI-16 | 8 |
 | 6 — Public Comments & Internal Notes | REG-14, API-18, API-19, API-20, API-21, API-22, API-23, API-24, API-25, API-26, API-27, API-28, UI-14, UI-24, STYLE-03 | 15 |
-| 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, API-79, UI-17, UI-18, UI-19, UI-20 | 19 |
-| 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-59, API-74, API-75, API-76, API-78, API-81, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 38 |
+| 7 — IT Staff Ticket Queue | UNIT-10, UNIT-11, API-29, API-30, API-31, API-32, API-33, API-34, API-35, API-36, API-37, API-38, API-39, API-40, API-79, API-59, UI-17, UI-18, UI-19, UI-20 | 20 |
+| 8 — Ticket Workflow & IT Staff Ticket Detail | UNIT-07, UNIT-08, UNIT-09, REG-10, REG-11, REG-12, REG-13, API-41, API-42, API-43, API-44, API-45, API-46, API-47, API-48, API-49, API-50, API-51, API-52, API-53, API-54, API-55, API-56, API-57, API-58, API-74, API-75, API-76, API-78, API-81, UI-15, UI-21, UI-22, UI-23, UI-25, STYLE-01, STYLE-04 | 37 |
 | 9 — Administrator User Management | SEC-11, API-60, API-61, API-62, API-63, API-64, API-65, API-66, API-67, API-68, API-69, API-70, API-82, API-71, API-77, API-72, UI-26, UI-27, UI-28, UI-29, UI-30, UI-31 | 22 |
 | 10 — Responsive QA, Visual Checklist & E2E | STYLE-02, STYLE-06, RESP-01, RESP-02, RESP-03, RESP-04, RESP-05, RESP-06, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 | 19 |
 | 11 — Integration & Release to Main | full regression of every row above on `lab3-staging`, then on `main` | — |

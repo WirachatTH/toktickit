@@ -23,6 +23,9 @@ beforeEach(() => {
   vi.spyOn(api, "fetchTickets").mockResolvedValue(EMPTY_LIST);
   vi.spyOn(api, "fetchCategories").mockResolvedValue([]);
   vi.spyOn(api, "fetchRelatedSystems").mockResolvedValue([]);
+  // Issue 7 — the IT Staff home is now the real queue (setup only).
+  vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({ data: [], pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 }, appliedQuery: { search: "", status: "ACTIVE", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 } });
+  vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([]);
 });
 
 function renderAppAt(path: string) {
@@ -80,12 +83,12 @@ describe("UI-09 the app shell for each role", () => {
 
 describe("UI-10 routes a role may not open, and routes that need a sign-in", () => {
   it.each([
-    ["a Requester", REQUESTER, "/admin/users", "/tickets"],
-    ["a Requester", REQUESTER, "/staff/queue", "/tickets"],
-    ["IT Staff", STAFF, "/tickets/new", "/staff/queue"],
-    ["IT Staff", STAFF, "/admin/users", "/staff/queue"],
-    ["an Administrator", ADMIN, "/tickets", "/admin/users"],
-  ] as const)("sends %s from %s to its home %s with a dismissible forbidden callout", async (_who, user, path, home) => {
+    ["a Requester", "/admin/users", "/tickets", REQUESTER],
+    ["a Requester", "/staff/queue", "/tickets", REQUESTER],
+    ["IT Staff", "/tickets/new", "/staff/queue", STAFF],
+    ["IT Staff", "/admin/users", "/staff/queue", STAFF],
+    ["an Administrator", "/tickets", "/admin/users", ADMIN],
+  ] as const)("sends %s from %s to its home %s with a dismissible forbidden callout", async (_who, path, home, user) => {
     signedInAs(user);
     renderAppAt(path);
     await waitFor(() => expect(location()).toHaveTextContent(new RegExp(`^${home}$`)));
