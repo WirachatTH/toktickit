@@ -274,3 +274,16 @@ describe("UI-15 'Problem appears resolved' (BR-05, BR-47, ui-spec §5)", () => {
     expect(screen.queryByText("Requester: appears resolved")).toBeNull();
   });
 });
+
+// Issue 10 — RESP-06 at component level (ui-spec §10): a dialog gives focus back
+// to the control that opened it.
+describe("RESP-06 the appears-resolved dialog returns focus (ui-spec §10)", () => {
+  it("puts focus back on Problem appears resolved when the dialog is cancelled", async () => {
+    renderDetail(BASE);
+    const open = await screen.findByRole("button", { name: "Problem appears resolved" });
+    await userEvent.click(open);
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(open).toHaveFocus();
+  });
+});

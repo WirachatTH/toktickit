@@ -267,6 +267,81 @@ describe("UI-18 search, filters, sort, pagination, and the URL (FR-22, ui-spec �
   });
 });
 
+// Issue 10 (carried over from the PR #57 review): a window of page numbers
+// instead of one button per page, and the old rows kept, dimmed, while the
+// next page or filter loads.
+describe("UI-18 pagination window and reloading (ui-spec §6.2, PR #57 review)", () => {
+  // The page buttons and gap markers, in order, as the user sees them.
+  async function pager() {
+    const nav = await screen.findByRole("navigation", { name: "Queue pagination" });
+    const numbers = within(nav).getByTestId("page-numbers");
+    return Array.from(numbers.children).map((el) => (el.tagName === "BUTTON" ? el.textContent!.trim() : `[${el.textContent!.trim()}]`));
+  }
+
+  it("shows every page when there are seven or fewer", async () => {
+    echoQueue([row({ id: 1 })], 70);
+    renderQueue(STAFF, "/staff/queue?page=4");
+    await waitFor(async () => expect(await pager()).toEqual(["1", "2", "3", "4", "5", "6", "7"]));
+  });
+
+  it("shows the first, the last, and the pages around the current one, with a marker for each gap", async () => {
+    echoQueue([row({ id: 1 })], 200);
+    renderQueue(STAFF, "/staff/queue?page=10");
+    await waitFor(async () => expect(await pager()).toEqual(["1", "[…]", "9", "10", "11", "[…]", "20"]));
+    // The gap marker is not a control and is not read out as "…".
+    const marker = within(screen.getByTestId("page-numbers")).getAllByText("…")[0];
+    expect(marker.tagName).not.toBe("BUTTON");
+    expect(marker).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("shows a page instead of a marker when the gap is a single page", async () => {
+    echoQueue([row({ id: 1 })], 200);
+    renderQueue(STAFF, "/staff/queue?page=4");
+    await waitFor(async () => expect(await pager()).toEqual(["1", "2", "3", "4", "5", "[…]", "20"]));
+  });
+
+  it("marks the current page and moves to a page clicked in the window", async () => {
+    echoQueue([row({ id: 1 })], 200);
+    renderQueue(STAFF, "/staff/queue?page=10");
+    const current = await screen.findByRole("button", { name: "10" });
+    expect(current).toHaveAttribute("aria-current", "true");
+    await userEvent.click(screen.getByRole("button", { name: "20" }));
+    await waitFor(() => expect(lastParams()).toMatchObject({ page: "20" }));
+  });
+
+  it("keeps the current rows on screen, dimmed and marked busy, while a filter change loads", async () => {
+    const first = reply([row({ id: 1, summary: "Old row" })]);
+    let release!: (r: QueueResponse) => void;
+    vi.spyOn(api, "fetchStaffQueue")
+      .mockResolvedValueOnce(first)
+      .mockImplementationOnce(() => new Promise<QueueResponse>((resolve) => (release = resolve)));
+    renderQueue();
+    await within(await screen.findByTestId("queue-table")).findByText("Old row");
+
+    await userEvent.selectOptions(screen.getByLabelText("Status", { selector: "#queue-status" }), "ALL");
+    await waitFor(() => expect(api.fetchStaffQueue).toHaveBeenCalledTimes(2));
+
+    // Still the old rows — no skeleton swapped in — but dimmed and busy.
+    const results = screen.getByTestId("queue-results");
+    expect(within(results).getByText("Old row")).toBeInTheDocument();
+    expect(results).toHaveAttribute("aria-busy", "true");
+    expect(results).toHaveClass("zg-queue-results--reloading");
+    expect(screen.queryByRole("status", { name: "Loading tickets" })).not.toBeInTheDocument();
+
+    release(reply([row({ id: 2, summary: "New row" })], { status: "ALL" }));
+    expect(await within(screen.getByTestId("queue-results")).findByText("New row")).toBeInTheDocument();
+    expect(screen.queryByText("Old row")).not.toBeInTheDocument();
+    expect(screen.getByTestId("queue-results")).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByTestId("queue-results")).not.toHaveClass("zg-queue-results--reloading");
+  });
+
+  it("still shows the skeleton on the first load, when there are no rows to keep", async () => {
+    vi.spyOn(api, "fetchStaffQueue").mockImplementation(() => new Promise<QueueResponse>(() => {}));
+    renderQueue();
+    expect(await screen.findByRole("status", { name: "Loading tickets" })).toBeInTheDocument();
+  });
+});
+
 describe("UI-19 empty, no-results, and failure are distinct (FR-23, AC-27)", () => {
   it("says the queue is clear when nothing is active and no filter is set", async () => {
     echoQueue([]);

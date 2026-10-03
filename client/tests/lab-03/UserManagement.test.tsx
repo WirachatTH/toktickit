@@ -214,3 +214,60 @@ describe("UI-31 server safety refusals (AC-40, BR-58, BR-60)", () => {
     expect(within(panel).getByLabelText(/^Role/)).toHaveValue("REQUESTER");
   });
 });
+
+// Issue 10 — RESP-06 at component level (ui-spec §1.8, §10): the side panel and
+// the dialog inside it trap focus, close on Escape one layer at a time, and give
+// focus back to the control that opened them.
+describe("RESP-06 side panel focus and Escape (ui-spec §1.8, §10)", () => {
+  it("returns focus to Create user when the Create panel closes with Escape or Close", async () => {
+    renderScreen();
+    const create = await screen.findByRole("button", { name: "Create user" });
+    await userEvent.click(create);
+    const panel = await screen.findByRole("dialog", { name: "Create user" });
+    expect(panel).toContainElement(document.activeElement as HTMLElement);
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(create).toHaveFocus();
+
+    await userEvent.click(create);
+    await userEvent.click(within(await screen.findByRole("dialog", { name: "Create user" })).getByRole("button", { name: "Close" }));
+    expect(create).toHaveFocus();
+  });
+
+  it("returns focus to the row's Edit button when the Edit panel is cancelled", async () => {
+    renderScreen();
+    await screen.findByTestId("users-table");
+    const edit = within(rowOf("Chanon Rattanakorn")).getByRole("button", { name: "Edit Chanon Rattanakorn" });
+    await userEvent.click(edit);
+    await userEvent.click(within(await screen.findByRole("dialog", { name: "Edit Chanon Rattanakorn" })).getByRole("button", { name: "Cancel" }));
+    expect(edit).toHaveFocus();
+  });
+
+  it("keeps Tab inside the panel", async () => {
+    renderScreen();
+    await userEvent.click(await screen.findByRole("button", { name: "Create user" }));
+    const panel = await screen.findByRole("dialog", { name: "Create user" });
+    for (let i = 0; i < 25; i++) {
+      await userEvent.tab();
+      expect(panel).toContainElement(document.activeElement as HTMLElement);
+    }
+  });
+
+  it("Escape in the confirmation closes only the confirmation, and focus goes back to its button", async () => {
+    renderScreen();
+    await screen.findByTestId("users-table");
+    await userEvent.click(within(rowOf("Somchai Prasert")).getByRole("button", { name: "Edit Somchai Prasert" }));
+    const panel = await screen.findByRole("dialog", { name: "Edit Somchai Prasert" });
+    await userEvent.type(within(panel).getByLabelText(/^New initial password/), "Reset-pass-2026");
+    const setButton = within(panel).getByRole("button", { name: "Set initial password" });
+    await userEvent.click(setButton);
+    await screen.findByRole("dialog", { name: "Set a new initial password?" });
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Set a new initial password?" })).not.toBeInTheDocument());
+    // The panel is still open, with what was typed, and focus is back on its button.
+    expect(screen.getByRole("dialog", { name: "Edit Somchai Prasert" })).toBeInTheDocument();
+    expect(within(panel).getByLabelText(/^New initial password/)).toHaveValue("Reset-pass-2026");
+    expect(setButton).toHaveFocus();
+  });
+});
