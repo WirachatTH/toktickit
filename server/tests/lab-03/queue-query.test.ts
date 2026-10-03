@@ -81,6 +81,17 @@ describe("UNIT-10 query normalisation (BR-62, BR-65, BR-66)", () => {
     expect(parseQueueQuery({ pageSize: "50" }).pageSize).toBe(50);
     expect(parseQueueQuery({ pageSize: "" }).pageSize).toBe(10);
   });
+
+  // PR #57 review: Number() also reads "1e1" and "0x10"; page values are
+  // plain digits only, like ids (positiveId).
+  it("accepts page and page size only as plain digits", () => {
+    for (const raw of ["1e1", "0x10", " 3", "3 ", "+3", "2.0", "1_0"]) {
+      expect(parseQueueQuery({ page: raw }).page, `page ${raw}`).toBe(1);
+      expect(parseQueueQuery({ pageSize: raw }).pageSize, `pageSize ${raw}`).toBe(10);
+    }
+    expect(parseQueueQuery({ page: "007" }).page).toBe(7);
+    expect(parseQueueQuery({ pageSize: "007" }).pageSize).toBe(7);
+  });
 });
 
 describe("UNIT-11 the fixed ordering for every sort (BR-63, BR-64)", () => {
