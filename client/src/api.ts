@@ -568,3 +568,45 @@ export async function markAppearsResolved(ticketId: number, comment?: string): P
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 9 — Administrator user management (api-spec.md §6).
+// ---------------------------------------------------------------------------
+
+export interface AdminUser extends AuthUser {
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface NewUserInput {
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  initialPassword: string;
+}
+
+export async function fetchAdminUsers(params: { search?: string; role?: Role } = {}): Promise<AdminUser[]> {
+  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
+  const res = await apiFetch(query ? `/api/admin/users?${query}` : "/api/admin/users");
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+export async function createUser(input: NewUserInput): Promise<AdminUser> {
+  const res = await apiFetch("/api/admin/users", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(input) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function updateUser(id: number, changes: Partial<Pick<AdminUser, "name" | "email" | "role" | "isActive">>): Promise<AdminUser> {
+  const res = await apiFetch(`/api/admin/users/${id}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(changes) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function setInitialPassword(id: number, initialPassword: string): Promise<AdminUser> {
+  const res = await apiFetch(`/api/admin/users/${id}/initial-password`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ initialPassword }) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}

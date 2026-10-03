@@ -20,6 +20,7 @@ import { attachSession, authRouter } from "./auth.js";
 import { registerDiscussionRoutes } from "./discussion.js";
 import { registerStaffQueueRoutes } from "./staffQueue.js";
 import { registerStaffTicketRoutes } from "./staffTicket.js";
+import { registerAdminUserRoutes } from "./adminUsers.js";
 import { canMarkAppearsResolved } from "./ticketWorkflow.js";
 import { isClosedStatus } from "./ticketStatus.js";
 import {
@@ -793,6 +794,9 @@ registerStaffQueueRoutes(app);
 
 // Lab 3, Issue 8 — IT Staff Ticket Detail and the workflow (staffTicket.ts).
 registerStaffTicketRoutes(app);
+
+// Lab 3, Issue 9 — Administrator user management (adminUsers.ts).
+registerAdminUserRoutes(app);
 
 // Lab 3, Issue 4 — the end of the chain (§6.2). A classified route whose
 // handler a later issue adds answers 404 until then; an error that escaped a

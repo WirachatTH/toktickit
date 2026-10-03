@@ -11,7 +11,7 @@ import { getPrisma } from "../../src/prisma.js";
 import { hashSessionToken, SESSION_COOKIE } from "../../src/session.js";
 import { endTestSessions, sessionCookieFor } from "./helpers/sessions.js";
 
-// SEC-01 to SEC-10, SEC-12, SEC-13 — the authorization layer and safe errors
+// SEC-01 to SEC-13 — the authorization layer and safe errors
 // (docs/lab-03/specification.md BR-20 to BR-27, api-spec.md §0.2, §0.3, §0.5, §7).
 //
 // The matrix below is written out here from api-spec §7 on purpose, not read
@@ -294,6 +294,30 @@ describe("the Lab 2 Development Requester list is gone (FR-13)", () => {
   });
 });
 
+describe("user management is for Administrators only (AC-41)", () => {
+  it("SEC-11 refuses Requesters and IT Staff on every /api/admin/users route with 403 and no user data", async () => {
+    const routes: [string, Test][] = [];
+    for (const who of ["requester", "staff"] as const) {
+      routes.push(
+        [`${who} list`, request(app).get("/api/admin/users").set("Cookie", cookies[who])],
+        [`${who} search`, request(app).get("/api/admin/users?search=authz").set("Cookie", cookies[who])],
+        [`${who} create`, request(app).post("/api/admin/users").set("Cookie", cookies[who]).send({ name: "Sneaky Admin", email: `sneaky.${stamp}@kmutt.ac.th`, role: "ADMINISTRATOR", isActive: true, initialPassword: "Sneaky-pass-2026" })],
+        [`${who} edit`, request(app).patch(`/api/admin/users/${users.admin}`).set("Cookie", cookies[who]).send({ isActive: false })],
+        [`${who} promote self`, request(app).patch(`/api/admin/users/${users[who]}`).set("Cookie", cookies[who]).send({ role: "ADMINISTRATOR" })],
+        [`${who} initial password`, request(app).post(`/api/admin/users/${users.admin}/initial-password`).set("Cookie", cookies[who]).send({ initialPassword: "Sneaky-pass-2026" })],
+      );
+    }
+    for (const [label, pending] of routes) {
+      const res = await send(label, pending);
+      expectBareError(res, 403, "FORBIDDEN", label);
+      expect(res.text, label).not.toMatch(/@kmutt\.ac\.th|Authz/);
+    }
+    expect(await prisma.user.count({ where: { email: `sneaky.${stamp}@kmutt.ac.th` } })).toBe(0);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: users.admin } })).toMatchObject({ isActive: true, role: "ADMINISTRATOR" });
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: users.requester } })).role).toBe("REQUESTER");
+  });
+});
+
 describe("guard order (BR-22)", () => {
   it("SEC-07 says 'sign in' before 'not allowed', and 'change your password' before both", async () => {
     // No session on a route the caller's role could never use: 401, not 403.
@@ -348,9 +372,10 @@ describe("safe errors (§6.2, api-spec §0.4–§0.5)", () => {
       ["unsupported charset", request(app).patch(`/api/tickets/${ownTicket}/attachments/${ownAttachment}/remove`).set("Cookie", cookies.requester).set("Content-Type", "application/json; charset=klingon").send("{}"), 415, "UNSUPPORTED_MEDIA_TYPE"],
       ["unknown API route", request(app).get("/api/no-such-thing").set("Cookie", cookies.requester), 404, "NOT_FOUND"],
       ["unknown method on a known path", request(app).delete("/api/tickets").set("Cookie", cookies.requester), 404, "NOT_FOUND"],
-      // Issues 7 and 8 built the staff routes, so this uses an Administrator
-      // route, whose handler arrives in Issue 9.
-      ["granted route not built yet", request(app).get("/api/admin/users").set("Cookie", cookies.admin), 404, "NOT_FOUND"],
+      // Since Issue 9 every route in api-spec §7 has a handler, so a path the
+      // API does not define at all stands in for "no handler" (SEC-13 proves
+      // every registered route is classified).
+      ["path the API does not define", request(app).get("/api/admin/reports").set("Cookie", cookies.admin), 404, "NOT_FOUND"],
     ];
     for (const [label, pending, status, code] of cases) {
       const res = await send(label, pending);
