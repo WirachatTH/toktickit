@@ -12,7 +12,8 @@ import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { ComingSoon } from "./screens/ComingSoon.js";
 import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
-import { ROUTES, SCREEN_ROLES } from "./routes.js";
+import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
+import { ROUTES, SCREEN_ROLES, STAFF_TICKET_PATTERN } from "./routes.js";
 
 // The actual route table the app ships, extracted out of App.tsx so tests
 // can render it directly inside a MemoryRouter instead of only ever testing
@@ -87,6 +88,14 @@ function AppRouteTable() {
         element={
           <Protected roles={SCREEN_ROLES.staffQueue}>
             <StaffTicketQueue />
+          </Protected>
+        }
+      />
+      <Route
+        path={STAFF_TICKET_PATTERN}
+        element={
+          <Protected roles={SCREEN_ROLES.staffTicket}>
+            <StaffTicketDetail />
           </Protected>
         }
       />

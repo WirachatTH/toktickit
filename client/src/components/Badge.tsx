@@ -8,10 +8,17 @@ const PRIORITY_CLASS: Record<Priority, string> = {
   HIGH: "zg-badge--priority-high",
 };
 
-// Lab 2 defined NEW only; the other seven status badges (ui-spec §1.2) arrive
-// with the workflow in Issue 8 and use the visible fallback until then.
-const STATUS_CLASS: Partial<Record<TicketStatus, string>> = {
+// Lab 3, Issue 8 — all eight statuses (docs/lab-03/ui-spec.md §1.2). NEW keeps
+// its Lab 2 class and label exactly.
+const STATUS_CLASS: Record<TicketStatus, string> = {
   NEW: "zg-badge--status-new",
+  OPEN: "zg-badge--status-open",
+  IN_PROGRESS: "zg-badge--status-in-progress",
+  WAITING_FOR_REQUESTER: "zg-badge--status-waiting-for-requester",
+  RESOLVED: "zg-badge--status-resolved",
+  CLOSED: "zg-badge--status-closed",
+  REOPENED: "zg-badge--status-reopened",
+  CANCELLED: "zg-badge--status-cancelled",
 };
 
 interface PriorityBadgeProps {
@@ -33,7 +40,9 @@ interface StatusBadgeProps {
 // literal class name "zg-badge undefined" instead of failing visibly.
 export function Badge({ kind, value }: PriorityBadgeProps | StatusBadgeProps) {
   const modifier = (kind === "priority" ? PRIORITY_CLASS[value] : STATUS_CLASS[value]) ?? "zg-badge--unknown";
-  return <span className={`zg-badge ${modifier}`}>{value}</span>;
+  // Status labels read with spaces ("IN PROGRESS"); NEW reads exactly as in Lab 2.
+  const label = kind === "status" ? String(value).replace(/_/g, " ") : value;
+  return <span className={`zg-badge ${modifier}`}>{label}</span>;
 }
 
 // Lab 3, Issue 4 — role badges (docs/lab-03/ui-spec.md §1.4). Outlined pills

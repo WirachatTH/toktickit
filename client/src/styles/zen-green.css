@@ -189,6 +189,14 @@ textarea.zg-field {
 .zg-badge--priority-medium { background: #E8EEF7; color: #2A4D7A; }
 .zg-badge--priority-high { background: #FBEAE2; color: #B23A24; }
 .zg-badge--status-new { background: #EAF6EF; color: #0B7A46; }
+/* Lab 3 status badges (docs/lab-03/ui-spec.md §1.2; every pair ≥ 4.5:1). */
+.zg-badge--status-open { background: #E3F1F4; color: #1E5F6E; }
+.zg-badge--status-in-progress { background: #E6EEFA; color: #23508C; }
+.zg-badge--status-waiting-for-requester { background: #F3ECFA; color: #5E3A87; }
+.zg-badge--status-resolved { background: #DFF3E4; color: #12612F; }
+.zg-badge--status-closed { background: #ECEEED; color: #3F4A44; }
+.zg-badge--status-reopened { background: #FCEFE6; color: #9A4A12; }
+.zg-badge--status-cancelled { background: #F1F1F1; color: #5B5B5B; }
 /* Fallback for a value outside the known set (e.g. malformed API data) —
    visibly distinct rather than an unstyled/blank badge. */
 .zg-badge--unknown { background: #E5E5E5; color: #4A4A4A; }
@@ -614,4 +622,20 @@ textarea.zg-field {
   border-radius: 0.375rem;
   background: var(--zg-border);
   opacity: 0.6;
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 8 — IT Staff Ticket Detail (docs/lab-03/ui-spec.md §7).
+   Desktop: main column and a sticky Ticket controls panel; below 992px the
+   panel moves above the main column.
+   --------------------------------------------------------------------- */
+
+.zg-detail-layout { display: flex; flex-direction: column; gap: 1.5rem; }
+.zg-detail-main { min-width: 0; }
+.zg-detail-controls dd { margin-bottom: 0.75rem; }
+
+@media (min-width: 992px) {
+  .zg-detail-layout { flex-direction: row-reverse; align-items: flex-start; }
+  .zg-detail-main { flex: 2 1 0; }
+  .zg-detail-controls { flex: 1 1 0; position: sticky; top: 1rem; }
 }

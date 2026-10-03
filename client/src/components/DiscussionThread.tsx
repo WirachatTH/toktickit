@@ -30,6 +30,8 @@ export interface DiscussionThreadProps {
   submitLabel: string;
   /** When set, the composer is shown disabled with this note (BR-52). */
   closedNote?: string | null;
+  /** Entries created elsewhere on the page (e.g. with "Problem appears resolved"), shown after the loaded ones. */
+  appended?: DiscussionEntry[];
   /** The draft is owned by the caller when given, so it survives tab switches. */
   draft?: string;
   onDraftChange?: (draft: string) => void;
@@ -48,6 +50,7 @@ export function DiscussionThread({
   closedNote,
   draft: controlledDraft,
   onDraftChange,
+  appended = [],
 }: DiscussionThreadProps) {
   const fieldId = useId();
   const [entries, setEntries] = useState<DiscussionEntry[] | null>(null);
@@ -71,6 +74,7 @@ export function DiscussionThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const shown = entries === null ? null : [...entries, ...appended.filter((a) => !entries.some((e) => e.id === a.id))];
   const trimmed = draft.trim();
   const closed = Boolean(closedNote) || closedByServer;
   const shownClosedNote = closedNote ?? (closedByServer ? CLOSED_NOTE : null);
@@ -108,10 +112,10 @@ export function DiscussionThread({
           Unable to load this thread. Please reload the page.
         </p>
       )}
-      {entries?.length === 0 && <p style={{ color: "var(--zg-text-muted)" }}>{emptyText}</p>}
-      {entries && entries.length > 0 && (
+      {shown?.length === 0 && <p style={{ color: "var(--zg-text-muted)" }}>{emptyText}</p>}
+      {shown && shown.length > 0 && (
         <ol className="zg-thread">
-          {entries.map((entry) => (
+          {shown.map((entry) => (
             <li key={entry.id} className="zg-thread-entry">
               <div className="zg-thread-meta">
                 <strong>{entry.author.name}</strong>

@@ -28,7 +28,8 @@ export const HOME_BY_ROLE: Record<Role, string> = {
   ADMINISTRATOR: ROUTES.adminUsers,
 };
 
-/** IT Staff Ticket Detail for one ticket (its screen arrives in Issue 8). */
+/** IT Staff Ticket Detail: the route pattern, and the path for one ticket. */
+export const STAFF_TICKET_PATTERN = "/staff/tickets/:id";
 export function staffTicketPath(id: number | string): string {
   return `/staff/tickets/${id}`;
 }
@@ -57,11 +58,13 @@ export const NAV_BY_ROLE: Record<Role, { label: string; to: string }[]> = {
 export const SCREEN_ROLES = {
   requester: ["REQUESTER"],
   staffQueue: ["IT_STAFF", "ADMINISTRATOR"],
+  staffTicket: ["IT_STAFF", "ADMINISTRATOR"],
   adminUsers: ["ADMINISTRATOR"],
 } as const satisfies Record<string, readonly Role[]>;
 
 const PROTECTED_SCREENS: { pattern: string; roles: readonly Role[] }[] = [
   { pattern: ROUTES.list, roles: SCREEN_ROLES.requester },
+  { pattern: "/staff/tickets/:id", roles: SCREEN_ROLES.staffTicket },
   { pattern: ROUTES.create, roles: SCREEN_ROLES.requester },
   { pattern: ROUTES.detailPattern, roles: SCREEN_ROLES.requester },
   { pattern: ROUTES.staffQueue, roles: SCREEN_ROLES.staffQueue },

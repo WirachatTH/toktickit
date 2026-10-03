@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ApiError, fetchComments, fetchTicket, postComment, TicketDetail, TicketDetailAttachment } from "../api.js";
+import { ApiError, DiscussionEntry, fetchComments, fetchTicket, markAppearsResolved, postComment, TicketDetail, TicketDetailAttachment } from "../api.js";
 import { Badge } from "../components/Badge.js";
 import { Button } from "../components/Button.js";
 import { LoadingSpinner } from "../components/LoadingSpinner.js";
 import { ErrorState } from "../components/ErrorState.js";
+import { Modal } from "../components/Modal.js";
+import { TextArea } from "../components/TextArea.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
 import { DiscussionThread } from "../components/DiscussionThread.js";
 import { CLOSED_COMMENT_NOTE } from "../components/DiscussionPanel.js";
@@ -46,6 +48,12 @@ export function RequesterTicketDetail() {
   const [state, setState] = useState<LoadState>("loading");
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  // Lab 3, Issue 8 — "Problem appears resolved" (BR-47, ui-spec §5).
+  const [marking, setMarking] = useState(false);
+  const [markComment, setMarkComment] = useState("");
+  const [markBusy, setMarkBusy] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
+  const [postedComments, setPostedComments] = useState<DiscussionEntry[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -109,6 +117,31 @@ export function RequesterTicketDetail() {
   }
 
   if (!ticket) return null;
+  const current = ticket;
+
+  function openMarkDialog() {
+    setMarkComment("");
+    setMarkError(null);
+    setMarking(true);
+  }
+
+  async function confirmMark() {
+    setMarkBusy(true);
+    setMarkError(null);
+    try {
+      const result = await markAppearsResolved(current.id, markComment.trim() || undefined);
+      setTicket({ ...current, requesterResolvedAt: result.requesterResolvedAt, canMarkAppearsResolved: false });
+      if (result.comment) setPostedComments((posted) => [...posted, result.comment as DiscussionEntry]);
+      setMarking(false);
+    } catch (error) {
+      const err = error instanceof ApiError ? error : null;
+      if (err?.fields?.comment) setMarkError(err.fields.comment);
+      else if (err?.code === "ALREADY_MARKED") setMarkError("This ticket can no longer be marked. Reload to see its latest state.");
+      else setMarkError("Something went wrong. Please try again.");
+    } finally {
+      setMarkBusy(false);
+    }
+  }
 
   return (
     <div>
@@ -120,7 +153,20 @@ export function RequesterTicketDetail() {
           <h1 className="h3 mb-0">{ticket.ticketNumber}</h1>
           <Badge kind="status" value={ticket.currentStatus} />
           <Badge kind="priority" value={ticket.requestedPriority} />
+          {ticket.requesterResolvedAt && (
+            <span className="zg-pill zg-pill--resolved"><span aria-hidden="true">✓ </span>Requester: appears resolved</span>
+          )}
+          {ticket.canMarkAppearsResolved && !ticket.requesterResolvedAt && (
+            <Button variant="secondary" onClick={openMarkDialog}>
+              Problem appears resolved
+            </Button>
+          )}
         </div>
+        {ticket.requesterResolvedAt && (
+          <p className="small mb-0 mt-2" style={{ color: "var(--zg-text-muted)" }}>
+            You told IT Staff this appears resolved on {formatDate(ticket.requesterResolvedAt)}.
+          </p>
+        )}
         <p className="mb-0 mt-2" data-testid="ticket-owner">
           <span className="zg-label d-inline me-1">Owner:</span>
           {ticket.owner ? ticket.owner.name : <em style={{ color: "var(--zg-text-muted)" }}>Not yet assigned</em>}
@@ -157,6 +203,13 @@ export function RequesterTicketDetail() {
         </div>
       </div>
 
+      {ticket.resolutionSummary && (
+        <section className="zg-card mb-4" aria-label="Resolution">
+          <h2 className="h5 mb-2">Resolution</h2>
+          <p className="mb-0" style={{ whiteSpace: "pre-wrap" }}>{ticket.resolutionSummary}</p>
+        </section>
+      )}
+
       <AttachmentSection
         locked={CLOSED_STATUSES.has(ticket.currentStatus)}
         ticketId={ticket.id}
@@ -179,8 +232,28 @@ export function RequesterTicketDetail() {
           composerLabel="Add a comment"
           submitLabel="Post comment"
           closedNote={ticket.canComment ? null : CLOSED_COMMENT_NOTE}
+          appended={postedComments}
         />
       </section>
+
+      {marking && (
+        <Modal titleId="appears-resolved-title" onClose={() => setMarking(false)}>
+          <h2 id="appears-resolved-title" className="h5">Problem appears resolved</h2>
+          <p>Let IT Staff know the problem appears to be resolved? They will confirm and close the ticket.</p>
+          <label htmlFor="appears-resolved-comment" className="zg-label">Comment (optional)</label>
+          <TextArea id="appears-resolved-comment" rows={3} value={markComment} invalid={Boolean(markError)} onChange={(e) => setMarkComment(e.target.value)} />
+          <div className="d-flex justify-content-between small mt-1">
+            <span>{markError && <span className="zg-field-error" role="alert">{markError}</span>}</span>
+            <span style={{ color: "var(--zg-text-muted)" }}>{markComment.length}/2000</span>
+          </div>
+          <div className="d-flex gap-2 justify-content-end mt-3 flex-wrap">
+            <Button variant="secondary" onClick={() => setMarking(false)} disabled={markBusy}>Cancel</Button>
+            <Button busy={markBusy} busyLabel="Sending…" disabled={markComment.trim().length > 2000} onClick={() => void confirmMark()}>
+              Confirm
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

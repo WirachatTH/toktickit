@@ -33,6 +33,7 @@ const TICKET: TicketDetail = {
   resolutionSummary: null,
   requesterResolvedAt: null,
   canComment: true,
+  canMarkAppearsResolved: false,
   createdAt: "2026-08-27T09:15:00.000Z",
   updatedAt: "2026-08-27T09:15:00.000Z",
   attachments: [

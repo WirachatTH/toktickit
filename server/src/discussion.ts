@@ -3,6 +3,8 @@ import type { Prisma } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { findAccessibleTicket, sessionUser } from "./authorization.js";
 import { isClosedStatus } from "./ticketStatus.js";
+import { canMarkAppearsResolved } from "./ticketWorkflow.js";
+import type { TicketStatus } from "@prisma/client";
 
 // Lab 3, Issue 6 — Public Comments and Internal Notes (docs/lab-03/api-spec.md
 // §4, specification.md BR-04, BR-25, BR-49 to BR-52, BR-80).
@@ -100,7 +102,51 @@ async function create(kind: Kind, req: Request, res: Response, next: NextFunctio
   }
 }
 
+class AlreadyMarkedError extends Error {}
+
+// api-spec §3.7 — "Problem appears resolved" (BR-05, BR-47). The Requester's
+// opinion, recorded with the time and an optional comment; the status never
+// changes, and no Requester route accepts a status value at all.
+async function markAppearsResolved(req: Request, res: Response, next: NextFunction) {
+  try {
+    const prisma = getPrisma();
+    const user = sessionUser(req);
+    const ticket = await findAccessibleTicket(prisma, user, Number(req.params.id));
+    if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
+
+    const raw = (req.body as { comment?: unknown } | null)?.comment;
+    if (raw !== undefined && raw !== null && typeof raw !== "string") {
+      return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Some fields need attention.", fields: { comment: "Enter text." } } });
+    }
+    const comment = typeof raw === "string" ? raw.trim() : "";
+    if (comment.length > BODY_MAX) {
+      return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Some fields need attention.", fields: { comment: `Keep it to ${BODY_MAX} characters or fewer.` } } });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // BR-80 — checked against the locked row, so a ticket closed a moment
+      // ago is never marked.
+      const [locked] = await tx.$queryRaw<{ currentStatus: TicketStatus; requesterResolvedAt: Date | null }[]>`
+        SELECT "currentStatus", "requesterResolvedAt" FROM "Ticket" WHERE id = ${ticket.id} FOR UPDATE
+      `;
+      if (!locked || !canMarkAppearsResolved(locked.currentStatus, locked.requesterResolvedAt)) throw new AlreadyMarkedError();
+      const updated = await tx.ticket.update({ where: { id: ticket.id }, data: { requesterResolvedAt: new Date() }, select: { requesterResolvedAt: true } });
+      const posted = comment
+        ? await tx.publicComment.create({ data: { ticketId: ticket.id, authorId: user.id, body: comment }, select: ENTRY_SELECT })
+        : null;
+      return { requesterResolvedAt: updated.requesterResolvedAt, comment: posted };
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof AlreadyMarkedError) {
+      return res.status(409).json({ error: { code: "ALREADY_MARKED", message: "This ticket can't be marked as appearing resolved now." } });
+    }
+    return next(error);
+  }
+}
+
 export function registerDiscussionRoutes(app: Express) {
+  app.post("/api/tickets/:id/appears-resolved", markAppearsResolved);
   app.get("/api/tickets/:id/comments", (req, res, next) => list("comment", req, res, next));
   app.post("/api/tickets/:id/comments", (req, res, next) => create("comment", req, res, next));
   app.get("/api/tickets/:id/internal-notes", (req, res, next) => list("note", req, res, next));
