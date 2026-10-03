@@ -26,6 +26,8 @@ beforeEach(() => {
   // Issue 7 — the IT Staff home is now the real queue (setup only).
   vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({ data: [], pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 }, appliedQuery: { search: "", status: "ACTIVE", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 } });
   vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([]);
+  // Issue 9 — the Administrator home is now the real User Management list (setup only).
+  vi.spyOn(api, "fetchAdminUsers").mockResolvedValue([]);
 });
 
 function renderAppAt(path: string) {

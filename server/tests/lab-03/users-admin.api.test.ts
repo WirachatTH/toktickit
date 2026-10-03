@@ -158,7 +158,7 @@ describe("creating users (§6.2, BR-53 to BR-55)", () => {
       [{ initialPassword: email("weak") }, "initialPassword"],
       [{ role: "ADMIN" }, "role"],
     ] as const) {
-      const one = await admin().post("/api/admin/users", { name: `${TAG} Valid`, email: email("weak"), role: "REQUESTER", isActive: true, initialPassword: PASSWORD, ...body });
+      const one = await admin().post("/api/admin/users", { name: `${TAG} Valid`, email: email("weak"), role: "REQUESTER", isActive: true, initialPassword: PASSWORD, ...(body as Record<string, unknown>) });
       expect(one.status, field).toBe(400);
       expect(Object.keys(one.body.error.fields), field).toEqual([field]);
     }

@@ -46,6 +46,10 @@ const CALLS: [string, () => Promise<unknown>][] = [
   ["logout", () => api.logout()],
   ["fetchCurrentUser", () => api.fetchCurrentUser()],
   ["changePassword", () => api.changePassword("old", "new")],
+  ["fetchAdminUsers", () => api.fetchAdminUsers({ search: "ana", role: "IT_STAFF" })],
+  ["createUser", () => api.createUser({ name: "Ana", email: "ana@kmutt.ac.th", role: "REQUESTER", isActive: true, initialPassword: "Initial-pass-1" })],
+  ["updateUser", () => api.updateUser(42, { isActive: false })],
+  ["setInitialPassword", () => api.setInitialPassword(42, "Initial-pass-1")],
 ];
 
 describe("every API call carries the session cookie (PR #55 review)", () => {

@@ -92,6 +92,41 @@ describe("the last active Administrator (BR-58, AC-40)", () => {
   });
 });
 
+describe("a lock plan made from a stale read (BR-81)", () => {
+  // The handler plans its locks from an unlocked read. Here that read sees an
+  // IT Staff member, so only their row is locked — but by the time the lock is
+  // granted, another transaction has made them the only active Administrator.
+  // The handler must notice and start over with the Administrators locked,
+  // not deactivate the last one.
+  it("API-70 a lock plan made from a stale read is redone: the target became the last active Administrator while it waited", async () => {
+    const [a] = await onlyAdministrators(1);
+    const target = await prisma.user.create({ data: { name: "Soon admin", email: `soon${++n}@lastadmin.test`, role: "IT_STAFF", mustChangePassword: false } });
+    let pending!: Promise<request.Response>;
+    await prisma.$transaction(
+      async (tx) => {
+        // Hold the target's row, change who the Administrators are, and only
+        // then let the request through.
+        await tx.user.update({ where: { id: target.id }, data: { role: "ADMINISTRATOR" } });
+        await tx.user.update({ where: { id: a.id }, data: { role: "IT_STAFF" } });
+        pending = patch(a, target.id, { isActive: false }).then((r) => r);
+        // Wait until the request is blocked on the target's row lock.
+        for (let i = 0; i < 100; i++) {
+          const [{ waiting }] = await prisma.$queryRaw<{ waiting: bigint }[]>`
+            SELECT count(*) AS waiting FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`;
+          if (waiting > 0n) return;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        throw new Error("the request never waited for the target's lock");
+      },
+      { timeout: 15_000 },
+    );
+    const res = await pending;
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("LAST_ADMINISTRATOR");
+    expect(await activeAdmins()).toBe(1);
+  });
+});
+
 describe("the BR-81 lock order (no deadlock)", () => {
   it("API-82 two Administrators deactivating two other Administrators at the same moment both succeed, every time", async () => {
     for (let round = 0; round < 6; round++) {
