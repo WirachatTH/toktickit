@@ -4,6 +4,8 @@ export interface ModalProps {
   titleId: string;
   onClose: () => void;
   children: ReactNode;
+  /** Lab 3 (ui-spec §1.8): a side panel for create/edit forms instead of a centred dialog. */
+  variant?: "dialog" | "panel";
 }
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -13,7 +15,7 @@ const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:
 // which button opened this), and clicking outside does nothing (§6.5 — a
 // destructive action's confirmation should never be dismissible by an
 // accidental stray click).
-export function Modal({ titleId, onClose, children }: ModalProps) {
+export function Modal({ titleId, onClose, children, variant = "dialog" }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,8 +53,8 @@ export function Modal({ titleId, onClose, children }: ModalProps) {
   }, [onClose]);
 
   return (
-    <div className="zg-modal-backdrop">
-      <div className="zg-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef}>
+    <div className={"zg-modal-backdrop" + (variant === "panel" ? " zg-modal-backdrop--panel" : "")}>
+      <div className={"zg-modal" + (variant === "panel" ? " zg-side-panel" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef}>
         {children}
       </div>
     </div>
