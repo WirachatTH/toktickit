@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Category,
@@ -98,6 +98,12 @@ export function StaffTicketQueue() {
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useMemo(() => readParams(searchParams), [searchParams]);
   const paramsKey = new URLSearchParams(params).toString();
+  // The URL as of the latest render. The router applies URL changes as a
+  // transition, so a callback that runs later (the delayed search) must read
+  // this, never a copy captured earlier — that stale copy is what put the old
+  // filters back after Clear filters (PR #57 review).
+  const latestParams = useRef(params);
+  latestParams.current = params;
 
   const [state, setState] = useState<LoadState>("loading");
   const [result, setResult] = useState<QueueResponse | null>(null);
@@ -119,6 +125,15 @@ export function StaffTicketQueue() {
     fetchStaffQueue(params)
       .then((res) => {
         if (cancelled) return;
+        // BR-67: a page past the last is empty although tickets exist. Go to
+        // the last page rather than calling that "no tickets" (PR #57 review).
+        if (res.data.length === 0 && res.pagination.totalItems > 0) {
+          const lastPage = toParams(res.appliedQuery);
+          delete lastPage.page;
+          if (res.pagination.totalPages > 1) lastPage.page = String(res.pagination.totalPages);
+          setSearchParams(lastPage, { replace: true });
+          return;
+        }
         setResult(res);
         setState("loaded");
         // Show what the server applied (BR-66); replace, so Back still works.
@@ -146,7 +161,7 @@ export function StaffTicketQueue() {
   }, [searchInput]);
 
   function update(changes: Record<string, string>, keepPage = false) {
-    const next: Record<string, string> = { ...params, ...changes };
+    const next: Record<string, string> = { ...latestParams.current, ...changes };
     if (!keepPage) delete next.page;
     for (const [key, value] of Object.entries(next)) if (value === "" || value === DEFAULTS[key]) delete next[key];
     setSearchParams(next);
@@ -162,6 +177,10 @@ export function StaffTicketQueue() {
   const sortValue = `${params.sort ?? DEFAULTS.sort}:${params.order ?? DEFAULTS.order}`;
   const rows = result?.data ?? [];
   const pagination = result?.pagination;
+  // Empty and no-results are about the whole queue, not this page (BR-67).
+  // With the jump to the last page above this equals "no rows", but it states
+  // the rule directly (PR #57 review).
+  const nothingMatches = state === "loaded" && (pagination?.totalItems ?? 0) === 0;
 
   function filterControls(prefix: string) {
     return (
@@ -319,11 +338,11 @@ export function StaffTicketQueue() {
         />
       )}
 
-      {state === "loaded" && rows.length === 0 && !hasFilters && (
+      {nothingMatches && !hasFilters && (
         <EmptyState message="The queue is clear — there are no active tickets." />
       )}
 
-      {state === "loaded" && rows.length === 0 && hasFilters && (
+      {nothingMatches && hasFilters && (
         <div data-testid="queue-no-results">
           <EmptyState
             message="No tickets match your search or filters."
