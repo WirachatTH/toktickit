@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import * as api from "../../src/api.js";
 import type { QueueResponse, QueueRow } from "../../src/api.js";
 import { AppRoutes } from "../../src/AppRoutes.js";
@@ -69,7 +69,13 @@ beforeEach(() => {
 });
 
 function SearchProbe() {
-  return <output data-testid="search">{useLocation().search}</output>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="search">{useLocation().search}</output>
+      <button type="button" data-testid="browser-back" onClick={() => navigate(-1)} />
+    </>
+  );
 }
 
 function renderQueue(user: api.AuthUser = STAFF, path = "/staff/queue") {
@@ -209,6 +215,23 @@ describe("UI-18 search, filters, sort, pagination, and the URL (FR-22, ui-spec Â
     }
   });
 
+  // PR #57 review round 2: Clear filters pushed two history entries (the
+  // delayed search fired after the Clear), so Back had to be pressed twice.
+  it("adds one history entry per Clear filters click, so one Back returns to the search", async () => {
+    echoQueue([]);
+    renderQueue(STAFF, "/staff/queue?owner=me");
+    await waitFor(() => expect(lastParams()).toEqual({ owner: "me" }));
+    await userEvent.type(screen.getAllByLabelText(/search/i)[0], "zzzz");
+    await waitFor(() => expect(screen.getByTestId("search").textContent).toBe("?owner=me&search=zzzz"));
+    await screen.findByTestId("queue-no-results");
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Clear filters" })[0]);
+    await waitFor(() => expect(screen.getByTestId("search").textContent).toBe(""));
+    await new Promise((r) => setTimeout(r, 500)); // past the search delay
+    await userEvent.click(screen.getByTestId("browser-back"));
+    await waitFor(() => expect(screen.getByTestId("search").textContent).toBe("?owner=me&search=zzzz"));
+  });
+
   it("shows 'Showing 11â€“20 of 35' and moves with Prev and Next", async () => {
     echoQueue([row({ id: 11 })], 35);
     renderQueue(STAFF, "/staff/queue?page=2");
@@ -255,6 +278,20 @@ describe("UI-19 empty, no-results, and failure are distinct (FR-23, AC-27)", () 
       expect(within(table()).getAllByRole("row")).toHaveLength(5);
       unmount();
     }
+  });
+
+  // PR #57 review round 2: if the count and the rows disagree (tickets closed
+  // between the two queries) the "last page" is the page already shown, and the
+  // screen stayed on its loading skeleton for good.
+  it("never stays loading when the last page itself comes back empty", async () => {
+    const spy = vi.spyOn(api, "fetchStaffQueue").mockResolvedValue(reply([], { page: 2 }, 14));
+    renderQueue(STAFF, "/staff/queue?page=2");
+    expect(await screen.findByText("The queue changed while it was loading.")).toBeInTheDocument();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.queryByText(/the queue is clear/i)).toBeNull();
+    spy.mockResolvedValue(reply([row({ id: 11 })], { page: 2 }, 11));
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await within(table()).findByText("TCK-000011")).toBeInTheDocument();
   });
 
   it("shows a failure banner with Retry, which loads again", async () => {
