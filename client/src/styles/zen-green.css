@@ -639,3 +639,7 @@ textarea.zg-field {
   .zg-detail-main { flex: 2 1 0; }
   .zg-detail-controls { flex: 1 1 0; position: sticky; top: 1rem; }
 }
+
+/* Lab 3 — a queue card is a real link (PR #57 review); it keeps the card look. */
+.zg-ticket-card--link { display: block; color: inherit; text-decoration: none; }
+.zg-ticket-card--link:hover { color: inherit; }

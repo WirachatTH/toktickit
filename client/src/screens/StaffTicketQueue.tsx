@@ -415,7 +415,9 @@ export function StaffTicketQueue() {
 
           <div className="d-md-none" data-testid="queue-cards">
             {rows.map((t) => (
-              <div key={t.id} className="zg-ticket-card" role="link" tabIndex={0} onClick={() => open(t)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && open(t)}>
+              // A real link (PR #57 review): Enter opens it, and it can be opened
+              // in a new tab like any link. (Space scrolls, as it does for links.)
+              <Link key={t.id} to={staffTicketPath(t.id)} className="zg-ticket-card zg-ticket-card--link">
                 <div className="d-flex justify-content-between align-items-start gap-2">
                   <strong>{t.ticketNumber}</strong>
                   <Badge kind="status" value={t.currentStatus} />
@@ -427,7 +429,7 @@ export function StaffTicketQueue() {
                   <span title={fullDate(t.updatedAt)}>{relativeTime(t.updatedAt)}</span>
                 </div>
                 {resolvedPill(t)}
-              </div>
+              </Link>
             ))}
           </div>
 

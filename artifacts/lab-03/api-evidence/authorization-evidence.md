@@ -1,11 +1,12 @@
 # Lab 3 — direct-API authorization evidence (PDF Part 7)
 
-Captured 2026-10-03T15:56:53Z against the local Docker stack through the Vite /api proxy,
+Captured 2026-10-03T20:01:33Z against the local Docker stack through the Vite /api proxy,
 with the seeded local-development accounts (README). Each request is sent straight to the API,
 bypassing the UI, by a role BR-20 does not grant; the server answers 403 FORBIDDEN and changes nothing.
-Ticket 4029 is a seeded IN_PROGRESS ticket.
+Ticket 4029 is an IN_PROGRESS ticket owned by user 82, picked from the queue by the script
+(artifacts/lab-03/api-evidence/capture-authorization-evidence.sh).
 
-Sign-ins: requester=200 staff=200 admin=200 (HTTP status of each login)
+Signed in as: Requester somchai.prasert (id 1), IT Staff chanon.rattanakorn, Administrator siriporn.boonmee (id 86).
 
 ## Baseline: the right role is let in
 
@@ -13,6 +14,9 @@ Sign-ins: requester=200 staff=200 admin=200 (HTTP status of each login)
 $ curl -X GET /api/staff/tickets/4029 -b <staff session>
 HTTP 200
 {"id":4029,"ticketNumber":"TCK-004029","requester":{"id":1,"name":"Somchai Prasert","email":"somchai.prasert@kmutt.ac.th","isActive":true},"category":{"id":4,"name":"Network"},"relatedSystem":{"id":3,"name":"VPN"},"summary":"VPN disconnects while uploading large files","description":"The VPN connection drops whenever I upload large drawing files to the department file share from home.","requestedP
+
+Ticket 4029 before the refused calls (read as IT Staff):
+    "itPriority":"HIGH" "currentStatus":"IN_PROGRESS" "owner":{"id":82 "requesterResolvedAt":null "updatedAt":"2026-09-27T14:41:12.009Z" comments=2 notes=1
 
 ## Requester → IT Staff operations
 
@@ -28,7 +32,7 @@ HTTP 403
 {"error":{"code":"FORBIDDEN","message":"You don't have permission to do that."}}
 
 
-### Requester reassigns the ticket
+### Requester reassigns the ticket to themselves
 $ curl -X PATCH /api/staff/tickets/4029/owner -b <requester session> -H 'Content-Type: application/json' -d '{"ownerId":1,"expectedOwnerId":82,"expectedStatus":"IN_PROGRESS"}'
 HTTP 403
 {"error":{"code":"FORBIDDEN","message":"You don't have permission to do that."}}
@@ -66,7 +70,7 @@ HTTP 403
 
 ## Administrator → IT Staff ticket changes (BR-21)
 
-### Administrator reassigns the ticket
+### Administrator assigns the ticket to themselves
 $ curl -X PATCH /api/staff/tickets/4029/owner -b <admin session> -H 'Content-Type: application/json' -d '{"ownerId":86,"expectedOwnerId":82,"expectedStatus":"IN_PROGRESS"}'
 HTTP 403
 {"error":{"code":"FORBIDDEN","message":"You don't have permission to do that."}}
@@ -124,3 +128,9 @@ HTTP 401
 {"error":{"code":"UNAUTHENTICATED","message":"Sign in to continue."}}
 
 
+## Nothing changed
+
+Ticket 4029 after every call above (read as IT Staff):
+    "itPriority":"HIGH" "currentStatus":"IN_PROGRESS" "owner":{"id":82 "requesterResolvedAt":null "updatedAt":"2026-09-27T14:41:12.009Z" comments=2 notes=1
+
+Before and after are identical: status, owner, IT Priority, appears-resolved signal, last-updated time, comment count, and note count.

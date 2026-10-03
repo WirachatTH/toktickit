@@ -126,6 +126,18 @@ describe("UI-17 queue rows (FR-21, ui-spec §6.2)", () => {
     expect(within(third).getByTitle(/2026/)).toBeInTheDocument();
   });
 
+  // PR #57 review: a card was a div with role="link" and its own key handling.
+  it("makes each small-screen card a real link to the ticket, opened with Enter like any link", async () => {
+    echoQueue([row({ id: 7, summary: "Printer jam" })]);
+    renderQueue();
+    const cards = await screen.findByTestId("queue-cards");
+    const card = within(cards).getByRole("link", { name: /TCK-000007/ });
+    expect(card.tagName).toBe("A");
+    expect(card).toHaveAttribute("href", "/staff/tickets/7");
+    expect(card).not.toHaveAttribute("role");
+    expect(card).not.toHaveAttribute("tabindex");
+  });
+
   it("renders a card per ticket for small screens, and the whole row opens the detail", async () => {
     echoQueue([row({ id: 7, summary: "Printer jam" })]);
     renderQueue();
