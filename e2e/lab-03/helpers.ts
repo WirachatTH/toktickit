@@ -30,18 +30,29 @@ export const ACCOUNTS = {
 export const E2E_EMAIL_PREFIX = "e2e3.";
 export const E2E_TICKET_PREFIX = "E2E lab3 ";
 
+// Each spec file's users carry the file's name, so the file can remove exactly
+// its own users when it ends without touching another file's (cleanup.ts).
+const specTag = (info: TestInfo) => path.basename(info.file).replace(/\.spec\.ts$/, "");
+export const emailPrefixFor = (info: TestInfo) => `${E2E_EMAIL_PREFIX}${specTag(info)}.`;
+
 // A per-run, per-project email: repeated runs never share an account, so the
 // in-memory sign-in throttle (keyed by email, D-12) never carries over.
 export function runEmail(info: TestInfo, label: string): string {
-  return `${E2E_EMAIL_PREFIX}${Date.now().toString(36)}.${info.project.name}.${label}@kmutt.ac.th`;
+  return `${emailPrefixFor(info)}${Date.now().toString(36)}.${info.project.name}.${label}@kmutt.ac.th`;
 }
 
 export const bp = (info: TestInfo) => info.project.name as "desktop" | "tablet" | "mobile";
 
 // ui-spec §13: artifacts/lab-03/screenshots/<folder>/<breakpoint>-<state>.png
+// Screenshots are evidence, written only when asked for: a normal test run
+// leaves the committed screenshots alone (PR #61 review). Capture with
+// `CAPTURE_SCREENSHOTS=1 npx playwright test --workers=1`.
+export const CAPTURE = process.env.CAPTURE_SCREENSHOTS === "1";
+
 // The whole page, except while a dialog or side panel is open: those are fixed
 // to the viewport, so a full-page capture would show the page running on below them.
 export async function shot(page: Page, info: TestInfo, folder: string, state: string): Promise<void> {
+  if (!CAPTURE) return;
   const dir = path.join(SCREENSHOTS, folder);
   fs.mkdirSync(dir, { recursive: true });
   const modal = (await page.getByRole("dialog").count()) > 0;

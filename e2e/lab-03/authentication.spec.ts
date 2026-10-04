@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   ACCOUNTS,
+  emailPrefixFor,
   INITIAL_PASSWORD,
   apiAs,
   bp,
@@ -13,6 +14,13 @@ import {
   shot,
   signIn,
 } from "./helpers.js";
+import { removeE2EData } from "./cleanup.js";
+
+// This file's own users go when it ends, so the next file — and its
+// screenshots — start from the seeded data (PR #61 review).
+test.afterAll(async ({}, info) => {
+  await removeE2EData({ emailPrefix: emailPrefixFor(info) });
+});
 
 // Lab 3, Issue 10 — sign-in, the forced password change, sign-in failures, and
 // the shell for each role (docs/lab-03/tests.md E2E-01 to E2E-03, RESP-04,
@@ -149,5 +157,46 @@ test.describe("authentication", () => {
     await expect(page.getByRole("alert").filter({ hasText: /Too many sign-in attempts\. Try again in \d+ minutes?\./ })).toBeVisible();
     await expect(page).toHaveURL(/\/login$/);
     await shot(page, info, "authentication", "login-throttled");
+  });
+
+  test("RESP-04 Login shows a busy state while signing in, and a safe message when the server fails", async ({ page }, info) => {
+    // Hold the sign-in request so the busy state can be seen, then let it through.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/auth/login", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/login");
+    await page.getByLabel(/^Email/).fill(ACCOUNTS.requester.email);
+    await page.getByLabel(/^Password/).fill("TokTickIT-dev-2026");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    const busy = page.getByRole("button", { name: "Signing in…" });
+    await expect(busy).toBeVisible();
+    await expect(busy).toBeDisabled();
+    await expect(busy).toHaveAttribute("aria-busy", "true");
+    await shot(page, info, "authentication", "login-submitting");
+    release();
+    await expect(page).toHaveURL(/\/tickets$/);
+    await page.unroute("**/api/auth/login");
+    await logOut(page);
+
+    // A server failure, stubbed in the browser (the real server can't be made to
+    // fail on demand). The body is deliberately revealing, so the check proves
+    // the screen shows its own plain message and never echoes what came back.
+    const leak = 'relation "User" does not exist at prisma/client.ts:42';
+    await page.route("**/api/auth/login", (route) =>
+      route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "INTERNAL_ERROR", message: leak } }) }),
+    );
+    await page.getByLabel(/^Email/).fill(ACCOUNTS.requester.email);
+    await page.getByLabel(/^Password/).fill("TokTickIT-dev-2026");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Something went wrong. Please try again." })).toBeVisible();
+    await expect(page.getByText(leak)).toHaveCount(0);
+    await expect(page.getByText(/prisma|relation "User"/)).toHaveCount(0);
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
+    await expectNoHorizontalOverflow(page, "Login failure");
+    await shot(page, info, "authentication", "login-failure");
   });
 });
