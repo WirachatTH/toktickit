@@ -380,7 +380,7 @@ Filled in per issue against `ui-spec.md` §12; evidence under `artifacts/lab-03/
 | Editable vs read-only distinct | n/a | Pass — STYLE-04 (Lab 2 read-only fields) | n/a | Pass — STYLE-04, `staff-ticket-detail/*-view` | Pass — disabled own-account controls, `self-restriction` |
 | Public Comments vs Internal Notes distinct | n/a | Pass — notes never shown (E2E-07) | n/a | Pass — STYLE-03, `internal-notes` vs `public-comments` | n/a |
 | Validation below fields; conflicts beside their control | Pass — `login-invalid`, `change-password-rules` | Pass — UI-14, UI-15 | n/a | Pass — `stale-conflict`, `status-confirm` | Pass — `create-validation`, `duplicate-email`, `last-administrator` |
-| Focus visible on every control | Pass — RESP-06 (keyboard pass) | Pass — shared field, button, tab rules (not walked by RESP-06) | Pass — RESP-06 (toolbar) | Pass — RESP-06 (tabs) | Pass — RESP-06 (side panel) |
+| Focus visible on every control | Pass — RESP-06 (keyboard pass) | Pass — shared field, button, and tab focus rules (RESP-06 walks the other screens) | Pass — RESP-06 (toolbar) | Pass — RESP-06 (tabs) | Pass — RESP-06 (side panel) |
 | No clipping / overlap / horizontal overflow — desktop | Pass — RESP-04, `authentication/desktop-*` | Pass — E2E-04, `requester-regression/desktop-*` | Pass — RESP-01, `staff-queue/desktop-*` | Pass — RESP-02, `staff-ticket-detail/desktop-*` | Pass — RESP-03, `user-management/desktop-*` |
 | No clipping / overlap / horizontal overflow — tablet | Pass — RESP-04, `authentication/tablet-*` | Pass — E2E-04, `requester-regression/tablet-*` | Pass — RESP-01, `staff-queue/tablet-*` | Pass — RESP-02, `staff-ticket-detail/tablet-*` | Pass — RESP-03, `user-management/tablet-*` |
 | No clipping / overlap / horizontal overflow — mobile | Pass — RESP-04, `authentication/mobile-*` | Pass — E2E-04, `requester-regression/mobile-*` | Pass — RESP-01, `staff-queue/mobile-*` | Pass — RESP-02, `staff-ticket-detail/mobile-*` | Pass — RESP-03, `user-management/mobile-*` |
@@ -388,9 +388,11 @@ Filled in per issue against `ui-spec.md` §12; evidence under `artifacts/lab-03/
 
 Checked by the Issue 10 suites at desktop (1280px), tablet (834px), and mobile (375px), and by
 looking at the screenshots. The overflow checks cover the page and, for tables, the table inside
-its card. Two states can't be produced on the shared development database without changing it, so
+its card. Some states can't be produced on the shared development database without changing it, so
 their responses are stubbed in the browser for the screenshot only: `staff-queue/*-empty` and
-`*-failure`, and `user-management/*-last-administrator` (API-70 tests the rule itself). The lock icon
+`*-failure`, `authentication/*-login-failure`, `user-management/*-failure`, and
+`user-management/*-last-administrator` (API-70 tests that rule itself). `authentication/*-login-submitting`
+holds the real sign-in request until the busy state is captured. The lock icon
 in the Internal region shows as a box in the screenshots because the container's Chromium has no
 emoji font; the caption text carries the meaning.
 
@@ -434,7 +436,5 @@ output recorded here as the Part 3 evidence (labsheet §14).
 - **E2E-created users and tickets are removed by the suite's own teardown** (`e2e/globalTeardown.ts`),
   straight from the database by their E2E prefixes, since no delete endpoint exists (BR-36, BR-59).
   Each run uses unique emails, so runs never collide or trip the per-email throttle.
-- **RESP-06's keyboard pass runs at desktop only.** Focus order doesn't depend on the width, and the
-  queue's filters are a sheet on mobile; tablet and mobile report it as skipped.
 - **Race tests (API-45, API-70, API-74 to API-77, API-82) fire two requests at once.** They prove the locks
   serialise the pair; they are run several times before a PR to rule out a lucky ordering.

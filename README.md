@@ -262,7 +262,10 @@ docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..03, 
   create their own tickets and users, which `e2e/globalTeardown.ts` removes when
   the run ends. One worker is the reliable setting on a modest machine; the
   default (three Chromiums beside the dev server in one container) can time out.
-- `npx playwright test lab-03/` runs only the Lab 3 suites. Lab 3 screenshots land
-  in `artifacts/lab-03/screenshots/`; the Lab 2 journey also rewrites
-  `artifacts/lab-02/screenshots/`, so `git checkout artifacts/lab-02` afterwards
-  if you don't mean to update the Lab 2 evidence.
+- `npx playwright test lab-03/` runs only the Lab 3 suites.
+- A normal run writes no screenshots, so the committed evidence stays untouched.
+  To recapture it, run `docker-compose exec -e CAPTURE_SCREENSHOTS=1 client npx
+  playwright test --workers=1`. That rewrites `artifacts/lab-03/screenshots/` and
+  the Lab 2 journey's `artifacts/lab-02/screenshots/`; restore the Lab 2 ones with
+  `git checkout artifacts/lab-02` if you only meant to refresh Lab 3. Each spec file
+  removes its own test data when it ends, so the screenshots show the seeded data.

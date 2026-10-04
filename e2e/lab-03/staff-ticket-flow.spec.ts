@@ -12,6 +12,13 @@ import {
   shot,
   signIn,
 } from "./helpers.js";
+import { removeE2EData } from "./cleanup.js";
+
+// This file's tickets go when it ends, so the next file — and the next
+// project's queue screenshots — start from the seeded data (PR #61 review).
+test.afterAll(async () => {
+  await removeE2EData({ ticketPrefix: E2E_TICKET_PREFIX });
+});
 
 // Lab 3, Issue 10 — one ticket from creation to resolution, through the
 // Requester, IT Staff, and Administrator screens (docs/lab-03/tests.md E2E-04 to
@@ -67,6 +74,61 @@ async function expectDetailLayout(page: Page, info: TestInfo) {
 }
 
 test.describe("the staff ticket flow", () => {
+  // First, while the queue holds only seeded tickets (this file's flow adds one).
+  test("RESP-01 the queue's states at each width: default, filtered, sorted, page 2, unassigned, no results, empty, failure", async ({ page }, info) => {
+    await signIn(page, ACCOUNTS.staff.email);
+    await expect(page).toHaveURL(/\/staff\/queue$/);
+    await expect(queueRows(page, info)).toBeVisible();
+    await expectQueueLayout(page, info);
+    await shot(page, info, "staff-queue", "default");
+
+    await page.goto("/staff/queue?status=ALL&itPriority=HIGH");
+    await expect(queueRows(page, info)).toBeVisible();
+    await expectQueueLayout(page, info);
+    await shot(page, info, "staff-queue", "filtered");
+
+    await page.goto("/staff/queue?status=ALL&sort=createdAt&order=asc");
+    await expect(queueRows(page, info)).toBeVisible();
+    await shot(page, info, "staff-queue", "sorted");
+
+    await page.goto("/staff/queue?status=ALL&page=2");
+    await expect(queueRows(page, info)).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Queue pagination" })).toContainText(/Page 2 of|Showing 11–/);
+    await expectQueueLayout(page, info);
+    await shot(page, info, "staff-queue", "page-2");
+
+    await page.goto("/staff/queue?owner=unassigned");
+    await expect(page).toHaveURL(/owner=unassigned/);
+    await shot(page, info, "staff-queue", "unassigned");
+
+    await page.goto("/staff/queue?search=zz-no-such-ticket-e2e");
+    await expect(page.getByText("No tickets match your search or filters.")).toBeVisible();
+    await expectNoHorizontalOverflow(page, "no results");
+    await shot(page, info, "staff-queue", "no-results");
+
+    // The empty queue and a failure can't be produced on the shared database
+    // without changing it, so these two answers are stubbed in the browser.
+    const empty = {
+      data: [],
+      pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },
+      appliedQuery: { search: "", status: "ACTIVE", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
+    };
+    await page.route(/\/api\/staff\/tickets(\?|$)/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(empty) }));
+    await page.goto("/staff/queue");
+    await expect(page.getByText("The queue is clear — there are no active tickets.")).toBeVisible();
+    await shot(page, info, "staff-queue", "empty");
+    await page.unroute(/\/api\/staff\/tickets(\?|$)/);
+
+    await page.route(/\/api\/staff\/tickets(\?|$)/, (route) =>
+      route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } }) }),
+    );
+    await page.goto("/staff/queue");
+    await expect(page.getByText("Unable to load the queue. Please try again.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expectNoHorizontalOverflow(page, "failure");
+    await shot(page, info, "staff-queue", "failure");
+  });
+
   test("E2E-04 to E2E-08 RESP-01 RESP-02 a ticket from the Requester, through IT Staff, to the Administrator's read-only view", async ({ page }, info) => {
     test.setTimeout(180_000);
     const summary = `${E2E_TICKET_PREFIX}${Date.now()} ${bp(info)}`;
@@ -121,6 +183,10 @@ test.describe("the staff ticket flow", () => {
     await expectQueueLayout(page, info);
     await queueFilter(page, info, "owner", "unassigned");
     await queueSearch(page, info).fill(ticketNumber);
+    // The current rows stay clickable while the search reloads them, so wait for
+    // the searched results before clicking (a row clicked mid-reload is replaced).
+    await expect(page).toHaveURL(new RegExp(`search=${ticketNumber}`));
+    await expect(page.getByTestId("queue-results")).toHaveAttribute("aria-busy", "false");
     const row = queueRows(page, info).getByRole("link", { name: new RegExp(ticketNumber) });
     await expect(row).toBeVisible();
     await expect(queueRows(page, info).getByText("Requester: appears resolved")).toBeVisible();
@@ -225,59 +291,5 @@ test.describe("the staff ticket flow", () => {
     await expect(page.getByRole("button", { name: "Post comment" })).toBeDisabled();
     await expect(page.getByText("Attachments can't be changed on a closed ticket.")).toBeVisible();
     await shot(page, info, "requester-regression", "closed-ticket");
-  });
-
-  test("RESP-01 the queue's states at each width: default, filtered, sorted, page 2, unassigned, no results, empty, failure", async ({ page }, info) => {
-    await signIn(page, ACCOUNTS.staff.email);
-    await expect(page).toHaveURL(/\/staff\/queue$/);
-    await expect(queueRows(page, info)).toBeVisible();
-    await expectQueueLayout(page, info);
-    await shot(page, info, "staff-queue", "default");
-
-    await page.goto("/staff/queue?status=ALL&itPriority=HIGH");
-    await expect(queueRows(page, info)).toBeVisible();
-    await expectQueueLayout(page, info);
-    await shot(page, info, "staff-queue", "filtered");
-
-    await page.goto("/staff/queue?status=ALL&sort=createdAt&order=asc");
-    await expect(queueRows(page, info)).toBeVisible();
-    await shot(page, info, "staff-queue", "sorted");
-
-    await page.goto("/staff/queue?status=ALL&page=2");
-    await expect(queueRows(page, info)).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Queue pagination" })).toContainText(/Page 2 of|Showing 11–/);
-    await expectQueueLayout(page, info);
-    await shot(page, info, "staff-queue", "page-2");
-
-    await page.goto("/staff/queue?owner=unassigned");
-    await expect(page).toHaveURL(/owner=unassigned/);
-    await shot(page, info, "staff-queue", "unassigned");
-
-    await page.goto("/staff/queue?search=zz-no-such-ticket-e2e");
-    await expect(page.getByText("No tickets match your search or filters.")).toBeVisible();
-    await expectNoHorizontalOverflow(page, "no results");
-    await shot(page, info, "staff-queue", "no-results");
-
-    // The empty queue and a failure can't be produced on the shared database
-    // without changing it, so these two answers are stubbed in the browser.
-    const empty = {
-      data: [],
-      pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },
-      appliedQuery: { search: "", status: "ACTIVE", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
-    };
-    await page.route(/\/api\/staff\/tickets(\?|$)/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(empty) }));
-    await page.goto("/staff/queue");
-    await expect(page.getByText("The queue is clear — there are no active tickets.")).toBeVisible();
-    await shot(page, info, "staff-queue", "empty");
-    await page.unroute(/\/api\/staff\/tickets(\?|$)/);
-
-    await page.route(/\/api\/staff\/tickets(\?|$)/, (route) =>
-      route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } }) }),
-    );
-    await page.goto("/staff/queue");
-    await expect(page.getByText("Unable to load the queue. Please try again.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
-    await expectNoHorizontalOverflow(page, "failure");
-    await shot(page, info, "staff-queue", "failure");
   });
 });

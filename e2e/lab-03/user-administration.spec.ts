@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import {
   ACCOUNTS,
+  emailPrefixFor,
   ORIGIN,
   apiAs,
   bp,
@@ -13,6 +14,13 @@ import {
   shot,
   signIn,
 } from "./helpers.js";
+import { removeE2EData } from "./cleanup.js";
+
+// This file's own users go when it ends, so the next file — and its
+// screenshots — start from the seeded data (PR #61 review).
+test.afterAll(async ({}, info) => {
+  await removeE2EData({ emailPrefix: emailPrefixFor(info) });
+});
 
 // Lab 3, Issue 10 — User Management end to end (docs/lab-03/tests.md E2E-09 to
 // E2E-11, RESP-03) and the keyboard-only pass (RESP-06). Screenshots:
@@ -199,7 +207,24 @@ test.describe("user administration", () => {
     await signIn(second, reset.email, newPassword);
     await expect(second).toHaveURL(/\/change-password$/);
     await expect(second.getByRole("heading", { name: "Set a new password" })).toBeVisible();
+    await shot(second, info, "user-management", "reset-forced-change");
     await context.close();
+  });
+
+  test("RESP-03 a failed load says so, with Retry, and Retry loads the list", async ({ page }, info) => {
+    await signIn(page, ACCOUNTS.admin.email);
+    await expect(list(page, info).getByText(ACCOUNTS.admin.name)).toBeVisible();
+    // A server failure, stubbed in the browser for this one request.
+    await page.route(/\/api\/admin\/users(\?|$)/, (route) =>
+      route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } }) }),
+    );
+    await page.reload();
+    await expect(page.getByText("Unable to load users. Please try again.")).toBeVisible();
+    await expectNoHorizontalOverflow(page, "User Management failure");
+    await shot(page, info, "user-management", "failure");
+    await page.unroute(/\/api\/admin\/users(\?|$)/);
+    await page.getByRole("button", { name: "Retry" }).click();
+    await expect(list(page, info).getByText(ACCOUNTS.admin.name)).toBeVisible();
   });
 
   test("E2E-11 a Requester is turned away from User Management, and the admin API refuses their session", async ({ page }, info) => {
@@ -219,9 +244,9 @@ test.describe("user administration", () => {
   });
 
   test("RESP-06 keyboard only: Login, the queue filters, the detail tabs, and the side panel", async ({ page }, info) => {
-    // Keyboard order doesn't depend on the width; the queue's filters are a
-    // sheet on mobile, so this pass runs once, at desktop.
-    test.skip(bp(info) !== "desktop", "keyboard pass runs at desktop");
+    // At every width. Below 768px the queue's filters sit in a sheet behind the
+    // Filters button, so there the order goes through that button.
+    const mobile = isMobile(info);
 
     // Login: Email → Password → Show password → Sign in, focus always visible.
     await page.goto("/login");
@@ -241,18 +266,26 @@ test.describe("user administration", () => {
     // The queue toolbar, in reading order. With a filter set, so Clear filters
     // is enabled (it is disabled, and skipped by Tab, when there is nothing to clear).
     await page.goto("/staff/queue?status=ALL&itPriority=HIGH");
-    await expect(page.getByTestId("queue-table")).toBeVisible();
-    await page.locator("#queue-search").focus();
+    await expect(page.getByTestId(mobile ? "queue-cards" : "queue-table")).toBeVisible();
+    await page.locator(mobile ? "#queue-search-mobile" : "#queue-search").focus();
     const toolbar = [await focused(page)];
+    if (mobile) {
+      await page.keyboard.press("Tab");
+      toolbar.push(await focused(page));
+      await expectFocusVisible(page, "Filters button");
+      await page.keyboard.press("Enter");
+      await expect(page.locator("#queue-mobile-filters")).toBeVisible();
+    }
     for (let i = 0; i < 7; i++) {
       await page.keyboard.press("Tab");
       toolbar.push(await focused(page));
       await expectFocusVisible(page, "Queue toolbar");
     }
-    expect(toolbar).toEqual(["input:Search", "select:Status", "select:IT Priority", "select:Category", "select:Owner", "input:Requester says resolved", "select:Sort", "button:Clear filters"]);
+    const filters = ["select:Status", "select:IT Priority", "select:Category", "select:Owner", "input:Requester says resolved", "select:Sort", "button:Clear filters"];
+    expect(toolbar).toEqual(mobile ? ["input:Search", "button:Filters", ...filters] : ["input:Search", ...filters]);
 
     // The detail tabs: arrow keys move the selection and the focus (ui-spec §10).
-    await page.getByTestId("queue-table").locator("tbody a").first().click();
+    await page.getByTestId(mobile ? "queue-cards" : "queue-table").locator("a").first().click();
     const publicTab = page.getByRole("tab", { name: "Public comments" });
     // Focused from code after a mouse click, so the ring is checked after the
     // arrow keys move focus (the browser shows :focus-visible for keyboard moves).

@@ -1,6 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import globalTeardown from "./globalTeardown.js";
 
 // Issue 9 — the full Requester journey (issues.md Issue 9 "To build";
 // api-spec.md end to end): select Requester → create a ticket with an
@@ -17,6 +18,13 @@ import { fileURLToPath } from "node:url";
 // whatever Requesters/Categories/Systems actually exist rather than
 // hardcoding ids, the same reason the Vitest suites fetch fixtures
 // dynamically instead of assuming specific database ids.
+
+// Lab 3, Issue 10 follow-up (PR #61 review): screenshots are evidence, written
+// only when asked for (CAPTURE_SCREENSHOTS=1), so a normal run leaves the
+// committed ones alone.
+async function capture(page: Page, options: { path: string }): Promise<void> {
+  if (process.env.CAPTURE_SCREENSHOTS === "1") await page.screenshot(options);
+}
 
 const FIXTURE_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures/sample.png");
 
@@ -112,6 +120,13 @@ async function logOut(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/login$/);
 }
 
+// The journey's tickets go when this file ends, so the Lab 3 files — and their
+// queue screenshots — start from the seeded data (PR #61 review). The global
+// teardown still sweeps once more at the very end.
+test.afterAll(async () => {
+  await globalTeardown();
+});
+
 test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
   test("create → find in My Tickets → view detail → download → soft-remove → switch Requester → isolation", async ({
     page,
@@ -151,7 +166,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
       .fill("Created by the Issue 9 end-to-end journey test — covers create, list, detail, download, and soft-remove.");
     await page.getByLabel("Attachments").setInputFiles(FIXTURE_FILE);
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-filled-form.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-filled-form.png`) });
 
     await page.getByRole("button", { name: "Submit Ticket" }).click();
 
@@ -160,7 +175,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const ticketNumber = (await ticketNumberEl.textContent())!.trim();
     expect(ticketNumber).toMatch(/^TCK-\d{6}$/); // BR-01
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-success.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-success.png`) });
 
     // --- Find it in My Tickets ---
     await clickNavControl(page, "link", "My Tickets");
@@ -170,14 +185,14 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const ticketRow = ticketRowLocator(page, breakpoint, ticketNumber);
     await expect(ticketRow).toBeVisible();
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.myTickets, `${breakpoint}-e2e-found.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.myTickets, `${breakpoint}-e2e-found.png`) });
 
     // --- Open Ticket Detail ---
     await ticketRow.click();
     await expect(page.getByText(ticketNumber, { exact: true }).first()).toBeVisible();
     await expect(page.getByText("sample.png")).toBeVisible();
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-view.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-view.png`) });
 
     // --- Download the attachment ---
     const [download] = await Promise.all([
@@ -191,7 +206,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Reason for removal").fill("Removed by the Issue 9 end-to-end journey test.");
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-remove-confirm.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-remove-confirm.png`) });
     await dialog.getByRole("button", { name: "Remove Attachment" }).click();
     await expect(dialog).not.toBeVisible();
 
@@ -200,7 +215,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     await expect(page.getByText("Removed by the Issue 9 end-to-end journey test.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Download" })).not.toBeVisible();
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-removed-state.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-removed-state.png`) });
 
     const ownedTicketUrl = page.url();
 

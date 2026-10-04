@@ -24,6 +24,7 @@ Added to `client/src/styles/zen-green.css`:
 | `--zg-internal-bg` | `#EEF1F6` | Internal Notes region background (cool grey-blue, deliberately not green and not the warning colour) |
 | `--zg-internal-border` | `#7C8BA3` | 4px dashed left edge of the Internal region |
 | `--zg-internal-text` | `#3D4A5C` | Internal region caption text |
+| `--zg-primary-hover` | `#00552F` | Primary button hover fill — Lab 2's existing value, moved from a hard-coded hex into a token so no rule carries an ad hoc colour (STYLE-06) |
 
 ### 1.2 Status badges
 Same pill geometry as Lab 2 (`.zg-badge`). Label = the value with `_` replaced by a
@@ -237,13 +238,19 @@ eighth column.
   summary, then priority badge · owner · updated; the appears-resolved pill on its
   own row when present. Filters move into a "Filters" bottom sheet (Lab 2 pattern).
 - Pagination: Lab 2 footer ("Showing 11–20 of 87", Prev/Next, page numbers; mobile
-  "Page 2 of 9").
+  "Page 2 of 9"). Up to seven pages are all shown; beyond that, the first page, the
+  last page, and the current page with its neighbours, with a "…" marker (not a
+  control, hidden from screen readers) for each gap — a gap of a single page shows
+  that page instead.
+- Tablet: the table fits the 720px container without scrolling inside its card —
+  the summary column narrows (ellipsis, full text in `title`), ticket numbers stay on
+  one line, and a long status badge may wrap.
 - Whole row is a link target to IT Staff Ticket Detail.
 
 ### 6.3 States
 | State | Presentation |
 | :--- | :--- |
-| Loading | skeleton rows/cards |
+| Loading | skeleton rows/cards on the first load; afterwards the current rows stay on screen, dimmed and `aria-busy`, while the next page or filter loads |
 | Empty (no tickets match the default Active view and no filters/search) | "The queue is clear — there are no active tickets." |
 | No results | "No tickets match your search or filters." + Clear filters |
 | Forbidden | the shell's forbidden callout (Requesters never see this screen) |
@@ -314,6 +321,8 @@ changed to In Progress"); failure banners keep entered text.
   (Active ✓ / Inactive ✗ pill with icon and text), **Edit** (tertiary button,
   `aria-label="Edit <name>"`).
 - Mobile: cards — name + role badge, email, status, Edit.
+- An email is always shown whole: it wraps, preferably just before the "@", and
+  never widens the table beyond its card.
 - States: loading skeleton; empty search result "No users match your search." with
   Clear; failure banner + Retry.
 
@@ -330,7 +339,10 @@ Title "Edit <name>": Full name*, Email*, Role*, Active switch. Below a divider, 
 section **Set new initial password** with a password field (same rules and
 Generate) and a secondary **Set initial password** button that opens a confirmation
 dialog ("<name> will be signed out everywhere and must choose a new password at their
-next sign-in."). Footer: **Save changes**, Cancel.
+next sign-in."). Footer: **Save changes**, Cancel. Save changes never sends that
+password, so while the field has text it is disabled, with the reason below the
+button: "Save changes doesn't send this password. Use Set initial password, or clear
+the field."
 
 ### 8.4 Safety rules in the UI
 Shown as disabled controls with a visible reason, and also enforced by the server
@@ -340,6 +352,10 @@ Shown as disabled controls with a visible reason, and also enforced by the serve
   replaced by a link to Change Password.
 - `409 LAST_ADMINISTRATOR`, `OWNS_OPEN_TICKETS`, `EMAIL_TAKEN`: message below the
   related field; nothing saved; panel stays open with the user's input.
+  `LAST_ADMINISTRATOR` sits below Active when the save deactivated the user, and below
+  Role when only the role changed.
+- `409 STALE_STATE` (the user kept changing while the save was applied, BR-81): banner
+  inside the panel; input kept; trying again is safe.
 
 ### 8.5 States
 Saved → panel closes, row updates, toast ("User created", "Changes saved",
@@ -361,6 +377,10 @@ failure → banner inside the panel, input kept.
 Lab 2 §7 applies to every new screen. In addition:
 - Tabs use `role="tablist"`/`tab`/`tabpanel`, `aria-selected`, arrow-key navigation.
 - Side panels and dialogs trap focus, close on Escape, restore focus to their opener.
+  With a dialog open inside a side panel, Escape and Tab belong to the dialog alone,
+  so Escape closes only the dialog.
+- Every button shows a visible focus ring (2px `--zg-secondary` outline; white on the
+  green header), including tertiary buttons such as Show password and Edit.
 - Password show/hide toggles are buttons with `aria-pressed` and a changing label.
 - The rules checklist is a list whose items carry the ✓/✗ state in text for screen
   readers ("met"/"not met").
@@ -378,7 +398,9 @@ Lab 2 §7 applies to every new screen. In addition:
 | User Management | table + right side panel | table + full-screen panel | cards + full-screen panel |
 
 All sizes: no horizontal page scroll, no clipped labels, no overlapping messages,
-touch targets ≥44px on mobile.
+touch targets ≥44px on mobile — fields, selects, buttons, and the menu's links. Header
+links keep each label on one line; when a role's links and account block don't fit
+one row at tablet, whole items wrap.
 
 ## 12. Visual inspection checklist
 Recorded per issue in `tests.md` §4:
@@ -398,8 +420,8 @@ breakpoint `desktop`, `tablet`, or `mobile`:
 
 | Folder | States |
 | :--- | :--- |
-| `authentication/` | `login`, `login-invalid`, `login-inactive`, `login-throttled`, `change-password-forced`, `change-password-rules`, `shell-requester`, `shell-it-staff`, `shell-administrator`, `logged-out-redirect` |
+| `authentication/` | `login`, `login-submitting`, `login-invalid`, `login-inactive`, `login-throttled`, `login-failure`, `change-password-forced`, `change-password-rules`, `shell-requester`, `shell-it-staff`, `shell-administrator`, `logged-out-redirect` |
 | `requester-regression/` | `ticket-detail-comments`, `appears-resolved-confirm`, `appears-resolved-done`, `closed-ticket` |
 | `staff-queue/` | `default`, `filtered`, `sorted`, `page-2`, `unassigned`, `empty`, `no-results`, `failure`, `admin-read-only` |
 | `staff-ticket-detail/` | `view`, `claim`, `priority-changed`, `status-confirm`, `public-comments`, `internal-notes`, `stale-conflict`, `admin-read-only` |
-| `user-management/` | `list`, `search`, `role-filter`, `create`, `create-validation`, `duplicate-email`, `edit`, `set-initial-password`, `self-restriction`, `last-administrator`, `forbidden` |
+| `user-management/` | `list`, `search`, `role-filter`, `create`, `create-validation`, `duplicate-email`, `edit`, `set-initial-password`, `reset-forced-change`, `self-restriction`, `last-administrator`, `failure`, `forbidden` |

@@ -1,11 +1,26 @@
 # Lab 3 — AI Use and Reflection
 
-**LLM/agent used:** *(to be filled in)*
+**LLM/agent used:** Claude Code (Anthropic's coding agent in the terminal), running **Claude Opus 5.5** for almost the whole sprint, with a short stretch on Claude Opus 5. The same agent was used in both roles:
+- **Specification agent** (Issue 1): drafted `specification.md`, `api-spec.md`, `ui-spec.md`, and `tests.md`, and revised them through three rounds of peer review.
+- **Coding agent** (Issues 2–10 and the follow-ups): wrote each issue's tests first, then the implementation, and opened each PR. The agent also checked my partner's PRs, but only reported back; I posted every review and comment myself.
 
-## Selected key prompts (6–10)
-| # | Prompt (summarised) | What I did with the result |
-|---|---------------------|----------------------------|
-| *(filled in as the sprint progresses)* | | |
+## Selected key prompts (10)
+Quoted word for word as I typed them. Where I pasted my partner's review into the prompt, it is shown as *[Menelaus's pasted review]*.
+
+| # | Prompt | What I did with the result |
+|---|--------|----------------------------|
+| 1 | "Now we're done with lab2. I've uploaded lab_03_xxx materials in the private folder. I'd like you to understand all of them first. Then await my next order" | Started Lab 3 by having the agent read the labsheet and the four mockups and explain them back to me before anything was planned or built. |
+| 2 | "Yes, please do honor the workflow agreement as before. Now create the plan and issue md files in private for this lab" | Got the private working plan and the 11-issue backlog. I kept the Lab 2 rule that the agent creates no branch, commit, PR, or issue unless I ask. Once I approved the backlog, I had the agent create the project board and the 11 GitHub issues from it. |
+| 3 | "When you move to issue N, move issue N to Specified on the board. Then, confirm your understanding of what needs to be done in the issue. Once you do, move issue N to Started. Then, proceed on whatever the issue requires. After that, open a pull-request following the format of the previous lab, then report back to me and await my order. You may start said process for Issue 1 right away." | Set the per-issue loop that every Lab 3 issue followed: board moves, read-back of the issue, tests first, a PR in the Lab 2 format, then a stop for my decision. This allows very short prompts after the first one but the agent's still able to deliver a successful result. |
+| 4 | "Back to ours, address all the issues reported back by Menelaus. Tell me first whether it holds true" | The agent is able to inspect the code of my peer without me actually sharing the code to it. This allows short prompts to review the code without wasting many tokens on context-understanding. |
+| 5 | "go with (b) and fix everything. Ensure all standards are covered and we leave no stones unturned." | The agent respected my choice and was encouraged to explore more hidden test-cases that might not be explicitly stated in the labsheet, preventing unnecessary request-changes. |
+| 6 | "Now back to ours. Another changes requested by Menelaus. Analyze and reflect on how we could've missed this and how we can prevent mistakes like this in the future before you start fixing." | This prompt made the agent more careful on testing my repository before opening pull-request. Not to mention, it even used the flaws that it found in my peer's repository as extra precautions for my repository too, greatly reducing the risks of bugs. |
+| 7 | "In the mean time, check https://github.com/Menelaus122/TokTickITV2/pull/53. Can you confirm again that you can actually run and verify everything just by me giving you the link before you continue?" | Confirmed the agent could check out and run my partner's branch on its own ports and database from just the PR link. From then on, each review of his PRs was based on running his code, not only reading it. |
+| 8 | "Move Issue 4 to PR Review. I noticed that you didn't move the card to "Started". Don't forget to do it for the next issues when you are about to start coding" | Corrected the agent when it skipped a board step. It then confirmed each move by reading the board back. |
+| 9 | "Move it to PR Review and check if it's merged. I also noticed that issue 8 is still in Specified. What's with that?" | Had the agent trace why a finished issue had moved back. A project automation had moved it when a follow-up PR was linked to the issue. After that, the board was checked after every action on a PR or issue. |
+| 10 | "Acknowledge it in the next issue. But now before starting the last issue, check again with our private plans about what's left to be done, including the documentations and all the submissions beyond just the code here" | Got the pre-release gap list before Issue 11. It covered the keyboard test skipped at two widths, these two documents, specs that no longer matched the code, and missing screenshots, and set the order for the release. |
 
 ## My Reflection
-*(written at the end of the sprint)*
+Although the process of building this lab was technically longer and harder than the previous labs, by giving the agent a clear set of instructions that repeats itself for every issue, it makes the process much smoother and efficient. Much time was saved for example: by simply giving the agent a github link instead of zipping files and letting the agent extract them. Another example: By having the agent start from testing first before actually publishing or opening a PR, it allows me to see potential bugs and errors before the agent moves on to the implementation stage which also saved me a lot of time that could've been wasted on unnecessary bug fixes. And in my opinion after 3 labs so far, I believe that Claude Opus 5 and above is a better agent than Gemini (That I used for the first lab) overall in terms of correctness and accuracy of the result.
+
+As for the specification stage, the agent turned the labsheet and the four mockups into a numbered contract (FR, BR, AC) with a role × operation matrix, so every test could trace back to an acceptance criterion. But even so, letting the agent draft the specifications by itself still proved to have some weaknesses. Without letting my peer check against it (And me checking against his), I believe that there would be many cases of misunderstanding of the labsheet itself, leading to an over- or under-implementation of the features. 
