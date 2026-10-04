@@ -6,8 +6,6 @@
 
 **Peer reviewer:** 67070501035 — GitHub: @Menelaus122
 
-Each entry quotes the first sentences of the review or reply, word for word; "…" marks where the quote is cut. Rounds are in order.
-
 ## Pull Requests I authored (reviewed by my partner)
 *(Repository: WirachatTH/toktickit — every PR targets `lab3-staging`)*
 
