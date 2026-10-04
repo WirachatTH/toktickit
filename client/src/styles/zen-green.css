@@ -18,6 +18,9 @@
   --zg-warning-bg: #FFF4DE;
   --zg-warning-text: #8A5A00;
   --zg-success-text: #0B7A46;
+  /* Lab 3, Issue 10 (STYLE-06): the primary button's hover fill, formerly an
+     ad hoc hex in its rule. Same value. */
+  --zg-primary-hover: #00552F;
   /* Lab 3 (docs/lab-03/ui-spec.md §1.1) — the Internal region only. */
   --zg-internal-bg: #EEF1F6;
   --zg-internal-border: #7C8BA3;
@@ -104,16 +107,16 @@ textarea.zg-field {
 .zg-btn-primary {
   background: var(--zg-primary);
   border-color: var(--zg-primary);
-  color: #fff;
+  color: var(--zg-surface);
 }
 .zg-btn-primary:hover:not(:disabled) {
-  background: #00552f;
-  border-color: #00552f;
-  color: #fff;
+  background: var(--zg-primary-hover);
+  border-color: var(--zg-primary-hover);
+  color: var(--zg-surface);
 }
 
 .zg-btn-secondary {
-  background: #fff;
+  background: var(--zg-surface);
   border: 1px solid var(--zg-secondary);
   color: var(--zg-secondary);
 }
@@ -137,12 +140,12 @@ textarea.zg-field {
 .zg-btn-destructive {
   background: var(--zg-error-border);
   border-color: var(--zg-error-border);
-  color: #fff;
+  color: var(--zg-surface);
 }
 .zg-btn-destructive:hover:not(:disabled) {
   background: var(--zg-error-text);
   border-color: var(--zg-error-text);
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .btn:disabled,
@@ -245,18 +248,18 @@ textarea.zg-field {
 
 .zg-shell-header {
   background: var(--zg-primary);
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-brand {
-  color: #fff;
+  color: var(--zg-surface);
   font-weight: 700;
   font-size: 1.25rem;
   text-decoration: none;
 }
 
 .zg-nav-link {
-  color: #fff;
+  color: var(--zg-surface);
   text-decoration: none;
   padding: 0.5rem 0.25rem;
   font-weight: 500;
@@ -264,12 +267,12 @@ textarea.zg-field {
 }
 
 .zg-nav-link:hover {
-  color: #fff;
+  color: var(--zg-surface);
   text-decoration: underline;
 }
 
 .zg-nav-link--active {
-  border-bottom-color: #fff;
+  border-bottom-color: var(--zg-surface);
   font-weight: 700;
 }
 
@@ -279,17 +282,17 @@ textarea.zg-field {
    the plain .zg-btn-tertiary color assumes a light surface and would be
    near-invisible on --zg-primary otherwise. */
 .zg-shell-nav .zg-btn-tertiary.zg-shell-requester {
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-nav .zg-btn-tertiary.zg-shell-requester:hover:not(:disabled) {
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-toggle {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.6);
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-nav {
@@ -311,6 +314,12 @@ textarea.zg-field {
   .zg-shell-nav.zg-shell-nav--open {
     display: flex;
   }
+  /* Lab 3, Issue 10 (RESP-05): the menu's links are touch targets (were 42px). */
+  .zg-shell-nav .zg-nav-link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
 
   /* ui-spec.md §8 — Mobile <768px: "buttons full-width and ≥44px tall
      (touch target)". Never implemented anywhere; found by measuring actual
@@ -326,6 +335,12 @@ textarea.zg-field {
      `.btn` full-width would break those. */
   .btn {
     min-height: 44px;
+  }
+
+  /* Lab 3, Issue 10 (RESP-04): fields and selects are touch targets too, and
+     were 40px. Textareas keep their own height (textarea.zg-field wins). */
+  .zg-field {
+    height: 44px;
   }
 
   .zg-actions-stack {
@@ -524,16 +539,16 @@ textarea.zg-field {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  color: #fff;
+  color: var(--zg-surface);
 }
 .zg-shell-account-name { font-weight: 600; }
 /* Account actions sit on the dark header: same rule as the Lab 2 requester
    button above, so the tertiary colour never disappears into --zg-primary. */
 .zg-shell-nav .zg-shell-account .zg-btn-tertiary,
 .zg-shell-nav .zg-shell-account a {
-  color: #fff;
+  color: var(--zg-surface);
 }
-.zg-shell-nav .zg-shell-account .zg-btn-tertiary:hover:not(:disabled) { color: #fff; }
+.zg-shell-nav .zg-shell-account .zg-btn-tertiary:hover:not(:disabled) { color: var(--zg-surface); }
 
 .zg-banner--warning { background: var(--zg-warning-bg); color: var(--zg-warning-text); }
 .zg-banner-dismiss {
@@ -709,4 +724,61 @@ textarea.zg-field {
 .zg-pill--active { background: var(--zg-pale); color: var(--zg-secondary); }
 @media (max-width: 767.98px) {
   .zg-switch { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 10 — focus and reloading (docs/lab-03/ui-spec.md §10, §12).
+   --------------------------------------------------------------------- */
+
+/* Every button shows where focus is (RESP-06). Bootstrap's ring depends on
+   per-variant variables the Zen Green variants never set, so the tertiary
+   ones (Show password, Generate, Edit) showed nothing. */
+.btn:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
+}
+/* On the green header the ring is white, so it stays visible. */
+.zg-shell-header .btn:focus-visible,
+.zg-shell-header a:focus-visible {
+  outline: 2px solid var(--zg-surface);
+  outline-offset: 2px;
+}
+
+/* Ticket Queue: the current rows stay on screen, dimmed, while the next page
+   or filter loads (PR #57 review). */
+.zg-queue-results--reloading {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.zg-pagination__gap {
+  align-self: center;
+  padding: 0 0.25rem;
+  color: var(--zg-text-muted);
+}
+
+/* User Management: an email is shown whole, wrapping if it must — unlike a
+   ticket summary, a cut-off address loses information — and a long one can't
+   push the table wider than its card (Issue 10, RESP-03). */
+.zg-wrap-anywhere { overflow-wrap: anywhere; }
+.zg-pill { white-space: nowrap; }
+.zg-user-card__email { margin: 0.35rem 0; }
+
+/* Ticket Queue at tablet (768–991px): the six columns must fit the 720px
+   container without the table scrolling sideways inside its card (Issue 10,
+   RESP-01 — the Owner and Updated columns were cut off). The summary column
+   narrows (it truncates with the full text in its title), ticket numbers stay
+   on one line, and a long status badge may wrap. */
+.zg-queue-table td:first-child { white-space: nowrap; }
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .zg-queue-summary { max-width: 12rem; }
+  .zg-queue-table .zg-badge,
+  .zg-queue-table .zg-pill { white-space: normal; }
+}
+
+/* The header's links keep each label on one line; at tablet, when the admin's
+   links and account block don't fit one row, whole items wrap instead
+   (Issue 10 visual check: "User Management" was breaking mid-label). */
+.zg-nav-link { white-space: nowrap; }
+@media (min-width: 768px) {
+  .zg-shell-nav { flex-wrap: wrap; justify-content: flex-end; row-gap: 0.25rem; }
 }

@@ -52,6 +52,20 @@ function Switch({ checked, disabled, onChange }: { checked: boolean; disabled?: 
   );
 }
 
+// An address that may wrap: preferably just before the "@", anywhere only if
+// one half alone is still too wide.
+function Email({ address }: { address: string }) {
+  const at = address.lastIndexOf("@");
+  if (at <= 0) return <>{address}</>;
+  return (
+    <>
+      {address.slice(0, at)}
+      <wbr />
+      {address.slice(at)}
+    </>
+  );
+}
+
 function StatusPill({ active }: { active: boolean }) {
   return (
     <span className={`zg-pill ${active ? "zg-pill--active" : "zg-pill--inactive"}`}>
@@ -360,7 +374,7 @@ export function UserManagement() {
                         {u.id === user.id && <span className="zg-pill zg-pill--you">You</span>}
                       </span>
                     </td>
-                    <td>{u.email}</td>
+                    <td className="zg-wrap-anywhere"><Email address={u.email} /></td>
                     <td><RoleBadge role={u.role} /></td>
                     <td><StatusPill active={u.isActive} /></td>
                     <td>{editButton(u)}</td>
@@ -376,7 +390,7 @@ export function UserManagement() {
                   <strong>{u.name}{u.id === user.id && <span className="zg-pill zg-pill--you ms-1">You</span>}</strong>
                   <RoleBadge role={u.role} />
                 </div>
-                <div className="zg-ticket-card__summary">{u.email}</div>
+                <div className="zg-user-card__email zg-wrap-anywhere"><Email address={u.email} /></div>
                 <div className="zg-ticket-card__meta">
                   <StatusPill active={u.isActive} />
                   {editButton(u)}
