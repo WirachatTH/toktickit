@@ -1,5 +1,5 @@
 import { BrowserRouter } from "react-router-dom";
-import { RequesterProvider } from "./context/RequesterContext.js";
+import { AuthProvider } from "./context/AuthContext.js";
 import { AppRoutes } from "./AppRoutes.js";
 
 // react-router v7 future flags opted into now: removes noisy console
@@ -8,10 +8,10 @@ const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } a
 
 export default function App() {
   return (
-    <RequesterProvider>
+    <AuthProvider>
       <BrowserRouter future={ROUTER_FUTURE}>
         <AppRoutes />
       </BrowserRouter>
-    </RequesterProvider>
+    </AuthProvider>
   );
 }

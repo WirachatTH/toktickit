@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
+import { generateSessionToken, SESSION_COOKIE } from "../../src/session.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 
 const PNG_BASE = Buffer.from(
@@ -34,8 +36,13 @@ let freshRequesterId: number;
 let edgeCaseRequesterId: number;
 let inactiveRequesterId: number;
 
-function authHeader(requesterId: number) {
-  return { "X-Dev-Requester-Id": String(requesterId) };
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
+// session for the same Requester — only how the test authenticates changes.
+// An id with no session (one that names nobody) sends no cookie at all.
+let sessionCookies = new Map<number, string>();
+function authHeader(requesterId: number): Record<string, string> {
+  const cookie = sessionCookies.get(requesterId);
+  return cookie ? { Cookie: cookie } : {};
 }
 
 // requestedPriority is a Postgres native enum — Postgres sorts native enums
@@ -47,18 +54,31 @@ const PRIORITY_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 beforeAll(async () => {
   await seed(prisma);
 
-  const requesters = await prisma.requesterUser.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 4 });
-  [ownerAId, ownerBId, sortFixtureRequesterId, paginationRequesterId] = requesters.map((r) => r.id);
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" }, take: 2 });
+  [ownerAId, ownerBId] = requesters.map((r) => r.id);
 
-  const inactive = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: false } });
+  // Lab 3: the sort and pagination fixtures assert exact totals (6 and 23), so
+  // they need Requesters that own nothing else. The Lab 3 seed now gives the
+  // seeded Requesters sample tickets, so these two are created by the test
+  // itself and removed in afterAll (docs/lab-03/specification.md D-22).
+  const sortFixtureRequester = await prisma.user.create({
+    data: { name: "Sort Fixture Requester", email: `sort-fixture-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
+  });
+  sortFixtureRequesterId = sortFixtureRequester.id;
+  const paginationRequester = await prisma.user.create({
+    data: { name: "Pagination Fixture Requester", email: `pagination-fixture-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
+  });
+  paginationRequesterId = paginationRequester.id;
+
+  const inactive = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: false } });
   inactiveRequesterId = inactive.id;
 
-  const freshRequester = await prisma.requesterUser.create({
-    data: { name: "Edge Case Fresh Requester", email: `edge-fresh-${Date.now()}@kmutt.ac.th`, isActive: true },
+  const freshRequester = await prisma.user.create({
+    data: { name: "Edge Case Fresh Requester", email: `edge-fresh-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
   });
   freshRequesterId = freshRequester.id;
-  const edgeCaseRequester = await prisma.requesterUser.create({
-    data: { name: "Edge Case Requester", email: `edge-case-${Date.now()}@kmutt.ac.th`, isActive: true },
+  const edgeCaseRequester = await prisma.user.create({
+    data: { name: "Edge Case Requester", email: `edge-case-${Date.now()}@kmutt.ac.th`, isActive: true, mustChangePassword: false },
   });
   edgeCaseRequesterId = edgeCaseRequester.id;
 
@@ -76,6 +96,7 @@ beforeAll(async () => {
       ticketNumber: "TCK-OWNER-A001",
       summary: "Requester A's own ticket",
       description: "Only Requester A should ever see this ticket in their list.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
   await prisma.ticket.create({
@@ -86,6 +107,7 @@ beforeAll(async () => {
       ticketNumber: "TCK-OWNER-B001",
       summary: "Requester B's own ticket",
       description: "Only Requester B should ever see this ticket in their list.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
 
@@ -113,6 +135,7 @@ beforeAll(async () => {
         ticketNumber: `TCK-FIX-${f.n}`,
         summary: f.summary,
         description: `Fixture ticket ${f.n} for Issue 7 search/filter/sort tests.`,
+        itPriority: f.priority, // Lab 3: required column, equal to requestedPriority at creation (BR-34)
         requestedPriority: f.priority,
         // updatedAt deliberately runs opposite to createdAt so a test that
         // sorts by the wrong field (e.g. always by createdAt) is caught.
@@ -132,12 +155,16 @@ beforeAll(async () => {
       ticketNumber: `TCK-PAGE-${String(i).padStart(3, "0")}`,
       summary: `Pagination fixture ticket ${i}`,
       description: "Fixture ticket for Issue 7 pagination tests.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       createdAt: minutes(i),
     })),
   });
+
+  sessionCookies = await sessionCookiesFor(prisma, [ownerAId, ownerBId, sortFixtureRequesterId, paginationRequesterId, freshRequesterId, edgeCaseRequesterId, inactiveRequesterId]);
 });
 
 afterAll(async () => {
+  await endTestSessions(prisma);
   // Clean up any attachment files written to disk by this file's tests
   const edgeTickets = await prisma.ticket.findMany({
     where: {
@@ -177,7 +204,9 @@ afterAll(async () => {
   // Ticket.requester is onDelete: Restrict — these two self-created
   // Requesters can only be deleted once every Ticket referencing them
   // (the deleteMany above) is already gone.
-  await prisma.requesterUser.deleteMany({ where: { id: { in: [freshRequesterId, edgeCaseRequesterId] } } });
+  await prisma.user.deleteMany({
+    where: { id: { in: [freshRequesterId, edgeCaseRequesterId, sortFixtureRequesterId, paginationRequesterId] } },
+  });
 });
 
 describe("GET /api/tickets — ownership scoping", () => {
@@ -201,7 +230,7 @@ describe("GET /api/tickets — ownership scoping", () => {
     expect(numbers).not.toContain("TCK-OWNER-B001");
   });
 
-  it("rejects with no X-Dev-Requester-Id header", async () => {
+  it("rejects a request with no session", async () => {
     const res = await request(app).get("/api/tickets");
     expect(res.status).toBe(401);
   });
@@ -493,6 +522,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-PCT1",
         summary: "Battery at 50% capacity issue",
         description: "Edge-case fixture for LIKE wildcard escaping.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     await prisma.ticket.create({
@@ -503,6 +533,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-PCT2",
         summary: "50 items delivered late today",
         description: "Edge-case fixture for LIKE wildcard escaping — must NOT match a search for '50%'.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -524,6 +555,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-USC1",
         summary: "Config key report_2026 is missing",
         description: "Edge-case fixture: literal underscore must not act as a single-character wildcard.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     await prisma.ticket.create({
@@ -534,6 +566,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-USC2",
         summary: "Config key reportX2026 is missing",
         description: "Edge-case fixture — must NOT match a search for 'report_2026'.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
     const underscoreRes = await request(app)
@@ -551,6 +584,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-ATT1",
         summary: "Ticket for attachmentCount cross-issue integration check",
         description: "Verifies GET /api/tickets' attachmentCount excludes soft-removed attachments.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -587,6 +621,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-SYS1",
         summary: "Filed against a System that will later be decommissioned",
         description: "A Requester's historical ticket must keep displaying correctly even after IT deactivates that System.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -616,6 +651,7 @@ describe("GET /api/tickets — rare real-world scenarios", () => {
         ticketNumber: "TCK-EDGE-THAI",
         summary: "เครื่องพิมพ์ขัดข้องที่ห้อง 204",
         description: "Edge-case fixture confirming ILIKE-based search works correctly on non-ASCII (Thai) text.",
+        itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
       },
     });
 
@@ -635,20 +671,22 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
 
-    it("rejects a non-numeric X-Dev-Requester-Id header with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app).get("/api/tickets").set({ "X-Dev-Requester-Id": "invalid-requester" });
+    // Lab 3 (BR-69): the Lab 2 header-parsing cases become the same checks on
+    // the session cookie — malformed, oversized, and well-formed-but-unknown.
+    it("rejects a malformed session cookie with 401 UNAUTHENTICATED", async () => {
+      const res = await request(app).get("/api/tickets").set("Cookie", `${SESSION_COOKIE}=invalid-requester`);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
 
-    it("rejects an out-of-Int32 X-Dev-Requester-Id header with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app).get("/api/tickets").set({ "X-Dev-Requester-Id": "9999999999" });
+    it("rejects an oversized session cookie with 401 UNAUTHENTICATED", async () => {
+      const res = await request(app).get("/api/tickets").set("Cookie", `${SESSION_COOKIE}=${"9".repeat(4000)}`);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
 
-    it("rejects a non-existent requester ID with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app).get("/api/tickets").set(authHeader(888888));
+    it("rejects a session token that names no session with 401 UNAUTHENTICATED", async () => {
+      const res = await request(app).get("/api/tickets").set("Cookie", `${SESSION_COOKIE}=${generateSessionToken()}`);
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
@@ -819,6 +857,7 @@ describe("GET /api/tickets — unlisted edge cases and robustness checks", () =>
             ticketNumber: `TCK-EDGE-TIE${n}`,
             summary: `Tiebreak fixture ${n}`,
             description: "Shares an identical createdAt with its siblings to exercise the id-desc tiebreak.",
+            itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
             createdAt: tiedCreatedAt,
           },
         });

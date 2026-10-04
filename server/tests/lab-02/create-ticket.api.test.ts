@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
+import { generateSessionToken, SESSION_COOKIE } from "../../src/session.js";
 import { formatTicketNumber } from "../../src/ticketNumber.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 
@@ -35,6 +37,14 @@ let activeSystemId: number;
 let inactiveSystemId: number;
 
 const createdTicketIds: number[] = [];
+
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
+// session for the same Requester — only how the test authenticates changes.
+let sessionCookies = new Map<number, string>();
+function requesterSession(requesterId: number): Record<string, string> {
+  const cookie = sessionCookies.get(requesterId);
+  return cookie ? { Cookie: cookie } : {};
+}
 const writtenStoredFilenames: string[] = [];
 
 async function trackAndCleanupTicket(ticketId: number) {
@@ -45,9 +55,9 @@ async function trackAndCleanupTicket(ticketId: number) {
 
 beforeAll(async () => {
   await seed(prisma);
-  const requester = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: true } });
+  const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false } });
   activeRequesterId = requester.id;
-  const inactive = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: false } });
+  const inactive = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: false } });
   inactiveRequesterId = inactive.id;
   const category = await prisma.category.findFirstOrThrow();
   categoryId = category.id;
@@ -58,9 +68,12 @@ beforeAll(async () => {
     data: { name: `Decommissioned Create-Ticket-Test System ${Date.now()}`, isActive: false },
   });
   inactiveSystemId = inactiveSystem.id;
+
+  sessionCookies = await sessionCookiesFor(prisma, [activeRequesterId, inactiveRequesterId]);
 });
 
 afterAll(async () => {
+  await endTestSessions(prisma);
   if (createdTicketIds.length > 0) {
     await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } }); // cascades Attachment rows
   }
@@ -82,7 +95,7 @@ describe("POST /api/tickets — valid creation", () => {
   it("creates a ticket, generates a backend TCK-###### number, and assigns the selected requester", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody());
 
     expect(res.status).toBe(201);
@@ -101,7 +114,7 @@ describe("POST /api/tickets — valid creation", () => {
   it("defaults requestedPriority to MEDIUM when omitted", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody());
     expect(res.status).toBe(201);
     await trackAndCleanupTicket(res.body.id);
@@ -111,7 +124,7 @@ describe("POST /api/tickets — valid creation", () => {
   it("accepts an explicit requestedPriority", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ requestedPriority: "HIGH" }));
     expect(res.status).toBe(201);
     await trackAndCleanupTicket(res.body.id);
@@ -121,7 +134,7 @@ describe("POST /api/tickets — valid creation", () => {
   it("succeeds with zero attachments — they are optional", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody());
     expect(res.status).toBe(201);
     await trackAndCleanupTicket(res.body.id);
@@ -132,7 +145,7 @@ describe("POST /api/tickets — valid creation", () => {
     const payload = "<script>alert('xss')</script> and some normal text besides it to satisfy the length minimum.";
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ description: payload }));
     expect(res.status).toBe(201);
     await trackAndCleanupTicket(res.body.id);
@@ -144,8 +157,8 @@ describe("POST /api/tickets — valid creation", () => {
 
   it("two rapid concurrent creations both succeed with distinct ticketNumbers (BR-01 race safety)", async () => {
     const [a, b] = await Promise.all([
-      request(app).post("/api/tickets").set("X-Dev-Requester-Id", String(activeRequesterId)).field(validBody()),
-      request(app).post("/api/tickets").set("X-Dev-Requester-Id", String(activeRequesterId)).field(validBody()),
+      request(app).post("/api/tickets").set(requesterSession(activeRequesterId)).field(validBody()),
+      request(app).post("/api/tickets").set(requesterSession(activeRequesterId)).field(validBody()),
     ]);
     expect(a.status).toBe(201);
     expect(b.status).toBe(201);
@@ -160,7 +173,7 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
     const before = await prisma.ticket.count();
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ summary: "" }));
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("VALIDATION_ERROR");
@@ -171,7 +184,7 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("rejects a whitespace-only Summary as empty after trimming", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ summary: "     " }));
     expect(res.status).toBe(400);
     expect(res.body.error.fields.summary).toBeTruthy();
@@ -180,27 +193,27 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("Summary boundary: 4 chars rejected, 5 accepted, 120 accepted, 121 rejected", async () => {
     const four = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ summary: "abcd" }));
     expect(four.status).toBe(400);
 
     const five = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ summary: "abcde" }));
     expect(five.status).toBe(201);
     await trackAndCleanupTicket(five.body.id);
 
     const oneTwenty = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ summary: "a".repeat(120) }));
     expect(oneTwenty.status).toBe(201);
     await trackAndCleanupTicket(oneTwenty.body.id);
 
     const oneTwentyOne = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ summary: "a".repeat(121) }));
     expect(oneTwentyOne.status).toBe(400);
   });
@@ -208,27 +221,27 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("Description boundary: 19 chars rejected, 20 accepted, 2000 accepted, 2001 rejected", async () => {
     const nineteen = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ description: "a".repeat(19) }));
     expect(nineteen.status).toBe(400);
 
     const twenty = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ description: "a".repeat(20) }));
     expect(twenty.status).toBe(201);
     await trackAndCleanupTicket(twenty.body.id);
 
     const twoThousand = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ description: "a".repeat(2000) }));
     expect(twoThousand.status).toBe(201);
     await trackAndCleanupTicket(twoThousand.body.id);
 
     const twoThousandOne = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ description: "a".repeat(2001) }));
     expect(twoThousandOne.status).toBe(400);
   });
@@ -236,7 +249,7 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("rejects a nonexistent Category", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ categoryId: "999999" }));
     expect(res.status).toBe(400);
   });
@@ -244,7 +257,7 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("rejects a nonexistent Related System", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ relatedSystemId: "999999" }));
     expect(res.status).toBe(400);
   });
@@ -252,7 +265,7 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("rejects an inactive Related System, even though its id is real", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ relatedSystemId: String(inactiveSystemId) }));
     expect(res.status).toBe(400);
   });
@@ -260,27 +273,29 @@ describe("POST /api/tickets — field validation (BR-20/21/22/23/26)", () => {
   it("rejects an out-of-enum requestedPriority sent directly, bypassing the UI's own constrained dropdown", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody({ requestedPriority: "URGENT!!" }));
     expect(res.status).toBe(400);
   });
 });
 
-describe("POST /api/tickets — Requester authentication (testing-only, BR-07/BR-10)", () => {
-  it("rejects a request with no X-Dev-Requester-Id header", async () => {
+// Lab 3 (BR-69): the Lab 2 header checks become the Lab 3 identity rules —
+// no session, a token that names no session, and a deactivated Requester.
+describe("POST /api/tickets — Requester authentication", () => {
+  it("rejects a request with no session", async () => {
     const res = await request(app).post("/api/tickets").field(validBody());
     expect(res.status).toBe(401);
   });
 
-  it("rejects a nonexistent requesterId", async () => {
-    const res = await request(app).post("/api/tickets").set("X-Dev-Requester-Id", "999999").field(validBody());
+  it("rejects a session token that names no session", async () => {
+    const res = await request(app).post("/api/tickets").set("Cookie", `${SESSION_COOKIE}=${generateSessionToken()}`).field(validBody());
     expect(res.status).toBe(401);
   });
 
-  it("rejects an inactive requesterId", async () => {
+  it("rejects a deactivated Requester's session", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(inactiveRequesterId))
+      .set(requesterSession(inactiveRequesterId))
       .field(validBody());
     expect(res.status).toBe(401);
   });
@@ -290,7 +305,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
   it("accepts a valid PNG and a valid PDF together", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "photo.png")
       .attach("attachments", PDF_BASE, "report.pdf");
@@ -304,7 +319,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
   it("accepts a file at exactly 5 MB", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", pngOfSize(FIVE_MB), "exactly-5mb.png");
     expect(res.status).toBe(201);
@@ -316,7 +331,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
     const before = await prisma.ticket.count();
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", pngOfSize(FIVE_MB + 1), "too-big.png");
     expect(res.status).toBe(413);
@@ -327,7 +342,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
     const gif = Buffer.from("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b", "hex");
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", gif, "animation.gif");
     expect(res.status).toBe(415);
@@ -337,7 +352,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
     const notAnImage = Buffer.from("This is plain text pretending to be a photo, padded a bit further.", "utf-8");
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", notAnImage, "totally-a-photo.png");
     expect(res.status).toBe(415);
@@ -346,7 +361,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
   it("rejects an empty (0-byte) file rather than crashing or silently storing a broken attachment", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", Buffer.alloc(0), "empty.png");
     expect(res.status).toBe(415);
@@ -355,7 +370,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
   it("accepts a Unicode filename (Thai script) and returns it unmangled", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "ภาพหน้าจอ_ปัญหา.png");
     expect(res.status).toBe(201);
@@ -366,7 +381,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
   it("accepts two attachments that share the exact same original filename — a real scenario (two screenshots both named screenshot.png)", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "screenshot.png")
       .attach("attachments", pngOfSize(2048), "screenshot.png");
@@ -385,7 +400,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
 
   it("rejects a 6th attachment on a single new ticket, creating nothing", async () => {
     const before = await prisma.ticket.count();
-    let req = request(app).post("/api/tickets").set("X-Dev-Requester-Id", String(activeRequesterId)).field(validBody());
+    let req = request(app).post("/api/tickets").set(requesterSession(activeRequesterId)).field(validBody());
     for (let i = 0; i < 6; i++) {
       req = req.attach("attachments", PNG_BASE, `photo-${i}.png`);
     }
@@ -397,7 +412,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
   it("stores a path-traversal filename safely — metadata keeps the original name, storage uses a generated safe one", async () => {
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "../../etc/passwd.png");
     expect(res.status).toBe(201);
@@ -415,7 +430,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "photo.png");
 
@@ -446,7 +461,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "first.png")
       .attach("attachments", PDF_BASE, "second.pdf");
@@ -466,7 +481,7 @@ describe("POST /api/tickets — attachments at creation time (BR-30/31/32/33/38)
     const before = await prisma.ticket.count();
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Dev-Requester-Id", String(activeRequesterId))
+      .set(requesterSession(activeRequesterId))
       .field(validBody())
       .attach("attachments", PNG_BASE, "good.png")
       .attach("attachments", Buffer.from("not a real file"), "bad.png");

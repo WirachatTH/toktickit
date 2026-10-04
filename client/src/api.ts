@@ -1,4 +1,17 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+// Lab 3 D-11 — the browser only ever talks to its own origin: every call is a
+// relative /api/... URL, which the Vite dev server proxies to the API
+// (API_PROXY_TARGET). The session cookie is therefore first-party in local
+// development and in the Docker E2E setup alike. VITE_API_URL is retired.
+const API_URL = "";
+
+// Every request goes through apiFetch, which always sends the session cookie
+// (credentials: "include"). Same-origin requests send it anyway, but the
+// option makes that explicit and keeps every call working if the client is
+// ever served from a different origin than the API (PR #55 review). The
+// server's CORS config already allows credentials for CLIENT_ORIGINS.
+function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_URL}${path}`, { ...init, credentials: "include" });
+}
 
 export interface Category {
   id: number;
@@ -15,31 +28,10 @@ export interface SystemStatus {
 //        then fetch `${API_URL}/api/categories`; if not ok, throw.
 //        return { online: true, categories }.
 // Throwing on failure lets the UI show a single Offline/error state.
-// ---------------------------------------------------------------------------
-// Lab 2, Issue 4 — Development Requester reference data (api-spec.md §3,
-// BR-06/BR-07). The header helper here establishes the one place every
-// later Requester-scoped call (Create Ticket, My Tickets, Ticket Detail,
-// Attachments) builds its X-Dev-Requester-Id header from.
-// ---------------------------------------------------------------------------
-
-export interface Requester {
-  id: number;
-  name: string;
-  email: string;
-}
-
-/** Testing-only identity header (BR-07) — never a substitute for real auth. */
-export function requesterHeaders(requesterId: number): Record<string, string> {
-  return { "X-Dev-Requester-Id": String(requesterId) };
-}
-
-export async function fetchActiveRequesters(): Promise<Requester[]> {
-  const res = await fetch(`${API_URL}/api/requesters`);
-  if (!res.ok) {
-    throw new Error("Unable to load Development Requesters");
-  }
-  return res.json();
-}
+// Lab 3, Issue 5 — every Requester call below is made as the signed-in user:
+// apiFetch sends the session cookie with it, and the server takes the
+// Requester from that session (BR-03). Lab 2's Development Requester list and
+// header are gone (FR-13), so no call names a Requester any more.
 
 // ---------------------------------------------------------------------------
 // Lab 2, Issue 5 — Create Ticket (api-spec.md §4, BR-38). Attachments ride
@@ -53,7 +45,16 @@ export interface RelatedSystem {
 }
 
 export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH";
-export type TicketStatus = "NEW";
+// Lab 3 — all eight statuses (api-spec §0.6).
+export type TicketStatus =
+  | "NEW"
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_REQUESTER"
+  | "RESOLVED"
+  | "CLOSED"
+  | "REOPENED"
+  | "CANCELLED";
 
 export interface Attachment {
   id: number;
@@ -95,24 +96,53 @@ export class ApiError extends Error {
   status: number;
   code: string;
   fields?: Record<string, string>;
+  /** Seconds from a Retry-After header (429 TOO_MANY_ATTEMPTS). */
+  retryAfterSeconds?: number;
 
-  constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
+  constructor(status: number, code: string, message: string, fields?: Record<string, string>, retryAfterSeconds?: number) {
     super(message);
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+function retryAfterOf(res: Response): number | undefined {
+  const raw = res.headers?.get?.("Retry-After");
+  const seconds = raw === null || raw === undefined ? NaN : Number(raw);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+// Lab 3, Issue 4 — a request answered 401 UNAUTHENTICATED means the server no
+// longer knows this browser's session (expired, logged out elsewhere, user
+// deactivated). AuthProvider listens and returns the user to Login with the
+// session-ended message (ui-spec.md §2, AC-08). A failed sign-in is
+// INVALID_CREDENTIALS, never this code, so it does not trigger it.
+type SessionEndedListener = () => void;
+const sessionEndedListeners = new Set<SessionEndedListener>();
+
+export function onSessionEnded(listener: SessionEndedListener): () => void {
+  sessionEndedListeners.add(listener);
+  return () => {
+    sessionEndedListeners.delete(listener);
+  };
 }
 
 async function toApiError(res: Response): Promise<ApiError> {
   try {
     const body = await res.json();
-    return new ApiError(
+    const error = new ApiError(
       res.status,
       body?.error?.code ?? "INTERNAL_ERROR",
       body?.error?.message ?? "Something went wrong. Please try again.",
-      body?.error?.fields
+      body?.error?.fields,
+      retryAfterOf(res)
     );
+    if (error.status === 401 && error.code === "UNAUTHENTICATED") {
+      sessionEndedListeners.forEach((listener) => listener());
+    }
+    return error;
   } catch {
     // Response body wasn't JSON at all (e.g. a proxy/network-level failure) —
     // never surface that raw detail to the user (BR-28).
@@ -121,18 +151,18 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const res = await fetch(`${API_URL}/api/categories`);
+  const res = await apiFetch("/api/categories");
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
 
 export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
-  const res = await fetch(`${API_URL}/api/systems`);
+  const res = await apiFetch("/api/systems");
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
 
-export async function createTicket(requesterId: number, input: NewTicketInput): Promise<Ticket> {
+export async function createTicket(input: NewTicketInput): Promise<Ticket> {
   const formData = new FormData();
   formData.append("categoryId", String(input.categoryId));
   formData.append("relatedSystemId", String(input.relatedSystemId));
@@ -147,9 +177,8 @@ export async function createTicket(requesterId: number, input: NewTicketInput): 
 
   // No Content-Type header here on purpose — the browser sets the
   // multipart boundary itself; setting it manually breaks the request.
-  const res = await fetch(`${API_URL}/api/tickets`, {
+  const res = await apiFetch("/api/tickets", {
     method: "POST",
-    headers: requesterHeaders(requesterId),
     body: formData,
   });
 
@@ -203,7 +232,7 @@ export interface TicketListParams {
   page?: number;
 }
 
-export async function fetchTickets(requesterId: number, params: TicketListParams = {}): Promise<TicketListResponse> {
+export async function fetchTickets(params: TicketListParams = {}): Promise<TicketListResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.categoryId) query.set("categoryId", String(params.categoryId));
@@ -213,9 +242,7 @@ export async function fetchTickets(requesterId: number, params: TicketListParams
   if (params.order) query.set("order", params.order);
   if (params.page) query.set("page", String(params.page));
 
-  const res = await fetch(`${API_URL}/api/tickets?${query.toString()}`, {
-    headers: requesterHeaders(requesterId),
-  });
+  const res = await apiFetch(`/api/tickets?${query.toString()}`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -237,6 +264,14 @@ export interface TicketDetailAttachment {
   removedReason: string | null;
 }
 
+/** A person inside a ticket payload (api-spec §0.6). */
+export interface PersonRef {
+  id: number;
+  name: string;
+  role: Role;
+  isActive: boolean;
+}
+
 export interface TicketDetail {
   id: number;
   ticketNumber: string;
@@ -247,28 +282,31 @@ export interface TicketDetail {
   description: string;
   requestedPriority: RequestedPriority;
   currentStatus: TicketStatus;
+  // Lab 3, Issue 5 (api-spec §3.3). Never IT Priority or notes (BR-71).
+  owner: PersonRef | null;
+  resolutionSummary: string | null;
+  requesterResolvedAt: string | null;
+  /** Lab 3, Issue 6 — false on a CLOSED or CANCELLED ticket (BR-52). */
+  canComment: boolean;
+  /** Lab 3, Issue 8 — whether "Problem appears resolved" is offered (BR-47). */
+  canMarkAppearsResolved: boolean;
   createdAt: string;
   updatedAt: string;
   attachments: TicketDetailAttachment[];
 }
 
-export async function fetchTicket(requesterId: number, ticketId: number): Promise<TicketDetail> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}`, { headers: requesterHeaders(requesterId) });
+export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
+  const res = await apiFetch(`/api/tickets/${ticketId}`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
 
-export async function addAttachmentToTicket(
-  requesterId: number,
-  ticketId: number,
-  file: File
-): Promise<TicketDetailAttachment> {
+export async function addAttachmentToTicket(ticketId: number, file: File): Promise<TicketDetailAttachment> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments`, {
     method: "POST",
-    headers: requesterHeaders(requesterId),
     body: formData,
   });
   if (!res.ok) throw await toApiError(res);
@@ -282,15 +320,10 @@ export interface RemovedAttachment {
   removedReason: string;
 }
 
-export async function removeAttachment(
-  requesterId: number,
-  ticketId: number,
-  attachmentId: number,
-  reason: string
-): Promise<RemovedAttachment> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/remove`, {
+export async function removeAttachment(ticketId: number, attachmentId: number, reason: string): Promise<RemovedAttachment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}/remove`, {
     method: "PATCH",
-    headers: { ...requesterHeaders(requesterId), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
   if (!res.ok) throw await toApiError(res);
@@ -302,21 +335,19 @@ export async function removeAttachment(
 // filename from fetchTicket()'s response, and that header isn't readable
 // from browser JS on a cross-origin response anyway unless the server opts
 // in via Access-Control-Expose-Headers, which it doesn't.
-export async function downloadAttachment(requesterId: number, ticketId: number, attachmentId: number): Promise<Blob> {
-  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`, {
-    headers: requesterHeaders(requesterId),
-  });
+export async function downloadAttachment(ticketId: number, attachmentId: number): Promise<Blob> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}/download`);
   if (!res.ok) throw await toApiError(res);
   return res.blob();
 }
 
 export async function checkSystem(): Promise<SystemStatus> {
-  const healthRes = await fetch(`${API_URL}/api/health`);
+  const healthRes = await apiFetch("/api/health");
   if (!healthRes.ok) {
     throw new Error("Unable to connect to TokTickIT API");
   }
   
-  const categoriesRes = await fetch(`${API_URL}/api/categories`);
+  const categoriesRes = await apiFetch("/api/categories");
   if (!categoriesRes.ok) {
     throw new Error("Unable to fetch categories");
   }
@@ -324,4 +355,258 @@ export async function checkSystem(): Promise<SystemStatus> {
   const categories: Category[] = await categoriesRes.json();
   
   return { online: true, categories };
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 3 — authentication (api-spec.md §1). The session lives in an
+// HttpOnly cookie the browser sends by itself; this code never sees the token.
+// ---------------------------------------------------------------------------
+
+export type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  mustChangePassword: boolean;
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const res = await apiFetch("/api/auth/login", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).user;
+}
+
+export async function logout(): Promise<void> {
+  const res = await apiFetch("/api/auth/logout", { method: "POST" });
+  if (!res.ok) throw await toApiError(res);
+}
+
+/** The signed-in user, or null when there is no session (401). */
+export async function fetchCurrentUser(): Promise<AuthUser | null> {
+  const res = await apiFetch("/api/auth/me");
+  if (res.status === 401) return null;
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).user;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthUser> {
+  const res = await apiFetch("/api/auth/change-password", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).user;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 6 — Public Comments and Internal Notes (api-spec.md §4). Two
+// endpoints each, no edit or delete (BR-51). The server sets the author and
+// the time; only the body is sent.
+// ---------------------------------------------------------------------------
+
+export interface DiscussionEntry {
+  id: number;
+  body: string;
+  createdAt: string;
+  author: PersonRef;
+}
+
+async function listEntries(path: string): Promise<DiscussionEntry[]> {
+  const res = await apiFetch(path);
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+async function postEntry(path: string, body: string): Promise<DiscussionEntry> {
+  const res = await apiFetch(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ body }) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export function fetchComments(ticketId: number): Promise<DiscussionEntry[]> {
+  return listEntries(`/api/tickets/${ticketId}/comments`);
+}
+
+export function postComment(ticketId: number, body: string): Promise<DiscussionEntry> {
+  return postEntry(`/api/tickets/${ticketId}/comments`, body);
+}
+
+export function fetchInternalNotes(ticketId: number): Promise<DiscussionEntry[]> {
+  return listEntries(`/api/tickets/${ticketId}/internal-notes`);
+}
+
+export function postInternalNote(ticketId: number, body: string): Promise<DiscussionEntry> {
+  return postEntry(`/api/tickets/${ticketId}/internal-notes`, body);
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 7 — the IT Staff Ticket Queue and assignable users (api-spec.md
+// §5.1, §5.3). Query values are sent as the URL has them; the server applies
+// defaults and clamps, and echoes what it applied (BR-66).
+// ---------------------------------------------------------------------------
+
+export type Priority = RequestedPriority;
+
+export interface QueueQuery {
+  search: string;
+  status: "ACTIVE" | "ALL" | TicketStatus;
+  itPriority: Priority | null;
+  categoryId: number | null;
+  owner: "any" | "unassigned" | "me" | number;
+  appearsResolved: boolean;
+  sort: "itPriority" | "createdAt" | "updatedAt" | "ticketNumber" | "status";
+  order: SortOrder;
+  page: number;
+  pageSize: number;
+}
+
+export interface QueueRow {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  requester: PersonRef;
+  category: { id: number; name: string };
+  requestedPriority: Priority;
+  itPriority: Priority;
+  currentStatus: TicketStatus;
+  owner: PersonRef | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QueueResponse {
+  data: QueueRow[];
+  pagination: PaginationMeta;
+  appliedQuery: QueueQuery;
+}
+
+export async function fetchStaffQueue(params: Record<string, string> = {}): Promise<QueueResponse> {
+  const query = new URLSearchParams(params).toString();
+  const res = await apiFetch(query ? `/api/staff/tickets?${query}` : "/api/staff/tickets");
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function fetchAssignableUsers(): Promise<PersonRef[]> {
+  const res = await apiFetch("/api/staff/assignable-users");
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 8 — IT Staff Ticket Detail, the workflow, and the Requester's
+// "Problem appears resolved" (api-spec.md §3.7, §5.2, §5.4 to §5.6). Every
+// change states what the screen showed (expectedStatus / expectedOwnerId), so
+// a change made meanwhile by someone else is refused, not overwritten.
+// ---------------------------------------------------------------------------
+
+export interface StaffTicketDetail {
+  id: number;
+  ticketNumber: string;
+  requester: { id: number; name: string; email: string; isActive: boolean };
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string };
+  summary: string;
+  description: string;
+  requestedPriority: Priority;
+  itPriority: Priority;
+  currentStatus: TicketStatus;
+  owner: PersonRef | null;
+  resolutionSummary: string | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments: TicketDetailAttachment[];
+  permittedTransitions: TicketStatus[];
+  capabilities: { canAssign: boolean; canChangePriority: boolean; canChangeStatus: boolean; canPostComment: boolean; canPostNote: boolean };
+}
+
+async function patchStaffTicket(ticketId: number, what: string, body: object): Promise<StaffTicketDetail> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/${what}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(body) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function fetchStaffTicket(ticketId: number): Promise<StaffTicketDetail> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}`);
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export function changeOwner(ticketId: number, body: { ownerId: number | null; expectedOwnerId: number | null; expectedStatus: TicketStatus }) {
+  return patchStaffTicket(ticketId, "owner", body);
+}
+
+export function changeItPriority(ticketId: number, body: { itPriority: Priority; expectedStatus: TicketStatus }) {
+  return patchStaffTicket(ticketId, "it-priority", body);
+}
+
+export function changeStatus(
+  ticketId: number,
+  body: { status: TicketStatus; expectedStatus: TicketStatus; expectedOwnerId: number | null; resolutionSummary?: string; reason?: string },
+) {
+  return patchStaffTicket(ticketId, "status", body);
+}
+
+export async function markAppearsResolved(ticketId: number, comment?: string): Promise<{ requesterResolvedAt: string; comment: DiscussionEntry | null }> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/appears-resolved`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(comment ? { comment } : {}),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Lab 3, Issue 9 — Administrator user management (api-spec.md §6).
+// ---------------------------------------------------------------------------
+
+export interface AdminUser extends AuthUser {
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface NewUserInput {
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  initialPassword: string;
+}
+
+export async function fetchAdminUsers(params: { search?: string; role?: Role } = {}): Promise<AdminUser[]> {
+  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
+  const res = await apiFetch(query ? `/api/admin/users?${query}` : "/api/admin/users");
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+export async function createUser(input: NewUserInput): Promise<AdminUser> {
+  const res = await apiFetch("/api/admin/users", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(input) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function updateUser(id: number, changes: Partial<Pick<AdminUser, "name" | "email" | "role" | "isActive">>): Promise<AdminUser> {
+  const res = await apiFetch(`/api/admin/users/${id}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(changes) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function setInitialPassword(id: number, initialPassword: string): Promise<AdminUser> {
+  const res = await apiFetch(`/api/admin/users/${id}/initial-password`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ initialPassword }) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
 }

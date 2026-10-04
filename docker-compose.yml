@@ -67,6 +67,8 @@ services:
       # created — same credentials as server/.env's DATABASE_URL, reachable
       # here over the same Compose network.
       - DATABASE_URL=postgresql://toktickit:toktickit@db:5432/toktickit?schema=public
+      # Lab 3 D-11 — where the Vite dev server proxies /api inside Compose.
+      - API_PROXY_TARGET=http://server:3000
     depends_on:
       - server
     # /e2e isn't nested under /app, so a file under /e2e can't reach

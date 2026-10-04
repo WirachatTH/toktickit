@@ -2,8 +2,8 @@ import { useState } from "react";
 import { checkSystem, Category } from "../api.js";
 
 // Lab 1 — unchanged. Kept reachable at "/" as an internal status check;
-// superseded as the app's entry point by the Development Requester Selector
-// (Lab 2), not deleted, so client/tests/lab-01/App.test.tsx still exercises
+// superseded as the app's entry point (by Lab 2's Requester screens, now
+// behind Lab 3's sign-in), not deleted, so client/tests/lab-01/App.test.tsx still exercises
 // exactly the same behavior it always has.
 type UiState = "idle" | "loading" | "success" | "error";
 

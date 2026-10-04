@@ -9,6 +9,9 @@ import { ApiError, TicketDetailAttachment } from "../../src/api.js";
 // Issue 8 — Attachment list, add, and soft-remove on Ticket Detail
 // (ui-spec.md §6.5, specification.md BR-30-39). UI-12/UI-13/UI-14 per
 // tests.md's planned test-file split.
+//
+// Lab 3, Issue 5 (BR-69): the API calls no longer carry a Requester id (the
+// server takes it from the session), so the call-argument assertions drop it.
 
 const ACTIVE: TicketDetailAttachment = {
   id: 1,
@@ -42,7 +45,7 @@ function makeActive(id: number): TicketDetailAttachment {
 // does in the real app.
 function Harness({ initial }: { initial: TicketDetailAttachment[] }) {
   const [attachments, setAttachments] = useState(initial);
-  return <AttachmentSection requesterId={3} ticketId={42} attachments={attachments} onAttachmentsChange={setAttachments} />;
+  return <AttachmentSection ticketId={42} attachments={attachments} onAttachmentsChange={setAttachments} />;
 }
 
 function renderSection(initial: TicketDetailAttachment[]) {
@@ -68,7 +71,7 @@ describe("active attachments", () => {
     renderSection([ACTIVE]);
 
     await userEvent.click(screen.getByRole("button", { name: /download/i }));
-    await waitFor(() => expect(api.downloadAttachment).toHaveBeenCalledWith(3, 42, ACTIVE.id));
+    await waitFor(() => expect(api.downloadAttachment).toHaveBeenCalledWith(42, ACTIVE.id));
   });
 
   it("shows a safe error if download fails", async () => {
@@ -159,7 +162,7 @@ describe("soft-remove requires a reason and explicit confirmation (UI-12, BR-34)
     fireEvent.change(screen.getByLabelText(/reason for removal/i), { target: { value: "x".repeat(200) } });
     await userEvent.click(screen.getByRole("button", { name: /remove attachment/i }));
 
-    await waitFor(() => expect(api.removeAttachment).toHaveBeenCalledWith(3, 42, ACTIVE.id, "x".repeat(200)));
+    await waitFor(() => expect(api.removeAttachment).toHaveBeenCalledWith(42, ACTIVE.id, "x".repeat(200)));
   });
 
   it("Cancel closes the modal without removing", async () => {
@@ -223,7 +226,7 @@ describe("soft-remove requires a reason and explicit confirmation (UI-12, BR-34)
     await userEvent.click(screen.getByRole("button", { name: /remove attachment/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(api.removeAttachment).toHaveBeenCalledWith(3, 42, ACTIVE.id, "Wrong file, superseded by a clearer screenshot.");
+    expect(api.removeAttachment).toHaveBeenCalledWith(42, ACTIVE.id, "Wrong file, superseded by a clearer screenshot.");
     // Same attachment now shown in the removed section — no Download/Remove
     // buttons left for it, and the previously-active list is now empty.
     expect(screen.queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
@@ -263,7 +266,7 @@ describe("Add Attachment", () => {
     await userEvent.upload(input, file);
 
     expect(await screen.findByText("new-evidence.png")).toBeInTheDocument();
-    expect(api.addAttachmentToTicket).toHaveBeenCalledWith(3, 42, file);
+    expect(api.addAttachmentToTicket).toHaveBeenCalledWith(42, file);
   });
 
   it("rejects an oversized file client-side without calling the API", async () => {

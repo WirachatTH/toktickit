@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 
 // Issue 8 — Requester Ticket Detail (docs/lab-02/specification.md BR-45,
@@ -24,19 +25,27 @@ let otherId: number;
 let category: { id: number; name: string };
 let system: { id: number; name: string };
 
-function authHeader(requesterId: number) {
-  return { "X-Dev-Requester-Id": String(requesterId) };
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
+// session for the same Requester — only how the test authenticates changes.
+// An id with no session (one that names nobody) sends no cookie at all.
+let sessionCookies = new Map<number, string>();
+function authHeader(requesterId: number): Record<string, string> {
+  const cookie = sessionCookies.get(requesterId);
+  return cookie ? { Cookie: cookie } : {};
 }
 
 beforeAll(async () => {
   await seed(prisma);
-  const requesters = await prisma.requesterUser.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" }, take: 2 });
   [ownerId, otherId] = requesters.map((r) => r.id);
   category = await prisma.category.findFirstOrThrow();
   system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+
+  sessionCookies = await sessionCookiesFor(prisma, [ownerId, otherId]);
 });
 
 afterAll(async () => {
+  await endTestSessions(prisma);
   // Deleting the Ticket rows cascades the Attachment rows in the DB, but
   // the real files the "includes both active and removed Attachments" test
   // uploads through the actual route are only ever written to disk, never
@@ -65,6 +74,7 @@ async function createOwnedTicket(overrides: Partial<{ requesterId: number; summa
       ticketNumber: `TCK-DETAIL-${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
       summary: overrides.summary ?? "Ticket Detail fixture ticket",
       description: "Fixture ticket created directly for Issue 8 ticket-detail tests.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
 }
@@ -103,7 +113,7 @@ describe("GET /api/tickets/:id — ownership (API-19, BR-45)", () => {
     expect(JSON.stringify(res.body)).not.toContain(ticket.ticketNumber);
   });
 
-  it("rejects with no X-Dev-Requester-Id header", async () => {
+  it("rejects a request with no session", async () => {
     const ticket = await createOwnedTicket();
     const res = await request(app).get(`/api/tickets/${ticket.id}`);
     expect(res.status).toBe(401);

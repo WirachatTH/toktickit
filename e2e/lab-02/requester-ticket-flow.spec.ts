@@ -1,6 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import globalTeardown from "./globalTeardown.js";
 
 // Issue 9 — the full Requester journey (issues.md Issue 9 "To build";
 // api-spec.md end to end): select Requester → create a ticket with an
@@ -18,6 +19,13 @@ import { fileURLToPath } from "node:url";
 // hardcoding ids, the same reason the Vitest suites fetch fixtures
 // dynamically instead of assuming specific database ids.
 
+// Lab 3, Issue 10 follow-up (PR #61 review): screenshots are evidence, written
+// only when asked for (CAPTURE_SCREENSHOTS=1), so a normal run leaves the
+// committed ones alone.
+async function capture(page: Page, options: { path: string }): Promise<void> {
+  if (process.env.CAPTURE_SCREENSHOTS === "1") await page.screenshot(options);
+}
+
 const FIXTURE_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures/sample.png");
 
 const SCREENSHOT_DIRS = {
@@ -26,7 +34,7 @@ const SCREENSHOT_DIRS = {
   ticketDetail: path.join(path.dirname(fileURLToPath(import.meta.url)), "../../artifacts/lab-02/screenshots/ticket-detail"),
 };
 
-// AppShell collapses "My Tickets" / "Create Ticket" / "Change Requester"
+// AppShell collapses "My Tickets" / "Create Ticket" / "Log out"
 // behind a "Menu" toggle below 768px (ui-spec.md §6.1) — real bug found on
 // the very first mobile run of this spec: clicking a nav link/button
 // directly timed out because it's hidden until Menu is tapped.
@@ -42,6 +50,11 @@ const SCREENSHOT_DIRS = {
 // (desktop/tablet, where every nav control is always visible).
 async function clickNavControl(page: Page, role: "link" | "button", name: string): Promise<void> {
   const target = page.getByRole(role, { name });
+  // isVisible() does not wait: make sure the shell has rendered the control at
+  // all before deciding it is hidden behind the mobile menu (same race as in
+  // signInAsRequester below). includeHidden, because a role locator otherwise
+  // skips exactly the collapsed-menu controls this has to find on mobile.
+  await expect(page.getByRole(role, { name, includeHidden: true })).toBeAttached();
   if (!(await target.isVisible())) {
     await page.getByRole("button", { name: "Toggle navigation menu" }).click();
   }
@@ -73,25 +86,46 @@ function ticketRowLocator(page: Page, breakpoint: string, ticketNumber: string) 
   return container.getByText(ticketNumber, { exact: true });
 }
 
-async function selectRequester(page: Page, index: number): Promise<string> {
-  await page.goto("/select-requester");
-  const select = page.getByLabel("Development Requester");
-  await expect(select).toBeVisible();
+// Lab 3, Issue 4 (REG-16, BR-69): the journey signs in instead of choosing a
+// Development Requester — only how it becomes a Requester changes. These are
+// the documented local-development accounts (README "Local development
+// accounts"); the journey only needs two different Requesters.
+const REQUESTER_ACCOUNTS = ["somchai.prasert@kmutt.ac.th", "napassorn.chaiyasit@kmutt.ac.th"];
+const DEV_PASSWORD = "TokTickIT-dev-2026";
 
-  const optionValues = await select.locator("option[value]:not([value=''])").all();
-  expect(optionValues.length).toBeGreaterThan(index);
-  const name = (await optionValues[index].textContent())!.trim();
-
-  await select.selectOption({ label: name });
-  await page.getByRole("button", { name: "Continue" }).click();
+async function signInAsRequester(page: Page, index: number): Promise<string> {
+  await page.goto("/tickets");
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel(/^Email/).fill(REQUESTER_ACCOUNTS[index]);
+  await page.getByLabel(/^Password/).fill(DEV_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tickets$/);
+  // The shell's account block holds the signed-in Requester's name. Wait for it
+  // to exist first: isVisible() does not wait, and right after the URL changes
+  // the shell may not have rendered yet — on desktop that sent this helper to
+  // click the (hidden) mobile Menu toggle until the test timed out (~1 run in 16).
+  // includeHidden: on mobile the block is inside the collapsed menu.
+  const account = page.getByRole("group", { name: "Account" });
+  await expect(page.getByRole("group", { name: "Account", includeHidden: true })).toBeAttached();
+  if (!(await account.isVisible())) await page.getByRole("button", { name: "Toggle navigation menu" }).click();
+  const name = (await account.locator(".zg-shell-account-name").textContent())!.trim();
+  if (await page.getByRole("button", { name: "Toggle navigation menu" }).isVisible()) {
+    await page.getByRole("button", { name: "Toggle navigation menu" }).click();
+  }
   return name;
 }
 
-async function changeRequester(page: Page): Promise<void> {
-  await clickNavControl(page, "button", "Change Requester");
-  await expect(page).toHaveURL(/\/select-requester$/);
+async function logOut(page: Page): Promise<void> {
+  await clickNavControl(page, "button", "Log out");
+  await expect(page).toHaveURL(/\/login$/);
 }
+
+// The journey's tickets go when this file ends, so the Lab 3 files — and their
+// queue screenshots — start from the seeded data (PR #61 review). The global
+// teardown still sweeps once more at the very end.
+test.afterAll(async () => {
+  await globalTeardown();
+});
 
 test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
   test("create → find in My Tickets → view detail → download → soft-remove → switch Requester → isolation", async ({
@@ -100,19 +134,24 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const breakpoint = testInfo.project.name; // "desktop" | "tablet" | "mobile"
 
     // --- Select Requester A ---
-    const requesterAName = await selectRequester(page, 0);
+    const requesterAName = await signInAsRequester(page, 0);
 
     // --- Create a ticket with an attachment ---
     await clickNavControl(page, "link", "Create Ticket");
     await expect(page).toHaveURL(/\/tickets\/new$/);
 
     const categorySelect = page.getByLabel("Category");
+    // locator.all() takes a snapshot without waiting, so wait for the options
+    // the API fills in first. Lab 3 routes the request through the Vite /api
+    // proxy (D-11), which exposed this race; the assertion below is unchanged.
+    await expect(categorySelect.locator("option[value]:not([value=''])").first()).toBeAttached();
     const categoryOptions = await categorySelect.locator("option[value]:not([value=''])").all();
     expect(categoryOptions.length).toBeGreaterThan(0);
     const categoryValue = await categoryOptions[0].getAttribute("value");
     await categorySelect.selectOption(categoryValue!);
 
     const systemSelect = page.getByLabel("Related System");
+    await expect(systemSelect.locator("option[value]:not([value=''])").first()).toBeAttached();
     const systemOptions = await systemSelect.locator("option[value]:not([value=''])").all();
     expect(systemOptions.length).toBeGreaterThan(0);
     const systemValue = await systemOptions[0].getAttribute("value");
@@ -127,7 +166,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
       .fill("Created by the Issue 9 end-to-end journey test — covers create, list, detail, download, and soft-remove.");
     await page.getByLabel("Attachments").setInputFiles(FIXTURE_FILE);
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-filled-form.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-filled-form.png`) });
 
     await page.getByRole("button", { name: "Submit Ticket" }).click();
 
@@ -136,7 +175,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const ticketNumber = (await ticketNumberEl.textContent())!.trim();
     expect(ticketNumber).toMatch(/^TCK-\d{6}$/); // BR-01
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-success.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.createTicket, `${breakpoint}-e2e-success.png`) });
 
     // --- Find it in My Tickets ---
     await clickNavControl(page, "link", "My Tickets");
@@ -146,14 +185,14 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const ticketRow = ticketRowLocator(page, breakpoint, ticketNumber);
     await expect(ticketRow).toBeVisible();
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.myTickets, `${breakpoint}-e2e-found.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.myTickets, `${breakpoint}-e2e-found.png`) });
 
     // --- Open Ticket Detail ---
     await ticketRow.click();
     await expect(page.getByText(ticketNumber, { exact: true }).first()).toBeVisible();
     await expect(page.getByText("sample.png")).toBeVisible();
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-view.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-view.png`) });
 
     // --- Download the attachment ---
     const [download] = await Promise.all([
@@ -167,7 +206,7 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Reason for removal").fill("Removed by the Issue 9 end-to-end journey test.");
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-remove-confirm.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-remove-confirm.png`) });
     await dialog.getByRole("button", { name: "Remove Attachment" }).click();
     await expect(dialog).not.toBeVisible();
 
@@ -176,13 +215,13 @@ test.describe("Full Requester journey (E2E-01, RESP-02)", () => {
     await expect(page.getByText("Removed by the Issue 9 end-to-end journey test.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Download" })).not.toBeVisible();
 
-    await page.screenshot({ path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-removed-state.png`) });
+    await capture(page, { path: path.join(SCREENSHOT_DIRS.ticketDetail, `${breakpoint}-e2e-removed-state.png`) });
 
     const ownedTicketUrl = page.url();
 
     // --- Switch Requester (AC-10) ---
-    await changeRequester(page);
-    const requesterBName = await selectRequester(page, 1);
+    await logOut(page);
+    const requesterBName = await signInAsRequester(page, 1);
     expect(requesterBName).not.toBe(requesterAName);
 
     // Requester A's ticket must not appear in Requester B's list.

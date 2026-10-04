@@ -18,6 +18,13 @@
   --zg-warning-bg: #FFF4DE;
   --zg-warning-text: #8A5A00;
   --zg-success-text: #0B7A46;
+  /* Lab 3, Issue 10 (STYLE-06): the primary button's hover fill, formerly an
+     ad hoc hex in its rule. Same value. */
+  --zg-primary-hover: #00552F;
+  /* Lab 3 (docs/lab-03/ui-spec.md §1.1) — the Internal region only. */
+  --zg-internal-bg: #EEF1F6;
+  --zg-internal-border: #7C8BA3;
+  --zg-internal-text: #3D4A5C;
 }
 
 body {
@@ -100,16 +107,16 @@ textarea.zg-field {
 .zg-btn-primary {
   background: var(--zg-primary);
   border-color: var(--zg-primary);
-  color: #fff;
+  color: var(--zg-surface);
 }
 .zg-btn-primary:hover:not(:disabled) {
-  background: #00552f;
-  border-color: #00552f;
-  color: #fff;
+  background: var(--zg-primary-hover);
+  border-color: var(--zg-primary-hover);
+  color: var(--zg-surface);
 }
 
 .zg-btn-secondary {
-  background: #fff;
+  background: var(--zg-surface);
   border: 1px solid var(--zg-secondary);
   color: var(--zg-secondary);
 }
@@ -133,12 +140,12 @@ textarea.zg-field {
 .zg-btn-destructive {
   background: var(--zg-error-border);
   border-color: var(--zg-error-border);
-  color: #fff;
+  color: var(--zg-surface);
 }
 .zg-btn-destructive:hover:not(:disabled) {
   background: var(--zg-error-text);
   border-color: var(--zg-error-text);
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .btn:disabled,
@@ -185,9 +192,24 @@ textarea.zg-field {
 .zg-badge--priority-medium { background: #E8EEF7; color: #2A4D7A; }
 .zg-badge--priority-high { background: #FBEAE2; color: #B23A24; }
 .zg-badge--status-new { background: #EAF6EF; color: #0B7A46; }
+/* Lab 3 status badges (docs/lab-03/ui-spec.md §1.2; every pair ≥ 4.5:1). */
+.zg-badge--status-open { background: #E3F1F4; color: #1E5F6E; }
+.zg-badge--status-in-progress { background: #E6EEFA; color: #23508C; }
+.zg-badge--status-waiting-for-requester { background: #F3ECFA; color: #5E3A87; }
+.zg-badge--status-resolved { background: #DFF3E4; color: #12612F; }
+.zg-badge--status-closed { background: #ECEEED; color: #3F4A44; }
+.zg-badge--status-reopened { background: #FCEFE6; color: #9A4A12; }
+.zg-badge--status-cancelled { background: #F1F1F1; color: #5B5B5B; }
 /* Fallback for a value outside the known set (e.g. malformed API data) —
    visibly distinct rather than an unstyled/blank badge. */
 .zg-badge--unknown { background: #E5E5E5; color: #4A4A4A; }
+
+/* Lab 3 role badges (docs/lab-03/ui-spec.md §1.4): outlined, so a role never
+   reads as a status or priority pill; Administrator filled. The 1px border is
+   inside the same pill geometry as every other badge. */
+.zg-badge--role-requester { background: #fff; border: 1px solid #5B6B62; color: #5B6B62; }
+.zg-badge--role-it-staff { background: #fff; border: 1px solid #0B7A46; color: #0B7A46; }
+.zg-badge--role-administrator { background: #006B3C; color: #fff; }
 
 /* ---------------------------------------------------------------------
    Loading / empty / error states
@@ -226,18 +248,18 @@ textarea.zg-field {
 
 .zg-shell-header {
   background: var(--zg-primary);
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-brand {
-  color: #fff;
+  color: var(--zg-surface);
   font-weight: 700;
   font-size: 1.25rem;
   text-decoration: none;
 }
 
 .zg-nav-link {
-  color: #fff;
+  color: var(--zg-surface);
   text-decoration: none;
   padding: 0.5rem 0.25rem;
   font-weight: 500;
@@ -245,12 +267,12 @@ textarea.zg-field {
 }
 
 .zg-nav-link:hover {
-  color: #fff;
+  color: var(--zg-surface);
   text-decoration: underline;
 }
 
 .zg-nav-link--active {
-  border-bottom-color: #fff;
+  border-bottom-color: var(--zg-surface);
   font-weight: 700;
 }
 
@@ -260,17 +282,17 @@ textarea.zg-field {
    the plain .zg-btn-tertiary color assumes a light surface and would be
    near-invisible on --zg-primary otherwise. */
 .zg-shell-nav .zg-btn-tertiary.zg-shell-requester {
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-nav .zg-btn-tertiary.zg-shell-requester:hover:not(:disabled) {
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-toggle {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.6);
-  color: #fff;
+  color: var(--zg-surface);
 }
 
 .zg-shell-nav {
@@ -292,6 +314,12 @@ textarea.zg-field {
   .zg-shell-nav.zg-shell-nav--open {
     display: flex;
   }
+  /* Lab 3, Issue 10 (RESP-05): the menu's links are touch targets (were 42px). */
+  .zg-shell-nav .zg-nav-link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
 
   /* ui-spec.md §8 — Mobile <768px: "buttons full-width and ≥44px tall
      (touch target)". Never implemented anywhere; found by measuring actual
@@ -307,6 +335,12 @@ textarea.zg-field {
      `.btn` full-width would break those. */
   .btn {
     min-height: 44px;
+  }
+
+  /* Lab 3, Issue 10 (RESP-04): fields and selects are touch targets too, and
+     were 40px. Textareas keep their own height (textarea.zg-field wins). */
+  .zg-field {
+    height: 44px;
   }
 
   .zg-actions-stack {
@@ -468,4 +502,283 @@ textarea.zg-field {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 3 — sign-in screens (docs/lab-03/ui-spec.md §3, §4).
+   Existing tokens only: no new colour enters the theme here.
+   --------------------------------------------------------------------- */
+
+.zg-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+.zg-banner--error { background: var(--zg-error-bg); color: var(--zg-error-text); }
+.zg-banner--info { background: var(--zg-pale); color: var(--zg-text); }
+
+.zg-password { display: flex; gap: 0.25rem; align-items: stretch; }
+.zg-password > input { flex: 1 1 auto; min-width: 0; }
+.zg-password-toggle { flex: 0 0 auto; min-width: 3.5rem; }
+
+.zg-checklist { list-style: none; padding: 0; font-size: 0.8125rem; }
+.zg-checklist li { margin-bottom: 0.125rem; }
+.zg-checklist--met { color: var(--zg-success-text); }
+.zg-checklist--unmet { color: var(--zg-text-muted); }
+
+@media (max-width: 767.98px) {
+  .zg-password-toggle { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 4 — the role-aware shell (docs/lab-03/ui-spec.md §2).
+   --------------------------------------------------------------------- */
+
+.zg-shell-account {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: var(--zg-surface);
+}
+.zg-shell-account-name { font-weight: 600; }
+/* Account actions sit on the dark header: same rule as the Lab 2 requester
+   button above, so the tertiary colour never disappears into --zg-primary. */
+.zg-shell-nav .zg-shell-account .zg-btn-tertiary,
+.zg-shell-nav .zg-shell-account a {
+  color: var(--zg-surface);
+}
+.zg-shell-nav .zg-shell-account .zg-btn-tertiary:hover:not(:disabled) { color: var(--zg-surface); }
+
+.zg-banner--warning { background: var(--zg-warning-bg); color: var(--zg-warning-text); }
+.zg-banner-dismiss {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  padding: 0 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .zg-shell-account { margin-left: 1rem; }
+}
+@media (max-width: 767.98px) {
+  .zg-shell-account { padding-top: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.4); }
+  .zg-banner-dismiss { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 6 — comment and note threads, the Internal region, and
+   tabs (docs/lab-03/ui-spec.md §1.6, §5, §7.2, §10). Tokens only.
+   --------------------------------------------------------------------- */
+
+.zg-thread { list-style: none; padding: 0; margin: 0; }
+.zg-thread-entry { padding: 0.75rem 0; border-bottom: 1px solid var(--zg-border); }
+.zg-thread-entry:last-child { border-bottom: 0; }
+.zg-thread-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.zg-thread-meta time { color: var(--zg-text-muted); font-size: 0.8125rem; }
+.zg-thread-body { overflow-wrap: anywhere; }
+
+.zg-internal-region {
+  background: var(--zg-internal-bg);
+  border-left: 4px dashed var(--zg-internal-border);
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+}
+.zg-internal-caption {
+  color: var(--zg-internal-text);
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.zg-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--zg-border); overflow-x: auto; }
+.zg-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0.5rem 0.75rem;
+  color: var(--zg-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.zg-tab--active { color: var(--zg-primary); border-bottom-color: var(--zg-primary); }
+.zg-tab:focus-visible { outline: 2px solid var(--zg-secondary); outline-offset: 2px; }
+
+@media (max-width: 767.98px) {
+  .zg-tab { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 7 — the IT Staff Ticket Queue (docs/lab-03/ui-spec.md
+   §1.5, §6). Pills carry text; colour never stands alone.
+   --------------------------------------------------------------------- */
+
+.zg-pill {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.zg-pill--resolved { background: #DFF3E4; color: #12612F; margin-top: 0.25rem; }
+.zg-pill--readonly { background: var(--zg-readonly-bg); color: var(--zg-text-muted); }
+.zg-pill--inactive { background: var(--zg-surface); border: 1px solid var(--zg-text-muted); color: var(--zg-text-muted); }
+.zg-pill--you { background: var(--zg-pale); color: var(--zg-secondary); }
+
+.zg-queue-summary { max-width: 22rem; }
+.zg-queue-check { min-height: 40px; }
+.zg-ticket-row { cursor: pointer; }
+
+.zg-skeleton-row {
+  height: 2.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--zg-border);
+  opacity: 0.6;
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 8 — IT Staff Ticket Detail (docs/lab-03/ui-spec.md §7).
+   Desktop: main column and a sticky Ticket controls panel; below 992px the
+   panel moves above the main column.
+   --------------------------------------------------------------------- */
+
+.zg-detail-layout { display: flex; flex-direction: column; gap: 1.5rem; }
+.zg-detail-main { min-width: 0; }
+.zg-detail-controls dd { margin-bottom: 0.75rem; }
+
+@media (min-width: 992px) {
+  .zg-detail-layout { flex-direction: row-reverse; align-items: flex-start; }
+  .zg-detail-main { flex: 2 1 0; }
+  .zg-detail-controls { flex: 1 1 0; position: sticky; top: 1rem; }
+}
+
+/* Lab 3 — a queue card is a real link (PR #57 review); it keeps the card look. */
+.zg-ticket-card--link { display: block; color: inherit; text-decoration: none; }
+.zg-ticket-card--link:hover { color: inherit; }
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 9 — User Management (docs/lab-03/ui-spec.md §1.8, §8).
+   Side panel: 440px on the right at desktop (the list stays visible,
+   dimmed); a full-screen sheet at tablet and mobile.
+   --------------------------------------------------------------------- */
+
+.zg-modal-backdrop--panel { justify-content: flex-end; align-items: stretch; padding: 0; }
+.zg-side-panel {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.zg-side-panel__footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--zg-surface);
+  border-top: 1px solid var(--zg-border);
+  padding-top: 0.75rem;
+  margin-top: auto;
+}
+@media (min-width: 992px) {
+  .zg-side-panel { width: 440px; }
+}
+
+.zg-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--zg-text);
+}
+.zg-switch__track {
+  width: 2.5rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--zg-border);
+  position: relative;
+  transition: background 0.15s;
+}
+.zg-switch__track::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--zg-surface);
+  transition: left 0.15s;
+}
+.zg-switch[aria-checked="true"] .zg-switch__track { background: var(--zg-secondary); }
+.zg-switch[aria-checked="true"] .zg-switch__track::after { left: 1.25rem; }
+.zg-switch:disabled { opacity: 0.6; }
+.zg-switch:focus-visible { outline: 2px solid var(--zg-secondary); outline-offset: 2px; }
+
+.zg-pill--active { background: var(--zg-pale); color: var(--zg-secondary); }
+@media (max-width: 767.98px) {
+  .zg-switch { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------
+   Lab 3, Issue 10 — focus and reloading (docs/lab-03/ui-spec.md §10, §12).
+   --------------------------------------------------------------------- */
+
+/* Every button shows where focus is (RESP-06). Bootstrap's ring depends on
+   per-variant variables the Zen Green variants never set, so the tertiary
+   ones (Show password, Generate, Edit) showed nothing. */
+.btn:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
+}
+/* On the green header the ring is white, so it stays visible. */
+.zg-shell-header .btn:focus-visible,
+.zg-shell-header a:focus-visible {
+  outline: 2px solid var(--zg-surface);
+  outline-offset: 2px;
+}
+
+/* Ticket Queue: the current rows stay on screen, dimmed, while the next page
+   or filter loads (PR #57 review). */
+.zg-queue-results--reloading {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.zg-pagination__gap {
+  align-self: center;
+  padding: 0 0.25rem;
+  color: var(--zg-text-muted);
+}
+
+/* User Management: an email is shown whole, wrapping if it must — unlike a
+   ticket summary, a cut-off address loses information — and a long one can't
+   push the table wider than its card (Issue 10, RESP-03). */
+.zg-wrap-anywhere { overflow-wrap: anywhere; }
+.zg-pill { white-space: nowrap; }
+.zg-user-card__email { margin: 0.35rem 0; }
+
+/* Ticket Queue at tablet (768–991px): the six columns must fit the 720px
+   container without the table scrolling sideways inside its card (Issue 10,
+   RESP-01 — the Owner and Updated columns were cut off). The summary column
+   narrows (it truncates with the full text in its title), ticket numbers stay
+   on one line, and a long status badge may wrap. */
+.zg-queue-table td:first-child { white-space: nowrap; }
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .zg-queue-summary { max-width: 12rem; }
+  .zg-queue-table .zg-badge,
+  .zg-queue-table .zg-pill { white-space: normal; }
+}
+
+/* The header's links keep each label on one line; at tablet, when the admin's
+   links and account block don't fit one row, whole items wrap instead
+   (Issue 10 visual check: "User Management" was breaking mid-label). */
+.zg-nav-link { white-space: nowrap; }
+@media (min-width: 768px) {
+  .zg-shell-nav { flex-wrap: wrap; justify-content: flex-end; row-gap: 0.25rem; }
 }

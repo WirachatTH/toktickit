@@ -13,7 +13,10 @@ import { TextArea } from "./TextArea.js";
 import { Modal } from "./Modal.js";
 
 export interface AttachmentSectionProps {
-  requesterId: number;
+  /** Lab 3 BR-70 — a CLOSED or CANCELLED ticket: no add or remove, download only. */
+  locked?: boolean;
+  /** Lab 3 FR-29 — IT Staff and Administrators only download; they never add or remove. */
+  downloadOnly?: boolean;
   ticketId: number;
   attachments: TicketDetailAttachment[];
   onAttachmentsChange: (attachments: TicketDetailAttachment[]) => void;
@@ -41,7 +44,8 @@ function safeMessage(error: unknown, fallback: string): string {
 // from RequesterTicketDetail per the planned test file split
 // (`AttachmentSection.test.tsx` — UI-12/UI-13/UI-14) — this owns everything
 // attachment-shaped; the screen owns only the read-only ticket info.
-export function AttachmentSection({ requesterId, ticketId, attachments, onAttachmentsChange }: AttachmentSectionProps) {
+export function AttachmentSection({ locked = false, downloadOnly = false, ticketId, attachments, onAttachmentsChange }: AttachmentSectionProps) {
+  const canChange = !locked && !downloadOnly;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState(false);
@@ -73,7 +77,7 @@ export function AttachmentSection({ requesterId, ticketId, attachments, onAttach
     setUploadError(null);
     setUploading(true);
     try {
-      const created = await addAttachmentToTicket(requesterId, ticketId, file);
+      const created = await addAttachmentToTicket(ticketId, file);
       // Updates in place — no full page reload (issues.md Issue 8 "To test").
       onAttachmentsChange([...attachments, created]);
     } catch (error) {
@@ -87,7 +91,7 @@ export function AttachmentSection({ requesterId, ticketId, attachments, onAttach
     setDownloadError(null);
     setDownloadingId(attachment.id);
     try {
-      const blob = await downloadAttachment(requesterId, ticketId, attachment.id);
+      const blob = await downloadAttachment(ticketId, attachment.id);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -126,7 +130,7 @@ export function AttachmentSection({ requesterId, ticketId, attachments, onAttach
     setRemoveFieldError(null);
     setRemoving(true);
     try {
-      const result = await removeAttachment(requesterId, ticketId, removeTarget.id, trimmed);
+      const result = await removeAttachment(ticketId, removeTarget.id, trimmed);
       onAttachmentsChange(
         attachments.map((a) =>
           a.id === result.id
@@ -146,26 +150,36 @@ export function AttachmentSection({ requesterId, ticketId, attachments, onAttach
     <div className="zg-card">
       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h2 className="h5 mb-0">Attachments</h2>
-        <span title={atLimit ? `A Ticket may have at most ${MAX_ACTIVE_ATTACHMENTS} active attachments.` : undefined}>
-          <Button
-            variant="secondary"
-            disabled={atLimit || uploading}
-            busy={uploading}
-            busyLabel="Uploading…"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Add Attachment
-          </Button>
-        </span>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".jpg,.jpeg,.png,.webp,.pdf"
-          className="zg-visually-hidden"
-          onChange={handleFileChosen}
-          aria-label="Add Attachment"
-        />
+        {canChange && (
+          <>
+            <span title={atLimit ? `A Ticket may have at most ${MAX_ACTIVE_ATTACHMENTS} active attachments.` : undefined}>
+              <Button
+                variant="secondary"
+                disabled={atLimit || uploading}
+                busy={uploading}
+                busyLabel="Uploading…"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Add Attachment
+              </Button>
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.pdf"
+              className="zg-visually-hidden"
+              onChange={handleFileChosen}
+              aria-label="Add Attachment"
+            />
+          </>
+        )}
       </div>
+
+      {locked && (
+        <p className="mb-3" style={{ color: "var(--zg-text-muted)" }}>
+          Attachments can't be changed on a closed ticket.
+        </p>
+      )}
 
       {uploadError && (
         <div className="zg-field-error mb-3" role="alert">
@@ -201,9 +215,11 @@ export function AttachmentSection({ requesterId, ticketId, attachments, onAttach
                 >
                   Download
                 </Button>
-                <Button variant="destructive" onClick={(e) => openRemoveModal(a, e.currentTarget)}>
-                  Remove
-                </Button>
+                {canChange && (
+                  <Button variant="destructive" onClick={(e) => openRemoveModal(a, e.currentTarget)}>
+                    Remove
+                  </Button>
+                )}
               </div>
             </li>
           ))}

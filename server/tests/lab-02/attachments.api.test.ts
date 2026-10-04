@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { seed } from "../../prisma/seed.js";
+import { endTestSessions, sessionCookiesFor } from "../lab-03/helpers/sessions.js";
 import { storedFilePath } from "../../src/attachmentStorage.js";
 import { buildAttachmentContentDisposition } from "../../src/attachmentPersistence.js";
 
@@ -40,28 +41,37 @@ async function createOwnedTicket(requesterId: number, summary = "Attachment life
       ticketNumber: `TCK-ATTTEST${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
       summary,
       description: "Fixture ticket created directly for Issue 6 attachment-lifecycle tests.",
+      itPriority: "MEDIUM", // Lab 3: required column, equal to requestedPriority at creation (BR-34)
     },
   });
   createdTicketIds.push(ticket.id);
   return ticket;
 }
 
-function authHeader(requesterId: number) {
-  return { "X-Dev-Requester-Id": String(requesterId) };
+// Lab 3 (REG-08, BR-69): Lab 2's development identity header is replaced by a
+// session for the same Requester — only how the test authenticates changes.
+// An id with no session (one that names nobody) sends no cookie at all.
+let sessionCookies = new Map<number, string>();
+function authHeader(requesterId: number): Record<string, string> {
+  const cookie = sessionCookies.get(requesterId);
+  return cookie ? { Cookie: cookie } : {};
 }
 
 beforeAll(async () => {
   await seed(prisma);
-  const requesters = await prisma.requesterUser.findMany({ where: { isActive: true }, take: 2 });
+  const requesters = await prisma.user.findMany({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, take: 2 });
   requesterAId = requesters[0].id;
   requesterBId = requesters[1].id;
   const category = await prisma.category.findFirstOrThrow();
   categoryId = category.id;
   const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
   systemId = system.id;
+
+  sessionCookies = await sessionCookiesFor(prisma, [requesterAId, requesterBId]);
 });
 
 afterAll(async () => {
+  await endTestSessions(prisma);
   const attachments = await prisma.attachment.findMany({
     where: { ticketId: { in: createdTicketIds } },
     select: { storedFilename: true },
@@ -159,7 +169,7 @@ describe("POST /api/tickets/:id/attachments — adding to an existing ticket", (
     expect(await prisma.attachment.count({ where: { ticketId: ticket.id } })).toBe(0);
   });
 
-  it("rejects with no X-Dev-Requester-Id header", async () => {
+  it("rejects a request with no session", async () => {
     const ticket = await createOwnedTicket(requesterAId);
     const res = await request(app).post(`/api/tickets/${ticket.id}/attachments`).attach("file", PNG_BASE, "a.png");
     expect(res.status).toBe(401);
