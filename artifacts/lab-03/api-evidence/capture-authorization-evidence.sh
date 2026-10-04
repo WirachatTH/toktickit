@@ -14,14 +14,15 @@
 # In Git Bash, run it without MSYS_NO_PATHCONV set: curl's cookie files live
 # under /tmp and need the usual path translation.
 set -u
-OUT="${1:?usage: capture-authorization-evidence.sh <output-file>}"
+fail() { echo "capture-authorization-evidence: $*" >&2; exit 1; }
+[ $# -ge 1 ] || fail "usage: capture-authorization-evidence.sh <output-file>"
+OUT="$1"
 B=http://127.0.0.1:5173
 O="Origin: http://localhost:5173"
 P=TokTickIT-dev-2026
 J=$(mktemp -d)
 DRAFT="$J/evidence.md"
 trap 'rm -rf "$J"' EXIT
-fail() { echo "capture-authorization-evidence: $*" >&2; exit 1; }
 
 login() { curl -s -c "$J/$1" -o /dev/null -w "%{http_code}" -H "$O" -H "Content-Type: application/json" -d "{\"email\":\"$2\",\"password\":\"$P\"}" "$B/api/auth/login"; }
 my_id() { curl -s -b "$J/$1" "$B/api/auth/me" | grep -oE '"user":\{"id":[0-9]+' | grep -oE '[0-9]+$'; }
@@ -32,6 +33,8 @@ for who in "requester somchai.prasert@kmutt.ac.th" "staff chanon.rattanakorn@kmu
   [ "$status" = "200" ] || fail "sign-in as $2 returned HTTP $status (is the stack up and seeded?)"
 done
 REQUESTER_ID=$(my_id requester); ADMIN_ID=$(my_id admin)
+# The ids go into request bodies below; empty ones would make them invalid JSON.
+[ -n "$REQUESTER_ID" ] && [ -n "$ADMIN_ID" ] || fail "could not read the signed-in users' ids from /api/auth/me"
 
 # An IN_PROGRESS ticket and its owner, from the queue (IN_PROGRESS always has an owner, BR-42).
 T="${TICKET:-$(curl -s -b "$J/staff" "$B/api/staff/tickets?status=IN_PROGRESS&pageSize=1" | grep -oE '"data":\[\{"id":[0-9]+' | grep -oE '[0-9]+$')}"

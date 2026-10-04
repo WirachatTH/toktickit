@@ -99,7 +99,7 @@ Lab 2 codes keep their meaning; Lab 3 adds the rest.
 | `TICKET_CLOSED` | 409 | the operation is not allowed on a `CLOSED` or `CANCELLED` ticket (BR-37, BR-52, BR-70) |
 | `INVALID_TRANSITION` | 409 | target status not permitted from the current one, or equal to it (BR-41) |
 | `OWNER_REQUIRED` | 409 | transition or unassignment would leave a ticket that needs an owner without one (BR-36, BR-42) |
-| `STALE_STATE` | 409 | `expectedStatus` or `expectedOwnerId` no longer matches the ticket (BR-31, BR-43) |
+| `STALE_STATE` | 409 | `expectedStatus` or `expectedOwnerId` no longer matches the ticket (BR-31, BR-43); or a user edit found the user changing under it on every attempt (BR-81, §6.3) |
 | `ALREADY_MARKED` | 409 | "Problem Appears Resolved" is already recorded, or not allowed in the current status (BR-47) |
 | `EMAIL_TAKEN` | 409 | another user has this email, compared case-insensitively (BR-54) |
 | `SELF_CHANGE_FORBIDDEN` | 409 | an Administrator tried to deactivate themselves, change their own role, or set their own initial password (BR-56, BR-57) |
@@ -482,6 +482,7 @@ Effects: deactivation and role change delete the user's sessions (BR-59).
 | `409` | `SELF_CHANGE_FORBIDDEN` | caller changing their own `isActive` to false or their own `role` (BR-57) |
 | `409` | `LAST_ADMINISTRATOR` | change would leave zero active Administrators (BR-58) |
 | `409` | `OWNS_OPEN_TICKETS` | role → `REQUESTER` while owning non-terminal tickets (BR-60) |
+| `409` | `STALE_STATE` | the user's role or activation changed between the unlocked read and the locks on three attempts in a row (BR-81); nothing is saved, and trying again is safe |
 
 ### 6.4 `POST /api/admin/users/:id/initial-password`
 **Body:** `{ "initialPassword": "…" }` (BR-07). Sets the hash, sets

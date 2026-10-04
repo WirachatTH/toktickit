@@ -19,7 +19,24 @@ class Refusal extends Error {
     super(message);
   }
 }
-class LockPlanChanged extends Error {}
+export class LockPlanChanged extends Error {}
+
+const LOCK_PLAN_ATTEMPTS = 3;
+
+// BR-81: an attempt that finds its lock plan out of date throws LockPlanChanged
+// and is tried again. If the user keeps changing under every attempt, answer
+// 409 STALE_STATE so the Administrator can try again (PR #60 review), rather
+// than a 500. Any other error passes straight through.
+export async function retryOnLockPlanChange<T>(attempt: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < LOCK_PLAN_ATTEMPTS; i++) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (!(error instanceof LockPlanChanged)) throw error;
+    }
+  }
+  throw new Refusal(409, "STALE_STATE", "This user was changed by someone else at the same time. Please try again.");
+}
 
 const invalid = (fields: Record<string, string>) => new Refusal(400, "VALIDATION_ERROR", "Some fields need attention.", fields);
 const emailTaken = () => new Refusal(409, "EMAIL_TAKEN", "Another user already has this email.", { email: "Another user already has this email." });
@@ -128,56 +145,50 @@ const updateUser = handle(async (req, res) => {
   const allowed = Object.fromEntries(Object.entries(body).filter(([k]) => ["name", "email", "role", "isActive"].includes(k)));
   const f = readFields(allowed, []);
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const user = await prisma.$transaction(async (tx) => {
-        const before = await tx.user.findUniqueOrThrow({ where: { id }, select: { role: true, isActive: true } });
-        const roleChanges = f.role !== undefined && f.role !== before.role;
-        const deactivates = f.isActive === false && before.isActive;
-        // BR-57 — never one's own role or activation.
-        if (id === caller.id && (roleChanges || deactivates)) {
-          throw new Refusal(409, "SELF_CHANGE_FORBIDDEN", "You can't change your own role or deactivate your own account.");
-        }
-        // BR-81 — one lock order for the whole system. A change that could take
-        // away an active Administrator locks the target and every active
-        // Administrator in ONE statement, in ascending id order; any other
-        // change locks only the target. The plan is made from an unlocked read
-        // and re-checked under the locks; if it no longer fits, start over
-        // rather than take more locks out of order.
-        const affectsAdmins = roleChanges || deactivates;
-        const lockAdmins = affectsAdmins && before.role === "ADMINISTRATOR" && before.isActive;
-        const rows = lockAdmins
-          ? await tx.$queryRaw<{ id: number; role: Role; isActive: boolean }[]>`
-              SELECT id, role, "isActive" FROM "User"
-              WHERE id = ${id} OR (role = 'ADMINISTRATOR' AND "isActive")
-              ORDER BY id FOR UPDATE`
-          : await tx.$queryRaw<{ id: number; role: Role; isActive: boolean }[]>`
-              SELECT id, role, "isActive" FROM "User" WHERE id = ${id} FOR UPDATE`;
-        const locked = rows.find((r) => r.id === id)!;
-        if (locked.role !== before.role || locked.isActive !== before.isActive) throw new LockPlanChanged();
+  const user = await retryOnLockPlanChange(() =>
+    prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUniqueOrThrow({ where: { id }, select: { role: true, isActive: true } });
+      const roleChanges = f.role !== undefined && f.role !== before.role;
+      const deactivates = f.isActive === false && before.isActive;
+      // BR-57 — never one's own role or activation.
+      if (id === caller.id && (roleChanges || deactivates)) {
+        throw new Refusal(409, "SELF_CHANGE_FORBIDDEN", "You can't change your own role or deactivate your own account.");
+      }
+      // BR-81 — one lock order for the whole system. A change that could take
+      // away an active Administrator locks the target and every active
+      // Administrator in ONE statement, in ascending id order; any other
+      // change locks only the target. The plan is made from an unlocked read
+      // and re-checked under the locks; if it no longer fits, start over
+      // rather than take more locks out of order.
+      const affectsAdmins = roleChanges || deactivates;
+      const lockAdmins = affectsAdmins && before.role === "ADMINISTRATOR" && before.isActive;
+      const rows = lockAdmins
+        ? await tx.$queryRaw<{ id: number; role: Role; isActive: boolean }[]>`
+            SELECT id, role, "isActive" FROM "User"
+            WHERE id = ${id} OR (role = 'ADMINISTRATOR' AND "isActive")
+            ORDER BY id FOR UPDATE`
+        : await tx.$queryRaw<{ id: number; role: Role; isActive: boolean }[]>`
+            SELECT id, role, "isActive" FROM "User" WHERE id = ${id} FOR UPDATE`;
+      const locked = rows.find((r) => r.id === id)!;
+      if (locked.role !== before.role || locked.isActive !== before.isActive) throw new LockPlanChanged();
 
-        if (f.email !== undefined && (await emailInUse(tx, f.email, id))) throw emailTaken();
-        // BR-58 — never zero active Administrators, counted under the locks.
-        if (lockAdmins && !rows.some((r) => r.id !== id && r.role === "ADMINISTRATOR" && r.isActive)) {
-          throw new Refusal(409, "LAST_ADMINISTRATOR", "TokTickIT must keep at least one active Administrator.");
-        }
-        // BR-60 — not a Requester while owning open tickets (deactivation is fine, BR-29).
-        if (roleChanges && f.role === "REQUESTER") {
-          const open = await tx.ticket.count({ where: { ownerId: id, currentStatus: { notIn: ["CLOSED", "CANCELLED"] } } });
-          if (open > 0) throw new Refusal(409, "OWNS_OPEN_TICKETS", "Reassign this user's open tickets before making them a Requester.");
-        }
-        const updated = await tx.user.update({ where: { id }, data: f, select: SESSION_USER_SELECT });
-        // BR-59 — deactivation and a role change end every session at once.
-        if (roleChanges || deactivates) await tx.session.deleteMany({ where: { userId: id } });
-        return updated;
-      });
-      return res.status(200).json(user);
-    } catch (error) {
-      if (error instanceof LockPlanChanged) continue;
-      throw error;
-    }
-  }
-  throw new Error("User changed repeatedly while being updated.");
+      if (f.email !== undefined && (await emailInUse(tx, f.email, id))) throw emailTaken();
+      // BR-58 — never zero active Administrators, counted under the locks.
+      if (lockAdmins && !rows.some((r) => r.id !== id && r.role === "ADMINISTRATOR" && r.isActive)) {
+        throw new Refusal(409, "LAST_ADMINISTRATOR", "TokTickIT must keep at least one active Administrator.");
+      }
+      // BR-60 — not a Requester while owning open tickets (deactivation is fine, BR-29).
+      if (roleChanges && f.role === "REQUESTER") {
+        const open = await tx.ticket.count({ where: { ownerId: id, currentStatus: { notIn: ["CLOSED", "CANCELLED"] } } });
+        if (open > 0) throw new Refusal(409, "OWNS_OPEN_TICKETS", "Reassign this user's open tickets before making them a Requester.");
+      }
+      const updated = await tx.user.update({ where: { id }, data: f, select: SESSION_USER_SELECT });
+      // BR-59 — deactivation and a role change end every session at once.
+      if (roleChanges || deactivates) await tx.session.deleteMany({ where: { userId: id } });
+      return updated;
+    }),
+  );
+  return res.status(200).json(user);
 });
 
 // §6.4 — a new initial password: forces a change at next sign-in and ends
