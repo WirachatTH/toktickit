@@ -271,3 +271,41 @@ describe("RESP-06 side panel focus and Escape (ui-spec §1.8, §10)", () => {
     expect(setButton).toHaveFocus();
   });
 });
+
+// PR #60 review (Menelaus122, optional nits 1 and 2).
+describe("UI-29 and UI-31 follow-ups (PR #60 review)", () => {
+  it("won't let Save changes silently drop a typed initial password, and says why", async () => {
+    const update = vi.spyOn(api, "updateUser");
+    const panel = await openEdit("Somchai Prasert");
+    const save = within(panel).getByRole("button", { name: "Save changes" });
+    expect(save).toBeEnabled();
+    await userEvent.type(within(panel).getByLabelText(/^New initial password/), "Reset-pass-2026");
+    expect(save).toBeDisabled();
+    expect(within(panel).getByText("Save changes doesn't send this password. Use Set initial password, or clear the field.")).toBeInTheDocument();
+    await userEvent.clear(within(panel).getByLabelText(/^New initial password/));
+    expect(save).toBeEnabled();
+    expect(within(panel).queryByText(/Save changes doesn't send this password/)).toBeNull();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("shows LAST_ADMINISTRATOR below Role when a role change caused it", async () => {
+    vi.spyOn(api, "fetchAdminUsers").mockResolvedValue([...USERS, user(11, "Krit Wattana", "ADMINISTRATOR")]);
+    vi.spyOn(api, "updateUser").mockRejectedValueOnce(new api.ApiError(409, "LAST_ADMINISTRATOR", "TokTickIT must keep at least one active Administrator."));
+    const panel = await openEdit("Krit Wattana");
+    await userEvent.selectOptions(within(panel).getByLabelText(/^Role/), "IT_STAFF");
+    await userEvent.click(within(panel).getByRole("button", { name: "Save changes" }));
+    const message = await within(panel).findByText("TokTickIT must keep at least one active Administrator.");
+    expect(message.closest(".mb-3")).toContainElement(within(panel).getByLabelText(/^Role/));
+    expect(message.closest(".mb-3")).not.toContainElement(within(panel).getByRole("switch", { name: "Active" }));
+  });
+
+  it("shows STALE_STATE as a banner in the panel and keeps the input", async () => {
+    vi.spyOn(api, "updateUser").mockRejectedValueOnce(new api.ApiError(409, "STALE_STATE", "This user was changed by someone else at the same time. Please try again."));
+    const panel = await openEdit("Chanon Rattanakorn");
+    await userEvent.clear(within(panel).getByLabelText(/^Full name/));
+    await userEvent.type(within(panel).getByLabelText(/^Full name/), "Chanon R.");
+    await userEvent.click(within(panel).getByRole("button", { name: "Save changes" }));
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("This user was changed by someone else at the same time. Please try again.");
+    expect(within(panel).getByLabelText(/^Full name/)).toHaveValue("Chanon R.");
+  });
+});
