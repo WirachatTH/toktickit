@@ -91,10 +91,12 @@ const rulesMet = (password: string, email: string) => checkPasswordRules(passwor
 
 type Errors = Partial<Record<"name" | "email" | "role" | "isActive" | "initialPassword" | "form", string>>;
 
-function errorsFrom(error: unknown): Errors {
+// LAST_ADMINISTRATOR goes beside the control that caused it: Active when the
+// save deactivated the user, Role when only the role changed (PR #60 review).
+function errorsFrom(error: unknown, lastAdminField: "isActive" | "role" = "isActive"): Errors {
   const err = error instanceof ApiError ? error : null;
   if (!err) return { form: "Something went wrong. Please try again." };
-  if (err.code === "LAST_ADMINISTRATOR") return { isActive: err.message };
+  if (err.code === "LAST_ADMINISTRATOR") return { [lastAdminField]: err.message };
   if (err.code === "OWNS_OPEN_TICKETS") return { role: err.message };
   if (err.code === "SELF_CHANGE_FORBIDDEN") return { role: err.message };
   if (err.fields) return err.fields as Errors;
@@ -119,6 +121,9 @@ function UserPanel({ me, editing, onClose, onSaved }: PanelProps) {
   const [busy, setBusy] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const titleId = editing ? "edit-user-title" : "create-user-title";
+  // Save changes never sends the new initial password (only Set initial
+  // password does), so it waits until that field is used or cleared (PR #60 review).
+  const unsentPassword = Boolean(editing) && password.length > 0;
   const title = editing ? `Edit ${editing.name}` : "Create user";
 
   function validate(): Errors {
@@ -131,14 +136,15 @@ function UserPanel({ me, editing, onClose, onSaved }: PanelProps) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (unsentPassword) return;
     const e = validate();
     setErrors(e);
     if (Object.keys(e).length > 0) return;
     setBusy(true);
+    const changes: Partial<Pick<AdminUser, "name" | "email" | "role" | "isActive">> = {};
     try {
       if (editing) {
         // Only what changed (UI-29); an empty edit just closes.
-        const changes: Partial<Pick<AdminUser, "name" | "email" | "role" | "isActive">> = {};
         if (name.trim() !== editing.name) changes.name = name.trim();
         if (email.trim().toLowerCase() !== editing.email) changes.email = email.trim();
         if (role !== editing.role) changes.role = role;
@@ -150,7 +156,7 @@ function UserPanel({ me, editing, onClose, onSaved }: PanelProps) {
         onSaved("User created");
       }
     } catch (error) {
-      setErrors(errorsFrom(error));
+      setErrors(errorsFrom(error, changes.isActive === undefined && changes.role !== undefined ? "role" : "isActive"));
     } finally {
       setBusy(false);
     }
@@ -236,6 +242,11 @@ function UserPanel({ me, editing, onClose, onSaved }: PanelProps) {
                 <Button variant="secondary" type="button" disabled={busy || !rulesMet(password, email)} onClick={() => setConfirmReset(true)}>
                   Set initial password
                 </Button>
+                {unsentPassword && (
+                  <p id="unsent-password-hint" className="small mt-2 mb-0" style={{ color: "var(--zg-text-muted)" }}>
+                    Save changes doesn't send this password. Use Set initial password, or clear the field.
+                  </p>
+                )}
               </>
             )}
           </>
@@ -243,7 +254,7 @@ function UserPanel({ me, editing, onClose, onSaved }: PanelProps) {
 
         <div className="zg-side-panel__footer d-flex gap-2 justify-content-end mt-4">
           <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button type="submit" busy={busy} busyLabel={editing ? "Saving…" : "Creating…"}>{editing ? "Save changes" : "Create user"}</Button>
+          <Button type="submit" busy={busy} busyLabel={editing ? "Saving…" : "Creating…"} disabled={unsentPassword} aria-describedby={unsentPassword ? "unsent-password-hint" : undefined}>{editing ? "Save changes" : "Create user"}</Button>
         </div>
       </form>
 
