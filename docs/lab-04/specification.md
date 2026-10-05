@@ -54,9 +54,9 @@ show what was actually done. The stakeholder wants four things:
 - **Dashboards** for Requester, IT Staff, and Administrator: metric cards,
   per-status and per-priority counts, short lists, drill-down links, and every
   feedback state. The Dashboard is each role's home and first navigation item.
-- **Drill-down filters:** the `status` filter on My Tickets and the `UNRESOLVED` value
-  on the queue, plus URL-driven filters on My Tickets and User Management, so every
-  drill-down lands on a matching list.
+- **Drill-down filters:** the `status` filter on My Tickets, the `UNRESOLVED` value on
+  the queue, and an activation filter on the user list, plus URL-driven filters on My
+  Tickets and User Management, so every drill-down lands on a matching list.
 - **One additive migration** (Actions Taken, history, `Ticket.resolvedAt`), its
   rollback plan, and an extended idempotent seed.
 - **Final hardening:**
@@ -234,7 +234,7 @@ show what was actually done. The stakeholder wants four things:
 | BR-35 | **Status groups.**<br>• **Unresolved** is `NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_FOR_REQUESTER`, and `REOPENED`.<br>• **Active** is Unresolved plus `RESOLVED`; it is the Lab 3 queue's `ACTIVE`, all except `CLOSED` and `CANCELLED`. |
 | BR-36 | The Requester Dashboard counts and lists only tickets whose Requester is the session user (Lab 3 BR-03). It never includes IT Priority, Internal Notes, or note counts. |
 | BR-37 | **Size and empty data.**<br>• A dashboard list holds at most 5 items; no dashboard returns a whole ticket collection.<br>• A count with nothing to count is `0`, never missing or null.<br>• A list with nothing to list is `[]`, and the UI shows that list's empty message. |
-| BR-38 | **Drill-down.**<br>• Every metric carries an `href`: a client route plus query string that opens a view listing the tickets it counts (or users, for BR-41).<br>• Where no existing view filters exactly, the `href` opens the closest superset, sorted so the counted items come first. The two cases are the "today" metrics and the inactive-user count. Each such case is marked in the BR-39 to BR-41 tables.<br>• Every list item links to its ticket's detail screen for the caller's role. |
+| BR-38 | **Drill-down.**<br>• Every metric carries an `href`: a client route plus query string that opens a view listing the tickets it counts (or users, for BR-41).<br>• Where no existing view filters exactly, the `href` opens the closest superset, which includes every counted item and is sorted by recency. The only such cases are the two "today" metrics, marked in the BR-39 table. Every other `href`, including every user count (BR-41), lists exactly what it counts.<br>• Every list item links to its ticket's detail screen for the caller's role. |
 | BR-39 | **IT Staff metrics.** All metrics are over the current tickets. "Me" is the session user. |
 
 | Key | Label | Calculation | Drill-down `href` |
@@ -244,7 +244,7 @@ show what was actually done. The stakeholder wants four things:
 | `myPlannedActions` | My planned actions | `PLANNED` Actions Taken assigned to me, on tickets that are not `CLOSED` or `CANCELLED` | `/dashboard#my-planned-actions` (the list below; each item opens its ticket) |
 | `appearsResolved` | Requester says resolved | Active tickets with the "appears resolved" signal set | `/staff/queue?appearsResolved=true` |
 | `createdToday` | Created today | Tickets created today (BR-33), any status | `/staff/queue?status=ALL&sort=createdAt&order=desc` (superset, newest first) |
-| `resolvedToday` | Resolved today | Tickets whose `resolvedAt` is today, now `RESOLVED` or `CLOSED` | `/staff/queue?status=ALL&sort=updatedAt&order=desc` (superset, most recent first) |
+| `resolvedToday` | Resolved today | Tickets whose `resolvedAt` is today, now `RESOLVED` or `CLOSED` | `/staff/queue?status=ALL&sort=updatedAt&order=desc` (superset, most recently updated first) |
 | `byStatus.<STATUS>` | one per status (8) | Tickets in that status | `/staff/queue?status=<STATUS>` |
 | `byItPriority.<P>` | Low / Medium / High | Unresolved tickets with that IT Priority | `/staff/queue?status=UNRESOLVED&itPriority=<P>` |
 
@@ -273,7 +273,7 @@ show what was actually done. The stakeholder wants four things:
 
 | ID | Rule |
 | :--- | :--- |
-| BR-41 | **Administrator Dashboard.** It is the BR-39 payload for the calling Administrator, read-only, plus user counts: active users per role, each with `href` `/admin/users?role=<ROLE>`, and the number of inactive users, with `href` `/admin/users` (superset). |
+| BR-41 | **Administrator Dashboard.** It is the BR-39 payload for the calling Administrator, read-only, plus user counts: active users per role, each with `href` `/admin/users?role=<ROLE>&status=active`, and the number of inactive users, with `href` `/admin/users?status=inactive`. Each `href` lists exactly the users it counts (BR-38). |
 | BR-42 | **Legacy tickets.** Tickets from Labs 1–3 have no Actions Taken and count in every ticket metric like any other ticket. `resolvedAt` is backfilled for those already `RESOLVED` or `CLOSED` (BR-47). A legacy Unresolved ticket must gain a completed action before it can be resolved (BR-28). |
 
 ### 5.10 Hardening
@@ -285,8 +285,8 @@ show what was actually done. The stakeholder wants four things:
 ### 5.11 Regression and changed earlier rules
 | ID | Rule |
 | :--- | :--- |
-| BR-45 | Every Lab 2 and Lab 3 rule keeps its meaning, **except** these deliberate changes:<br>(1) each role's home screen and first navigation item is now `/dashboard` (Lab 3 FR-10, ui-spec §2; D-08);<br>(2) a transition to `RESOLVED` also needs the gate (BR-28) on top of Lab 3 BR-41 to BR-44;<br>(3) Administrators may write Actions Taken, an exception to Lab 3 BR-21 (D-07);<br>(4) My Tickets (`GET /api/tickets`) accepts an optional `status` filter, and the queue's `status` filter accepts `UNRESOLVED` (D-13); without them both behave exactly as before. |
-| BR-46 | Lab 1–3 tests keep their assertions except where a BR-45 change requires a new expectation: the home-route and navigation tests, and any Lab 3 test that resolves a ticket without a completed action. These get the extra setup or new expectation. Every changed test is named, with its reason, in the PR that changes it. |
+| BR-45 | Every Lab 2 and Lab 3 rule keeps its meaning, **except** these deliberate changes:<br>(1) each role's home screen and first navigation item is now `/dashboard` (Lab 3 FR-10, ui-spec §2; D-08);<br>(2) a transition to `RESOLVED` also needs the gate (BR-28) on top of Lab 3 BR-41 to BR-44;<br>(3) Administrators may write Actions Taken, an exception to Lab 3 BR-21 (D-07);<br>(4) My Tickets (`GET /api/tickets`) accepts an optional `status` filter, the queue's `status` filter accepts `UNRESOLVED`, and the user list (`GET /api/admin/users`) accepts an optional `status` filter of `active` or `inactive` (D-13); without them all three behave exactly as before. |
+| BR-46 | Lab 1–3 tests keep their assertions except where a BR-45 change requires a new expectation. Those tests include, at least:<br>• the home-route and navigation tests (BR-45 (1));<br>• any Lab 3 test that resolves a ticket without a completed action (BR-45 (2));<br>• Lab 3 API-42 (`server/tests/lab-03/staff-ticket-detail.api.test.ts`): its strict check of the Administrator's `capabilities` gains `canWriteActions: true`, and its title no longer says "no capabilities" (BR-45 (3));<br>• Lab 2 REG-14 (`client/tests/lab-02/RequesterTicketDetail.test.tsx`): it asserts that Actions Taken never appear on Requester Ticket Detail, and is rewritten so they appear read-only while Internal Notes, IT Priority, and status controls stay absent (FR-06).<br>Each gets the extra setup or the new expectation, and nothing else. Every changed test is named, with its reason, in the PR that changes it. |
 
 ### 5.12 Migration and seed
 | ID | Rule |
@@ -449,6 +449,7 @@ contract, except the additive changes in BR-45.
 | *Changed:* My Tickets | `GET /api/tickets` | adds optional `status` filter |
 | *Changed:* Requester Ticket Detail | `GET /api/tickets/:id` | adds `resolvedAt` |
 | *Changed:* Ticket Queue | `GET /api/staff/tickets` | `status` also accepts `UNRESOLVED` |
+| *Changed:* User Management | `GET /api/admin/users` | adds optional `status` filter (`active`, `inactive`) |
 
 New error codes: `RESOLUTION_BLOCKED`, `TICKET_RESOLVED`, `ACTION_NOT_PLANNED` (all
 `409`). `STALE_STATE` also covers `expectedVersion`. The guard order, error envelope,
@@ -489,7 +490,7 @@ Origin guard, and route-policy table are unchanged.
 | AC-20 | Given an Administrator, when the dashboard is retrieved, then it contains the BR-39 metrics for them and user counts equal to independent database counts. |
 | AC-21 | Given tickets created or resolved just before and just after 00:00 Asia/Bangkok, when "today" and "last 7 days" metrics are computed, then each ticket falls on the correct Bangkok day. |
 | AC-22 | Given no matching data, when any dashboard is retrieved, then every count is `0`, every list is `[]`, and the response is `200`. |
-| AC-23 | Given any metric's `href`, when it is opened, then the view lists exactly the counted items, or, for the metrics BR-38 marks as supersets, includes them all and shows them first. |
+| AC-23 | Given any metric's `href`, when it is opened, then the view lists exactly the counted items, or, for the two "today" metrics BR-38 marks as supersets, includes every counted item, sorted by recency. |
 | AC-24 | Given a role calling another role's dashboard endpoint, then it receives `403` with no metrics. Given no session, `401`. |
 | AC-25 | Given the seeded data, when each dashboard endpoint is called repeatedly, then it answers within the D-17 budget, returns at most 5 items per list, and runs the same number of queries regardless of ticket count. |
 
@@ -561,7 +562,7 @@ Origin guard, and route-policy table are unchanged.
 | D-10 | No Action Taken writes on `RESOLVED` tickets: reopen first (`409 TICKET_RESOLVED`). `CLOSED` and `CANCELLED` refuse with `TICKET_CLOSED`. | This keeps a resolved ticket free of planned work and open follow-ups (BR-29) without a second gate on `CLOSED`. New work on a resolved ticket means it is not really resolved, and `REOPENED` exists for exactly that (Lab 3 D-14). |
 | D-11 | The mockups' "from yesterday" deltas are not built. | They need stored daily snapshots: a reporting store labsheet §4.2 excludes ("export warehouses"). Current counts with drill-down meet §4.6. |
 | D-12 | Dashboard lists hold at most 5 items. "Recent" means newest first, and "recently resolved" means the last 7 Bangkok days. | Labsheet §6.2 asks for concise data, not whole collections. Five fits one mobile screen. "View all" opens the full list. |
-| D-13 | Drill-down needs two additive filters: `status` on My Tickets (`ALL` default, `UNRESOLVED`, or one status), and `UNRESOLVED` on the queue. My Tickets reads its status filter and sort from the URL, and User Management its role filter. | Without them, a Requester's "Waiting for you" card could only open an unfiltered list. Both are optional, and their defaults reproduce Lab 2/3 behaviour exactly, so no earlier test changes. |
+| D-13 | Drill-down needs three additive filters: `status` on My Tickets (`ALL` default, `UNRESOLVED`, or one status), `UNRESOLVED` on the queue, and `status` (`active` or `inactive`) on the user list. My Tickets reads its status filter and sort from the URL; User Management reads its role and activation filters from the URL. The activation filter appears on screen as a removable "Active only" or "Inactive only" chip, not as a second toolbar control. | Without them, a Requester's "Waiting for you" card could only open an unfiltered list, and "Active IT Staff" would open a list that also holds inactive IT Staff (PR #74 review). All three are optional, and their defaults reproduce Lab 2/3 behaviour exactly, so no earlier test changes. Lab 3 kept User Management to one toolbar filter; the chip only shows a drill-down's filter and lets the user remove it, so the toolbar stays as it was. |
 | D-14 | After `REOPENED`, actions completed before the reopen still count towards the gate. | Requiring "new work since reopen" needs a reopen timestamp and a rule for what counts as new. The public reopen reason (Lab 3 BR-45) already records why, and IT Staff are expected to add the follow-up work. Kept simple and stated. |
 | D-15 | Duplicate-create protection uses a client-generated `clientRequestId` with a unique constraint, for Action Taken creation. Other creates rely on the disabled button. | A disabled button cannot stop a network retry. A server key can, and Actions Taken are the new create path. Earlier create paths keep their Lab 2/3 contracts and get UI busy-state protection, as BR-43 allows. |
 | D-16 | Test files live under `server/tests/lab-04/`, `client/tests/lab-04/`, and `e2e/lab-04/`, with the file names labsheet §12 lists. Extra files are added only where §12 has no home (units, migration, regression, performance). | Matches labsheet §12 and the Lab 3 convention (Lab 3 D-20). |

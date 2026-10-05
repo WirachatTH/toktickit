@@ -326,10 +326,10 @@ AC-18). Any `requesterId` in the query is ignored.
 - Adds `users`:
 ```json
 "users": [
-  { "key": "activeRequesters", "label": "Active Requesters", "value": 6, "href": "/admin/users?role=REQUESTER" },
-  { "key": "activeItStaff", "label": "Active IT Staff", "value": 3, "href": "/admin/users?role=IT_STAFF" },
-  { "key": "activeAdministrators", "label": "Active Administrators", "value": 2, "href": "/admin/users?role=ADMINISTRATOR" },
-  { "key": "inactive", "label": "Inactive accounts", "value": 2, "href": "/admin/users" }
+  { "key": "activeRequesters", "label": "Active Requesters", "value": 6, "href": "/admin/users?role=REQUESTER&status=active" },
+  { "key": "activeItStaff", "label": "Active IT Staff", "value": 3, "href": "/admin/users?role=IT_STAFF&status=active" },
+  { "key": "activeAdministrators", "label": "Active Administrators", "value": 2, "href": "/admin/users?role=ADMINISTRATOR&status=active" },
+  { "key": "inactive", "label": "Inactive accounts", "value": 2, "href": "/admin/users?status=inactive" }
 ]
 ```
 
@@ -359,9 +359,19 @@ unchanged. Lenient parsing follows Lab 2 D-5: invalid values fall back to the de
 `status` also accepts `UNRESOLVED` (BR-35). Everything else, including the `ACTIVE`
 default and `appliedQuery`, is unchanged.
 
-### 4.3 `GET /api/admin/users`
-Unchanged. The User Management screen now reads its `role` filter from the URL, so
-`/admin/users?role=IT_STAFF` opens already filtered.
+### 4.3 `GET /api/admin/users` (User Management)
+Adds an optional `status` parameter:
+
+| Value | Meaning |
+| :--- | :--- |
+| absent (default, and any unknown value) | every user, the Lab 3 behaviour |
+| `active` | only users with `isActive: true` |
+| `inactive` | only users with `isActive: false` |
+
+It combines with `search` and `role` using AND. The ordering (name, then id) and the
+response shape are unchanged. The User Management screen reads `role` and `status`
+from the URL, so `/admin/users?role=IT_STAFF&status=active` lists exactly the users
+the "Active IT Staff" card counts.
 
 ---
 

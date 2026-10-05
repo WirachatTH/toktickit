@@ -115,7 +115,7 @@ Planned until the issue that owns the row runs it green.
 | DASH-08 | AC-21, BR-33 | API | Tickets created and resolved at 16:59:59Z and 17:00:01Z around a Bangkok midnight (throwaway schema, clock fixed) | `createdToday` and `resolvedToday` count only the post-midnight ticket; the 7-day window includes and excludes at the right instants | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-09 | AC-22, BR-37 | API | All three dashboards on an empty throwaway schema, and a Requester with no tickets | `200`; every `value` 0; every list `[]`; no field missing or `null` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-10 | AC-24, BR-15 | API | Each dashboard endpoint called by the two other roles and with no session | `403 FORBIDDEN` with no metrics; `401` without a session | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| DASH-11 | AC-23, BR-38 | API | For each ticket metric, follow its `href` query against the queue or My Tickets API | Exact metrics: the list's `totalItems` equals the metric; superset metrics: the list contains every counted ticket on its first page(s), first | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
+| DASH-11 | AC-23, BR-38 | API | For each metric, ticket and user alike, follow its `href` query against the queue, My Tickets, or user-list API | Exact metrics, every user count included: the list's size equals the metric and it holds exactly the counted ids; the two "today" supersets: the list includes every counted ticket and is sorted by recency | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-12 | BR-42, BR-34 | API | Legacy-shaped tickets (no actions, backfilled `resolvedAt`) in the counts | Counted like any ticket; no `500`; values still equal SQL counts | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 
 ### 2.5 Security and authorization
@@ -148,11 +148,22 @@ Planned until the issue that owns the row runs it green.
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | REG-01 | AC-33, BR-46 | Regression | Lab 1, Lab 2, and Lab 3 server suites on the Lab 4 build | Pass; only the BR-46 tests changed, each named in its PR | `server/tests/lab-04/regression.api.test.ts` | Planned |
 | REG-02 | AC-33, BR-46 | Regression | Lab 1–3 client suites and the Lab 2–3 Playwright suites on the Lab 4 build | Pass; home-route and navigation expectations updated to `/dashboard` (named in the Issue 6 PR) | `client/tests/lab-04/Navigation.test.tsx` | Planned |
-| REG-03 | BR-45, D-13 | Regression | `GET /api/tickets` without `status`, and the queue without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL` and `ACTIVE`) | `server/tests/lab-04/regression.api.test.ts` | Planned |
-| REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED`, `?status=WAITING_FOR_REQUESTER`, and the queue with `status=UNRESOLVED` | Only matching own tickets / matching tickets; pagination metadata correct | `server/tests/lab-04/regression.api.test.ts` | Planned |
+| REG-03 | BR-45, D-13 | Regression | `GET /api/tickets`, the queue, and `GET /api/admin/users`, each without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL`, `ACTIVE`, and every user) | `server/tests/lab-04/regression.api.test.ts` | Planned |
+| REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED` and `?status=WAITING_FOR_REQUESTER`; the queue with `status=UNRESOLVED`; `GET /api/admin/users` with `status=active`, `status=inactive`, combined with `role`, and with an unknown value | Only matching own tickets, matching tickets, or matching users; pagination metadata correct; an unknown user `status` returns every user, as in Lab 3 | `server/tests/lab-04/regression.api.test.ts` | Planned |
 | REG-05 | FR-20 | Regression | `apiCredentials.test.ts` coverage check with the new API functions | Every new client API function is listed and sends credentials | `client/tests/lab-04/apiCredentials.lab4.test.ts` | Planned |
 | REG-06 | AC-34, FR-17 | Regression | Double submit on Create Ticket, Post comment, Add internal note, Create user (UI busy state) | One request per click burst; one row created | `client/tests/lab-04/Hardening.test.tsx` | Planned |
 | REG-07 | AC-34, FR-18 | Regression | Recoverable failure on Create Ticket, comment, note, user panels, and Actions Taken | Typed input kept after `400`, `409`, network error, and `500` | `client/tests/lab-04/Hardening.test.tsx` | Planned |
+| REG-08 | AC-33 | Regression | Lab 1 feature: health check, the public Categories list, and the System Status page | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-01/health.test.ts` | Planned |
+| REG-09 | AC-33 | Regression | Lab 2 feature: Create Ticket (validation, numbering, attachments on create) | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
+| REG-10 | AC-33 | Regression | Lab 2 feature: My Tickets search, filters, sort, and pagination | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
+| REG-11 | AC-33 | Regression | Lab 2 feature: Requester Ticket Detail and the attachment lifecycle | Pass on the Lab 4 build, changed only as BR-46 allows (Lab 2 REG-14 rewritten, BR-46) | `server/tests/lab-02/attachments.api.test.ts` | Planned |
+| REG-12 | AC-33 | Regression | Lab 3 feature: sign-in, sessions, password change, and the login throttle | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| REG-13 | AC-33 | Regression | Lab 3 feature: the authorization matrix, Origin guard, and safe errors | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| REG-14 | AC-33 | Regression | Lab 3 feature: Public Comments, Internal Notes, and "appears resolved" | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
+| REG-15 | AC-33 | Regression | Lab 3 feature: the IT Staff Ticket Queue | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
+| REG-16 | AC-33 | Regression | Lab 3 feature: IT Staff Ticket Detail, ownership, IT Priority, and the status workflow | Pass on the Lab 4 build, changed only as BR-46 allows (Lab 3 API-42 and gate setup, BR-46) | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
+| REG-17 | AC-33 | Regression | Lab 3 feature: Administrator User Management and its safety rules | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
+| REG-18 | AC-33 | Regression | Lab 2 and Lab 3 browser journeys: Requester ticket flow, authentication, IT Staff ticket flow, user administration | Pass at desktop, tablet, and mobile, changed only as BR-46 allows | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
 
 ### 2.8 Performance smoke
 
@@ -186,7 +197,7 @@ Planned until the issue that owns the row runs it green.
 | UI-18 | AC-27, AC-18 | UI | Requester Dashboard renders metrics and lists | Exact values; "Waiting for you" emphasised with text when above 0; no IT Priority shown | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
 | UI-19 | AC-27, FR-15 | UI | Requester Dashboard empty (brand-new Requester), failure, Retry | Zeros plus the Create Ticket empty state; error banner; Retry refetches | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
 | UI-20 | AC-26, FR-10 | UI | Navigation for each role and the post-login landing | Dashboard first with `aria-current` on `/dashboard`; landing `/dashboard`; forbidden callout shown there | `client/tests/lab-04/Navigation.test.tsx` | Planned |
-| UI-21 | AC-23, D-13 | UI | Drill-down targets: My Tickets `?status=`, queue `status=UNRESOLVED`, User Management `?role=` | Each screen opens with the filter applied and requests it from the API | `client/tests/lab-04/DrillDownFilters.test.tsx` | Planned |
+| UI-21 | AC-23, D-13 | UI | Drill-down targets: My Tickets `?status=`, queue `status=UNRESOLVED`, User Management `?role=` with `?status=active` and `?status=inactive` | Each screen opens with the filter applied and requests it from the API; User Management shows the removable activation chip, and removing it drops the parameter | `client/tests/lab-04/DrillDownFilters.test.tsx` | Planned |
 | UI-22 | AC-34, FR-16 | UI | Feedback consistency sweep: each screen's not-found, forbidden, and failure states use the shared components | Shared `EmptyState`/`ErrorState`/callout rendered with the screen's message | `client/tests/lab-04/Hardening.test.tsx` | Planned |
 
 ### 2.10 UI style
@@ -255,7 +266,7 @@ Planned until the issue that owns the row runs it green.
 | AC-30 | UI-07, UI-08, E2E-03 |
 | AC-31 | MIG-01, MIG-02, MIG-03, MIG-04 |
 | AC-32 | MIG-06, MIG-07 |
-| AC-33 | REG-01, REG-02, E2E-09 |
+| AC-33 | REG-01, REG-02, REG-08, REG-09, REG-10, REG-11, REG-12, REG-13, REG-14, REG-15, REG-16, REG-17, REG-18, E2E-09 |
 | AC-34 | REG-06, REG-07, UI-22, E2E-08 |
 | AC-35 | STYLE-01, STYLE-02, STYLE-03, RESP-01, RESP-02, RESP-03 |
 | AC-36 | SEC-01, SEC-04, SEC-05, SEC-07 |
@@ -274,11 +285,11 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 4 — Ticket Workflow & Resolution Gate | UNIT-05, WF-01, WF-02, WF-03, WF-04, WF-05, WF-06, WF-07, WF-08, WF-09, WF-10, WF-11, UI-12, UI-13, UI-14 | 15 |
 | 5 — Dashboard APIs | UNIT-06, UNIT-07, DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DASH-07, DASH-08, DASH-09, DASH-10, DASH-11, DASH-12, SEC-07, REG-03, REG-04, PERF-01, PERF-02 | 19 |
 | 6 — Dashboard UI & Navigation | REG-02, UI-15, UI-16, UI-17, UI-18, UI-19, UI-20, UI-21, STYLE-02 | 9 |
-| 7 — Final Hardening & Full Regression | REG-01, REG-06, REG-07, UI-22 | 4 |
+| 7 — Final Hardening & Full Regression | REG-01, REG-06, REG-07, REG-08, REG-09, REG-10, REG-11, REG-12, REG-13, REG-14, REG-15, REG-16, REG-17, REG-18, UI-22 | 15 |
 | 8 — Responsive & Accessibility QA, Visual Checklist & E2E | RESP-01, RESP-02, RESP-03, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09 | 12 |
 | 9 — Integration & Release to Main | full regression of every row above on `lab4-staging`, then on `main` | — |
 
-**Totals:** UNIT 7, API 22, WF 11, DASH 12, SEC 7, MIG 7, REG 7, PERF 3, UI 22, STYLE 3, RESP 3, E2E 9: **113 planned tests**.
+**Totals:** UNIT 7, API 22, WF 11, DASH 12, SEC 7, MIG 7, REG 18, PERF 3, UI 22, STYLE 3, RESP 3, E2E 9: **124 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 

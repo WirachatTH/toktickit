@@ -197,7 +197,7 @@ like Lab 2's warning (`--zg-warning-bg` / `--zg-warning-text`, info icon):
   Administrators" (Lab 3 §1.5).
 - **Ticket content:** the §3.2 cards, strips, and lists.
 - **User accounts card:** the four BR-41 counts as metric rows, each with a View link
-  to User Management with its role filter applied, and a "Manage users" link.
+  to User Management with its role and activation filters applied, and a "Manage users" link.
 - **Quick actions:** User Management, Ticket Queue.
 
 ### 3.5 Dashboard states
@@ -312,7 +312,7 @@ like Lab 2's warning (`--zg-warning-bg` / `--zg-warning-text`, info icon):
 | :--- | :--- |
 | My Tickets (`/tickets`) | A **Status** select (All, Open requests, and each status). The status filter and the existing sort live in the URL (`?status=`, `?sort=`, `?order=`), so opening `/tickets?status=WAITING_FOR_REQUESTER` shows the filter already applied. Lab 2's other controls are unchanged |
 | Ticket Queue (`/staff/queue`) | The Status select gains **Unresolved**. Every other filter already lives in the URL (Lab 3) |
-| User Management (`/admin/users`) | The role filter is read from and written to `?role=` |
+| User Management (`/admin/users`) | The role filter is read from and written to `?role=`. `?status=active` or `?status=inactive` shows a removable chip, "Active only" or "Inactive only", beside the toolbar; removing it drops the parameter. The toolbar itself is unchanged (D-13) |
 | Ticket Detail (both) | `#action-<id>` scrolls to the card and focuses it |
 
 ## 8. Screen modes and feedback (labsheet §8.5)
