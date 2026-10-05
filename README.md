@@ -269,3 +269,16 @@ docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..03, 
   the Lab 2 journey's `artifacts/lab-02/screenshots/`; restore the Lab 2 ones with
   `git checkout artifacts/lab-02` if you only meant to refresh Lab 3. Each spec file
   removes its own test data when it ends, so the screenshots show the seeded data.
+
+## Lab 4 — Actions Taken, Resolution Gate, Dashboards & Final Hardening
+
+Lab 4 lets IT Staff and Administrators plan and record the work on a ticket as
+Actions Taken. The backend refuses to resolve a ticket until that work is done, each
+role gets a Dashboard as its home screen, and the whole application is hardened. The
+engineering contract lives in `docs/lab-04/` (`specification.md`, `api-spec.md`,
+`ui-spec.md`, `tests.md`).
+
+> **Status:** Issue 1 (the contract) is in review. Nothing in Lab 4 is implemented
+> yet; the Lab 3 instructions above still describe the running application. This
+> section gains the migration (and rollback), seed, test, and demonstration steps
+> as each issue lands.
