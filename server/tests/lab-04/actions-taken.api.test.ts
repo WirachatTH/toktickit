@@ -222,6 +222,13 @@ describe("creating (BR-01 to BR-11)", () => {
       await prisma.user.update({ where: { id: temp.id }, data: { isActive: false } });
       const [row] = (await list(t, "staff")).body.data;
       expect(row.assignee).toEqual({ id: temp.id, name: temp.name, role: "IT_STAFF", isActive: false });
+      // Re-sending the unchanged assignee, as an edit form does, is not a new assignment.
+      const edited = await edit(t, row.id, "staff", { expectedVersion: 1, description: "Still theirs", assigneeId: temp.id });
+      expect(edited.status).toBe(200);
+      expect(edited.body.assignee.id).toBe(temp.id);
+      // Assigning them afresh is refused.
+      const other = (await create(t, "staff", planned())).body;
+      expect((await edit(t, other.id, "staff", { expectedVersion: 1, assigneeId: temp.id })).status).toBe(400);
     } finally {
       await prisma.ticket.deleteMany({ where: { id: t } });
       await prisma.user.delete({ where: { id: temp.id } });
@@ -472,6 +479,13 @@ describe("server-owned fields and duplicates (BR-09, BR-43)", () => {
     const late = await create(t, "staff", planned({ clientRequestId: key }));
     expect(late.status).toBe(200);
     expect(late.body.id).toBe(first.body.id);
+
+    // A key already used on another ticket is refused, never answered with that ticket's action.
+    const elsewhere = await makeTicket();
+    const reused = await create(elsewhere, "staff", planned({ clientRequestId: key }));
+    expect(reused.status).toBe(400);
+    expect(reused.body.error.fields.clientRequestId).toBeTruthy();
+    expect(await prisma.actionTaken.count({ where: { ticketId: elsewhere } })).toBe(0);
   });
 
   it("API-20 accepts a follow-up only of a completed action that needs one, on the same ticket", async () => {
@@ -479,7 +493,8 @@ describe("server-owned fields and duplicates (BR-09, BR-43)", () => {
     const needs = (await create(t, "staff", completed({ followUpRequired: true, followUpNote: "Check again in a week." }))).body;
     expect(needs.followUpHandled).toBe(false);
     const plain = (await create(t, "staff", completed())).body;
-    const open = (await create(t, "staff", planned())).body;
+    // Flagged but still planned, so only the status check can refuse it (PR #75 review).
+    const open = (await create(t, "staff", planned({ followUpRequired: true, followUpNote: "Planned, but flagged." }))).body;
     const other = await makeTicket();
     const foreign = (await create(other, "staff", completed({ followUpRequired: true, followUpNote: "Elsewhere." }))).body;
     for (const followUpOfId of [plain.id, open.id, foreign.id, 2_000_000_000]) {

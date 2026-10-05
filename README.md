@@ -302,9 +302,13 @@ ticket's actions only while that ticket has none and still has its seeded status
 tickets you changed in a demo are left alone.
 
 ### Rolling back the Lab 4 migration
-Either restore the backup (`pg_restore --clean -d toktickit pre-lab4.dump` inside the
-database container), or apply the reviewed down-script, which removes exactly what
-the migration added and returns the schema to Lab 3:
+Either restore the backup, streaming the dump from the host into the database
+container as the `toktickit` user:
+```bash
+docker exec -i toktickit-db pg_restore -U toktickit --clean --if-exists -d toktickit < pre-lab4.dump
+```
+or apply the reviewed down-script, which removes exactly what the migration added and
+returns the schema to Lab 3:
 ```bash
 docker-compose exec server npx prisma db execute --file prisma/rollback/lab4_down.sql --schema prisma/schema.prisma
 ```

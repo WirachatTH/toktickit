@@ -65,10 +65,12 @@ const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[
 
 export function parseActionAt(raw: unknown): Date | null {
   if (typeof raw !== "string" || !ISO_WITH_OFFSET.test(raw)) return null;
-  const month = Number(raw.slice(5, 7));
-  const day = Number(raw.slice(8, 10));
   const date = new Date(raw);
-  if (Number.isNaN(date.getTime()) || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  if (Number.isNaN(date.getTime())) return null;
+  // The calendar date must exist as written: JavaScript would quietly read
+  // 31 February as 3 March.
+  const calendar = new Date(`${raw.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== raw.slice(0, 10)) return null;
   return date;
 }
 

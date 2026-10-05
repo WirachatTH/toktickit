@@ -345,7 +345,7 @@ All models live in `server/prisma/schema.prisma`.
 ### 7.1 Models
 | Model | Change | Fields |
 | :--- | :--- | :--- |
-| `ActionTaken` | new | `id`; `ticketId` (FK → Ticket, cascade); `actionAt`; `description` (≤2000); `result` (≤2000, nullable); `status` (`ActionTakenStatus`, default `PLANNED`); `assigneeId` (FK → User, restrict); `createdById` (FK → User, restrict); `performedById` (nullable FK → User, restrict); `followUpRequired` (bool, default `false`); `followUpNote` (≤1000, nullable); `attachmentNotes` (≤1000, nullable); `followUpOfId` (nullable FK → ActionTaken, restrict); `cancelReason` (≤1000, nullable); `cancelledById` (nullable FK → User, restrict); `completedAt`, `cancelledAt` (nullable); `version` (int, default 1); `clientRequestId` (UUID, nullable); `createdAt`; `updatedAt` |
+| `ActionTaken` | new | `id`; `ticketId` (FK → Ticket, cascade); `actionAt`; `description` (≤2000); `result` (≤2000, nullable); `status` (`ActionTakenStatus`, default `PLANNED`); `assigneeId` (FK → User, restrict); `createdById` (FK → User, restrict); `performedById` (nullable FK → User, restrict); `followUpRequired` (bool, default `false`); `followUpNote` (≤1000, nullable); `attachmentNotes` (≤1000, nullable); `followUpOfId` (nullable FK → ActionTaken, no action: checked at the end of the statement, so a ticket's cascade can delete a whole follow-up chain at once); `cancelReason` (≤1000, nullable); `cancelledById` (nullable FK → User, restrict); `completedAt`, `cancelledAt` (nullable); `version` (int, default 1); `clientRequestId` (UUID, nullable); `createdAt`; `updatedAt` |
 | `ActionTakenEvent` | new | `id`; `actionTakenId` (FK → ActionTaken, cascade); `type` (`ActionTakenEventType`); `actorId` (FK → User, restrict); `changes` (JSON: `{ field: { from, to } }`); `createdAt` |
 | `Ticket` | column added | `resolvedAt` (nullable timestamp, BR-31, BR-47) |
 | All Lab 3 models | unchanged | — |
@@ -417,7 +417,7 @@ the `CHECK` constraints and the backfill:
 
 | Group | Content |
 | :--- | :--- |
-| Actions Taken | about 25 actions across the seed tickets:<br>• tickets with **zero**, **one**, and **several** (≥4) actions;<br>• every action status;<br>• follow-up chains: one handled, one still open;<br>• several assignees, including an inactive IT Staff assignee kept from before deactivation, and an Administrator assignee;<br>• attachment notes on some. |
+| Actions Taken | 15 actions across the seed tickets, enough for every case below:<br>• tickets with **zero**, **one**, and **several** (≥4) actions;<br>• every action status;<br>• follow-up chains: one handled, one still open;<br>• several assignees, including an inactive IT Staff assignee kept from before deactivation, and an Administrator assignee;<br>• attachment notes on some. |
 | Gate states | an `IN_PROGRESS` ticket that can be resolved; one blocked by a planned action; one blocked by an open follow-up; one with no actions at all |
 | Resolved tickets | every seed `RESOLVED` or `CLOSED` ticket has a completed action (BR-49) and a `resolvedAt`, some within the last 7 days |
 | Dashboard data | IT Staff accounts with planned actions and owned tickets (non-zero), and the Administrator Krit Wattana, who owns no ticket and is assigned no action (zero "my" metrics); the Requester `first.login@kmutt.ac.th` has no tickets (empty Requester Dashboard). No account is added, so the Lab 3 account counts stay as documented |

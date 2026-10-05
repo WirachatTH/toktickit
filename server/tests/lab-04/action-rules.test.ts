@@ -92,7 +92,8 @@ describe("UNIT-02 the Action Date/Time window (BR-07)", () => {
   it("requires an ISO timestamp with an offset", () => {
     expect(parseActionAt("2026-10-05T09:00:00Z")).toEqual(new Date("2026-10-05T09:00:00Z"));
     expect(parseActionAt("2026-10-05T16:00:00+07:00")).toEqual(new Date("2026-10-05T09:00:00Z"));
-    for (const bad of ["2026-10-05T09:00:00", "2026-10-05", "yesterday", "2026-13-05T09:00:00Z", 1728118800000, null, undefined]) {
+    expect(parseActionAt("2028-02-29T09:00:00Z")).toEqual(new Date("2028-02-29T09:00:00Z")); // a leap day exists
+    for (const bad of ["2026-10-05T09:00:00", "2026-10-05", "yesterday", "2026-13-05T09:00:00Z", "2026-02-31T09:00:00Z", "2026-04-31T09:00:00+07:00", "2026-10-00T09:00:00Z", 1728118800000, null, undefined]) {
       expect(parseActionAt(bad), String(bad)).toBeNull();
     }
     expect(fieldsOf(parseCreateBody({ ...valid, actionAt: "2026-10-06T09:00:00" })).actionAt).toBeTruthy();

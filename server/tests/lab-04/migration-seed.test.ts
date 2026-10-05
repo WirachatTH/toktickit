@@ -176,6 +176,18 @@ describe("the database backs up the rules (MIG-05) and the seed (MIG-06, MIG-07)
     await seed(db);
     expect(await count()).toEqual(first);
     expect((await db.actionTaken.findUniqueOrThrow({ where: { id: sample.id } })).description).toBe("Changed by a demo");
+
+    // A seed ticket a demo has moved on gets no actions, even with none left (BR-48):
+    // planned work must never be added to a ticket a demo has since resolved.
+    const moved = await db.ticket.findFirstOrThrow({ where: { summary: "Laptop fan runs loudly and the case gets hot" } });
+    await db.actionTaken.deleteMany({ where: { ticketId: moved.id } });
+    await db.ticket.update({ where: { id: moved.id }, data: { currentStatus: "RESOLVED" } });
+    await seed(db);
+    expect(await db.actionTaken.count({ where: { ticketId: moved.id } })).toBe(0);
+    // Back in its seeded status with no actions, it gets them again.
+    await db.ticket.update({ where: { id: moved.id }, data: { currentStatus: "OPEN" } });
+    await seed(db);
+    expect(await db.actionTaken.count({ where: { ticketId: moved.id } })).toBe(1);
   });
 
   it("MIG-07 seeds every case the dashboards and the gate need", async () => {
