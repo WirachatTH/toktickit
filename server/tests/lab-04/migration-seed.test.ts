@@ -164,6 +164,8 @@ describe("the database backs up the rules (MIG-05) and the seed (MIG-06, MIG-07)
     await expect(insert(`, "version"`, `, 0`)).rejects.toThrow(/check constraint/i);
     await insert("", "");
     expect(await db.actionTaken.count()).toBe(before + 1);
+    // Leave the seeded data as the seed made it, for MIG-06 and MIG-07.
+    await db.actionTaken.deleteMany({ where: { description: "Check", ticketId: ticket.id } });
   });
 
   it("MIG-06 is idempotent and never changes an existing action", async () => {
@@ -236,5 +238,20 @@ describe("the database backs up the rules (MIG-05) and the seed (MIG-06, MIG-07)
     const krit = await db.user.findUniqueOrThrow({ where: { email: "krit.wattana@kmutt.ac.th" } });
     expect(plannedBy.has(krit.id)).toBe(false);
     expect(tickets.some((t) => t.ownerId === krit.id)).toBe(false);
+  });
+
+  it("MIG-07 dates planned work ahead and finished work in the past, even on tickets seeded long ago", async () => {
+    // A database seeded in Lab 3: the same tickets, a month older, without actions yet.
+    await db.actionTaken.deleteMany({});
+    await db.$executeRawUnsafe(`UPDATE "Ticket" SET "createdAt" = "createdAt" - interval '30 days', "updatedAt" = "updatedAt" - interval '30 days'`);
+    await seed(db);
+    const actions = await db.actionTaken.findMany({ include: { ticket: true } });
+    expect(actions.length).toBeGreaterThan(0);
+    const now = Date.now();
+    for (const a of actions) {
+      if (a.status === "PLANNED") expect(a.actionAt.getTime(), a.description).toBeGreaterThan(now);
+      else expect(a.actionAt.getTime(), a.description).toBeLessThanOrEqual(now);
+      expect(a.actionAt.getTime(), a.description).toBeGreaterThanOrEqual(a.ticket.createdAt.getTime());
+    }
   });
 });

@@ -70,11 +70,14 @@ describe("UNIT-01 text rules (BR-06)", () => {
   });
 
   it("checks the cancellation reason at 9, 10, 1000, and 1001 characters", () => {
-    const reason = (n: number) => parseStatusBody({ status: "CANCELLED", expectedVersion: 1, reason: "r".repeat(n) });
-    expect("fields" in reason(9) && reason(9).fields.reason).toBeTruthy();
-    expect("value" in reason(10)).toBe(true);
-    expect("value" in reason(1000)).toBe(true);
-    expect("fields" in reason(1001) && reason(1001).fields.reason).toBeTruthy();
+    const reasonError = (n: number) => {
+      const res = parseStatusBody({ status: "CANCELLED", expectedVersion: 1, reason: "r".repeat(n) });
+      return "fields" in res ? res.fields.reason : null;
+    };
+    expect(reasonError(9)).toBeTruthy();
+    expect(reasonError(10)).toBeNull();
+    expect(reasonError(1000)).toBeNull();
+    expect(reasonError(1001)).toBeTruthy();
     expect("fields" in parseStatusBody({ status: "CANCELLED", expectedVersion: 1, reason: `   ${"r".repeat(9)}   ` })).toBe(true);
   });
 

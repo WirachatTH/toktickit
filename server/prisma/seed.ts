@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import type { Priority, PrismaClient, Role, TicketStatus } from "@prisma/client";
+import type { ActionTakenStatus, Prisma, Priority, PrismaClient, Role, TicketStatus } from "@prisma/client";
 import { getPrisma } from "../src/prisma.js";
 import { hashPassword } from "../src/password.js";
 import { formatTicketNumber } from "../src/ticketNumber.js";
 
-// Lab 1 Issue 3, Lab 2 Issue 2, Lab 3 Issue 2 — reference data, accounts, and
-// sample tickets (docs/lab-03/specification.md §7.6).
+// Lab 1 Issue 3, Lab 2 Issue 2, Lab 3 Issue 2, Lab 4 Issue 2 — reference data,
+// accounts, sample tickets, and their Actions Taken (docs/lab-03/specification.md
+// §7.6, docs/lab-04/specification.md §7.6).
 //
 // IDEMPOTENT AND ADDITIVE (BR-78). Every run creates whatever is missing and
 // nothing else: it never overwrites an existing password, role, or activation
@@ -93,6 +94,8 @@ export interface SeedTicket {
   daysAgo: number;
   resolutionSummary?: string;
   requesterResolvedHoursAfter?: number;
+  // Lab 4 BR-31 — when a RESOLVED or CLOSED ticket was resolved.
+  resolvedHoursAfter?: number;
   comments?: SeedEntry[];
   notes?: SeedEntry[];
 }
@@ -160,21 +163,22 @@ export const TICKETS: SeedTicket[] = [
   { requester: "somchai", category: "Software", system: "Email", summary: "Calendar invites arrive about an hour late",
     description: "Meeting invites sent from other faculties arrive about an hour after they were sent.",
     requestedPriority: "LOW", itPriority: "LOW", status: "RESOLVED", owner: "chanon", daysAgo: 10,
-    resolutionSummary: "The mail server clock had drifted; it was corrected and invites now arrive on time." },
+    resolutionSummary: "The mail server clock had drifted; it was corrected and invites now arrive on time.", resolvedHoursAfter: 30 },
   { requester: "napassorn", category: "Hardware", system: "Printer", summary: "Registrar printer toner is empty",
     description: "The registrar office printer reports an empty toner cartridge and only prints blank pages.",
     requestedPriority: "MEDIUM", itPriority: "MEDIUM", status: "RESOLVED", owner: "pimchanok", daysAgo: 9,
-    resolutionSummary: "Toner cartridge replaced and a test page printed successfully." },
+    // Resolved about four days ago: inside the dashboards' 7-day window.
+    resolutionSummary: "Toner cartridge replaced and a test page printed successfully.", resolvedHoursAfter: 5 * 24 },
 
   // --- CLOSED ---
   { requester: "teerapat", category: "Network", system: "Campus Wi-Fi", summary: "New kiosk tablet cannot join staff Wi-Fi",
     description: "The new library kiosk tablet cannot join the staff Wi-Fi network and shows an authentication error.",
     requestedPriority: "MEDIUM", itPriority: "LOW", status: "CLOSED", owner: "worawit", daysAgo: 14,
-    resolutionSummary: "The tablet was registered on the staff network and connects normally." },
+    resolutionSummary: "The tablet was registered on the staff network and connects normally.", resolvedHoursAfter: 20 },
   { requester: "kanyarat", category: "Software", system: "LEB2 App", summary: "LEB2 app crashes when opening the gradebook",
     description: "The LEB2 app closes immediately whenever I open the gradebook for my course.",
     requestedPriority: "HIGH", itPriority: "HIGH", status: "CLOSED", owner: "chanon", daysAgo: 12,
-    resolutionSummary: "Fixed by the LEB2 update released this week; confirmed working by the Requester." },
+    resolutionSummary: "Fixed by the LEB2 update released this week; confirmed working by the Requester.", resolvedHoursAfter: 48 },
 
   // --- REOPENED: the reason is a Public Comment by the IT Staff member (BR-45) ---
   { requester: "piyawat", category: "Hardware", system: "Corporate Laptop", summary: "Laptop battery drains within an hour",
@@ -203,6 +207,97 @@ export const TICKETS: SeedTicket[] = [
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Actions Taken on the seed tickets (docs/lab-04/specification.md §7.6,
+// BR-48, BR-49). Keyed by ticket summary. Finished work (completed or
+// cancelled) happened `hoursAfter` the ticket's creation. Planned work is due
+// `hoursAhead` of the moment the seed runs, so it lies ahead even on a database
+// whose tickets were seeded long ago. Between them they give:
+// tickets with zero, one, and several actions; every action status; a handled
+// and an open follow-up; an Administrator assignee and an IT Staff member
+// deactivated since; and IN_PROGRESS tickets that can be resolved, are blocked
+// by planned work, and are blocked by an open follow-up. Every RESOLVED or
+// CLOSED ticket has completed work and nothing planned, so the seed never shows
+// a state the resolution gate would refuse (BR-49). Krit Wattana (Administrator)
+// owns nothing and is assigned nothing, so his own dashboard metrics are zero.
+// ---------------------------------------------------------------------------
+
+export interface SeedAction {
+  description: string;
+  status: ActionTakenStatus;
+  assignee: Key;
+  createdBy: Key;
+  hoursAfter?: number; // finished work: hours after the ticket was created
+  hoursAhead?: number; // planned work: hours after the seed runs
+  result?: string;
+  followUpNote?: string; // present = follow-up required (BR-04)
+  attachmentNotes?: string;
+  followUpOf?: number; // index of the earlier action in this ticket's list (BR-14)
+  cancelReason?: string;
+}
+
+export const ACTIONS: Record<string, SeedAction[]> = {
+  // IN_PROGRESS, blocked by planned work; four actions, a handled follow-up, and a cancellation.
+  "VPN disconnects while uploading large files": [
+    { description: "Raised the VPN idle timeout from 30 to 120 minutes.", status: "COMPLETED", assignee: "chanon", createdBy: "chanon", hoursAfter: 22,
+      result: "Uploads of 150 MB now finish; 300 MB uploads still drop.", followUpNote: "Test a 500 MB upload after changing the gateway MTU.",
+      attachmentNotes: "Gateway settings before the change: vpn-gateway-before.txt on the IT share." },
+    { description: "Replace the Requester's home router.", status: "CANCELLED", assignee: "pimchanok", createdBy: "chanon", hoursAfter: 30,
+      cancelReason: "Not needed: the fault is on our VPN gateway, not the home router." },
+    { description: "Lowered the VPN gateway MTU to 1400 and retested large uploads.", status: "COMPLETED", assignee: "worawit", createdBy: "worawit", hoursAfter: 46,
+      result: "A 500 MB upload completed twice without dropping.", followUpOf: 0 },
+    { description: "Confirm with the Requester after a week of normal use.", status: "PLANNED", assignee: "chanon", createdBy: "chanon", hoursAhead: 48 },
+  ],
+  // IN_PROGRESS, ready to resolve: completed work, nothing planned, no open follow-up.
+  "LEB2 shows the wrong timetable for semester 1": [
+    { description: "Cleared the timetable cache and re-synced semester 1.", status: "COMPLETED", assignee: "worawit", createdBy: "worawit", hoursAfter: 26,
+      result: "The semester 1 timetable now shows correctly for the reporting user." },
+  ],
+  // IN_PROGRESS, blocked by an open follow-up; assigned to an Administrator.
+  "Request read access to the grade submission app": [
+    { description: "Asked the head of department to approve read access.", status: "COMPLETED", assignee: "siriporn", createdBy: "pimchanok", hoursAfter: 6,
+      result: "Approval request sent by email; waiting for the reply.", followUpNote: "Grant read access once the approval arrives." },
+  ],
+  // OPEN, exactly one action, planned.
+  "Laptop fan runs loudly and the case gets hot": [
+    { description: "Clean the fan and replace the thermal paste.", status: "PLANNED", assignee: "pimchanok", createdBy: "pimchanok", hoursAhead: 24,
+      attachmentNotes: "Fan noise recording: fan-noise.m4a, to be attached by the Requester." },
+  ],
+  "Shared finance mailbox missing from Outlook": [
+    { description: "Re-granted the finance mailbox permission from the admin console.", status: "COMPLETED", assignee: "worawit", createdBy: "worawit", hoursAfter: 4,
+      result: "Permission applied; waiting for the Requester to restart Outlook.", attachmentNotes: "Permission page screenshot: mailbox-permissions.png on the IT share." },
+  ],
+  "Calendar invites arrive about an hour late": [
+    { description: "Corrected the mail server clock and turned on NTP sync.", status: "COMPLETED", assignee: "chanon", createdBy: "chanon", hoursAfter: 28,
+      result: "Test invites from two faculties arrived within a minute." },
+  ],
+  "Registrar printer toner is empty": [
+    { description: "Replaced the toner cartridge.", status: "COMPLETED", assignee: "pimchanok", createdBy: "pimchanok", hoursAfter: 4.5 * 24,
+      result: "A test page printed cleanly." },
+  ],
+  "New kiosk tablet cannot join staff Wi-Fi": [
+    { description: "Registered the tablet's MAC address on the staff network.", status: "COMPLETED", assignee: "worawit", createdBy: "worawit", hoursAfter: 18,
+      result: "The tablet connects and stays connected." },
+  ],
+  "LEB2 app crashes when opening the gradebook": [
+    { description: "Installed this week's LEB2 update on the Requester's device.", status: "COMPLETED", assignee: "chanon", createdBy: "chanon", hoursAfter: 46,
+      result: "The gradebook opens without crashing." },
+  ],
+  // REOPENED: earlier work completed, new work planned.
+  "Laptop battery drains within an hour": [
+    { description: "Recalibrated the battery.", status: "COMPLETED", assignee: "pimchanok", createdBy: "pimchanok", hoursAfter: 20,
+      result: "The battery lasted three hours in testing." },
+    { description: "Replace the battery with a new unit.", status: "PLANNED", assignee: "pimchanok", createdBy: "pimchanok", hoursAhead: 72 },
+  ],
+  // Assigned before Suda Kaewmanee was deactivated; the assignee stays (BR-08).
+  "VPN asks for the authenticator code twice": [
+    { description: "Reinstall the VPN client with the new profile.", status: "PLANNED", assignee: "suda", createdBy: "suda", hoursAhead: 24 },
+  ],
+};
+
+// How many actions the most recent seed() run created (printed by main()).
+let lastActionsCreated = 0;
 
 export interface SeedSummary {
   createdAccounts: number;
@@ -263,6 +358,9 @@ async function ensureTicket(
     ...(seed.comments ?? []).map((c) => c.hoursAfter),
     ...(seed.notes ?? []).map((n) => n.hoursAfter),
     seed.requesterResolvedHoursAfter ?? 0,
+    seed.resolvedHoursAfter ?? 0,
+    // Finished actions are activity too (Lab 4 BR-21); planned ones may lie ahead.
+    ...(ACTIONS[seed.summary] ?? []).map((a) => a.hoursAfter ?? 0),
   );
 
   await prisma.$transaction(async (tx) => {
@@ -281,6 +379,7 @@ async function ensureTicket(
         currentStatus: seed.status,
         resolutionSummary: seed.resolutionSummary ?? null,
         requesterResolvedAt: seed.requesterResolvedHoursAfter === undefined ? null : at(seed.requesterResolvedHoursAfter),
+        resolvedAt: seed.resolvedHoursAfter === undefined ? null : at(seed.resolvedHoursAfter),
         createdAt,
         updatedAt: at(lastActivity),
       },
@@ -302,6 +401,70 @@ async function ensureTicket(
     }
   });
   summary.createdTickets += 1;
+}
+
+// BR-48 — a seed ticket's actions are added only while the ticket has none and
+// is still in its seeded status. A re-run therefore adds nothing, an action a
+// demo edited is never duplicated, and no planned work is added to a ticket a
+// demo has since resolved (which would break BR-49).
+async function ensureActions(prisma: PrismaClient, seed: SeedTicket, users: Map<string, number>): Promise<number> {
+  const plan = ACTIONS[seed.summary];
+  if (!plan) return 0;
+  const ticket = await prisma.ticket.findFirst({
+    where: { requesterId: users.get(seed.requester)!, summary: seed.summary },
+    select: { id: true, createdAt: true, currentStatus: true, _count: { select: { actionsTaken: true } } },
+  });
+  if (!ticket || ticket.currentStatus !== seed.status || ticket._count.actionsTaken > 0) return 0;
+
+  const at = (hours: number) => new Date(ticket.createdAt.getTime() + hours * HOUR);
+  const now = Date.now();
+  await prisma.$transaction(async (tx) => {
+    const ids: number[] = [];
+    for (const a of plan) {
+      // Planned work was planned an hour after the ticket arrived; finished work
+      // was recorded when it happened.
+      const createdAt = a.status === "PLANNED" ? at(1) : at(a.hoursAfter!);
+      const actionAt = a.status === "PLANNED" ? new Date(now + a.hoursAhead! * HOUR) : at(a.hoursAfter!);
+      const createdById = users.get(a.createdBy)!;
+      const data = {
+        ticketId: ticket.id,
+        actionAt,
+        description: a.description,
+        result: a.result ?? null,
+        status: a.status,
+        assigneeId: users.get(a.assignee)!,
+        createdById,
+        performedById: a.status === "COMPLETED" ? createdById : null,
+        completedAt: a.status === "COMPLETED" ? createdAt : null,
+        cancelledById: a.status === "CANCELLED" ? createdById : null,
+        cancelledAt: a.status === "CANCELLED" ? createdAt : null,
+        cancelReason: a.cancelReason ?? null,
+        followUpRequired: a.followUpNote !== undefined,
+        followUpNote: a.followUpNote ?? null,
+        attachmentNotes: a.attachmentNotes ?? null,
+        followUpOfId: a.followUpOf === undefined ? null : ids[a.followUpOf],
+        version: a.status === "CANCELLED" ? 2 : 1,
+        createdAt,
+      };
+      const created = await tx.actionTaken.create({ data, select: { id: true } });
+      ids.push(created.id);
+      // The history the API would have written (BR-22): a cancelled action was
+      // planned first, then cancelled; a completed one was recorded as done.
+      const snapshot: Record<string, { from: null; to: unknown }> = {};
+      for (const key of ["actionAt", "description", "assigneeId", "result", "followUpRequired", "followUpNote", "attachmentNotes", "followUpOfId"] as const) {
+        const value = data[key];
+        if (value !== null) snapshot[key] = { from: null, to: value instanceof Date ? value.toISOString() : value };
+      }
+      snapshot.status = { from: null, to: a.status === "CANCELLED" ? "PLANNED" : a.status };
+      await tx.actionTakenEvent.create({ data: { actionTakenId: created.id, type: "CREATED", actorId: createdById, changes: snapshot as Prisma.InputJsonValue, createdAt } });
+      if (a.status === "CANCELLED") {
+        await tx.actionTakenEvent.create({
+          data: { actionTakenId: created.id, type: "CANCELLED", actorId: createdById, createdAt, changes: { status: { from: "PLANNED", to: "CANCELLED" }, cancelReason: { from: null, to: a.cancelReason ?? null } } },
+        });
+      }
+    }
+  });
+  return plan.length;
 }
 
 export async function seed(prisma: PrismaClient): Promise<SeedSummary> {
@@ -333,6 +496,10 @@ export async function seed(prisma: PrismaClient): Promise<SeedSummary> {
     await ensureTicket(prisma, ticket, { users, categories, systems }, summary);
   }
 
+  // Lab 4 — Actions Taken. Counted separately, so the Lab 3 summary keeps its shape.
+  lastActionsCreated = 0;
+  for (const ticket of TICKETS) lastActionsCreated += await ensureActions(prisma, ticket, users);
+
   return summary;
 }
 
@@ -341,6 +508,7 @@ async function main() {
   console.log("Seeding complete.");
   console.log(`  Accounts created: ${summary.createdAccounts}; passwords assigned to existing accounts: ${summary.passwordsAssigned}`);
   console.log(`  Sample tickets created: ${summary.createdTickets}`);
+  console.log(`  Actions Taken created: ${lastActionsCreated}`);
   console.log(`  Local-development password for every documented account: ${SEED_PASSWORD}`);
   console.log(`  ${FIRST_LOGIN_EMAIL} must change it at first sign-in.`);
 }

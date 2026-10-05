@@ -159,7 +159,7 @@ describe("creating (BR-01 to BR-11)", () => {
 
   it("API-05 an Administrator creates, edits, completes, and cancels actions like IT Staff", async () => {
     const t = await makeTicket();
-    const a = await create(t, "admin", planned({ assigneeId: users.admin.id }));
+    const a = await create(t, "admin", planned({ assigneeId: users.admin.id, actionAt: iso(-1) }));
     expect(a.status).toBe(201);
     expect((await edit(t, a.body.id, "admin", { expectedVersion: 1, description: "Order a battery" })).status).toBe(200);
     const done = await setStatus(t, a.body.id, "admin", { status: "COMPLETED", expectedVersion: 2, result: "Battery ordered." });
@@ -465,6 +465,13 @@ describe("server-owned fields and duplicates (BR-09, BR-43)", () => {
     expect(theirs.status).toBe(201);
     expect(theirs.body.id).not.toBe(first.body.id);
     expect(await prisma.actionTaken.count({ where: { ticketId: t } })).toBe(3);
+
+    // A retry reports the original success even if the ticket moved on in between:
+    // it is the same request, not a new one checked against today's state.
+    await prisma.ticket.update({ where: { id: t }, data: { currentStatus: "RESOLVED" } });
+    const late = await create(t, "staff", planned({ clientRequestId: key }));
+    expect(late.status).toBe(200);
+    expect(late.body.id).toBe(first.body.id);
   });
 
   it("API-20 accepts a follow-up only of a completed action that needs one, on the same ticket", async () => {

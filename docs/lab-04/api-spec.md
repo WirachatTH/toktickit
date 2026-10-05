@@ -207,7 +207,12 @@ Both update the ticket's `updatedAt`. **Response `200`:** `<Action Taken>`.
 | `409` | `TICKET_RESOLVED` / `TICKET_CLOSED` | ticket status |
 | `409` | `ACTION_NOT_PLANNED` | already `COMPLETED` or `CANCELLED` |
 
-The check order is the same as §1.4.
+The check order follows §1.4, with one refinement: fields the request sends are checked
+before the `409`s, but the stored values a completion inherits (its result, its date,
+its follow-up note) are checked after them. An action that is already final therefore
+always answers `409 ACTION_NOT_PLANNED`, never a complaint about its old values; a
+planned action dated in the future answers `400` on `actionAt` until the completion
+sends a past date.
 
 ### 1.6 `GET /api/tickets/:id/actions-taken/:actionId/history`
 **Roles:** IT Staff, Administrator. Requester → `403` (BR-15).
