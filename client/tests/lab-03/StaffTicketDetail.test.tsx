@@ -48,6 +48,8 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
   vi.spyOn(api, "fetchInternalNotes").mockResolvedValue([]);
+  // Lab 4, Issue 3 — the screen now also loads its Actions Taken (setup only, BR-46).
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
   vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([person(8, "Pimchanok Srisuk"), person(10, "Chanon Rattanakorn"), person(9, "Siriporn Boonmee", "ADMINISTRATOR")]);
 });
 
@@ -211,7 +213,9 @@ describe("UI-25 the Administrator's view (FR-30, BR-21)", () => {
   it("shows everything read-only: no controls, no composers, and the note", async () => {
     renderDetail(ticket({ permittedTransitions: [], capabilities: NO_CAPS }), ADMIN);
     const panel = await screen.findByRole("region", { name: "Ticket controls" });
-    expect(within(panel).getByText("Administrators can view tickets but not change them.")).toBeInTheDocument();
+    // Lab 4 BR-17 (BR-46): Administrators now manage Actions Taken, and the note says so;
+    // every Lab 3 ticket control stays read-only, as asserted around it.
+    expect(within(panel).getByText("Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.")).toBeInTheDocument();
     expect(within(panel).getByText("Chanon Rattanakorn")).toBeInTheDocument();
     expect(within(panel).queryByRole("combobox")).toBeNull();
     expect(within(panel).queryByRole("button")).toBeNull();

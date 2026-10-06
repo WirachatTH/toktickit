@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import * as api from "../../src/api.js";
+import { LAB4_CALLS } from "../lab-04/lab4ApiCalls.js";
 
 // Every API call sends the session cookie (credentials: "include") and stays
 // on the page's own origin (relative /api URL, D-11). Raised in the PR #55
@@ -68,6 +69,8 @@ describe("every API call carries the session cookie (PR #55 review)", () => {
       .filter(([name, value]) => typeof value === "function" && name !== "ApiError" && name !== "onSessionEnded")
       .map(([name]) => name)
       .sort();
-    expect(exported).toEqual(CALLS.map(([name]) => name).sort());
+    // Lab 4 BR-46: the Lab 4 calls are checked in lab-04/apiCredentials.lab4.test.ts
+    // (REG-05); together the two lists must still cover every export.
+    expect(exported).toEqual([...CALLS, ...LAB4_CALLS].map(([name]) => name).sort());
   });
 });
