@@ -1,4 +1,4 @@
-import type { Role, TicketStatus } from "../api.js";
+import type { ActionTakenStatus, Role, TicketStatus } from "../api.js";
 
 export type Priority = "LOW" | "MEDIUM" | "HIGH";
 
@@ -57,4 +57,31 @@ const ROLE_BADGE: Record<Role, [string, string]> = {
 export function RoleBadge({ role }: { role: Role }) {
   const [modifier, label] = ROLE_BADGE[role] ?? ["zg-badge--unknown", String(role)];
   return <span className={`zg-badge ${modifier}`}>{label}</span>;
+}
+
+// Lab 4, Issue 3 — action status badges and follow-up pills (docs/lab-04/ui-spec.md
+// §1.1, §1.2). An action's words never repeat a ticket status's, and every
+// state carries its text and an icon, so colour is never the only signal.
+const ACTION_BADGE: Record<ActionTakenStatus, [string, string, string]> = {
+  PLANNED: ["zg-badge--action-planned", "Planned", "◷"],
+  COMPLETED: ["zg-badge--action-completed", "Completed", "✓"],
+  CANCELLED: ["zg-badge--action-cancelled", "Cancelled", "✕"],
+};
+
+export function ActionStatusBadge({ status }: { status: ActionTakenStatus }) {
+  const [modifier, label, icon] = ACTION_BADGE[status] ?? ["zg-badge--unknown", String(status), ""];
+  return (
+    <span className="zg-badge-group">
+      <span aria-hidden="true" className="zg-badge-icon">{icon}</span>
+      <span className={`zg-badge ${modifier}`}>{label}</span>
+    </span>
+  );
+}
+
+export function FollowUpPill({ handled }: { handled: boolean }) {
+  return handled ? (
+    <span className="zg-pill zg-pill--followup-handled">Follow-up handled</span>
+  ) : (
+    <span className="zg-pill zg-pill--followup-needed">Follow-up needed</span>
+  );
 }

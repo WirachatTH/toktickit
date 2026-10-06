@@ -269,7 +269,9 @@ test.describe("the staff ticket flow", () => {
     await expectQueueLayout(page, info);
     await shot(page, info, "staff-queue", "admin-read-only");
     await page.goto(`/staff/tickets/${ticketId}`);
-    await expect(page.getByText("Administrators can view tickets but not change them.")).toBeVisible();
+    // Lab 4 BR-17 (BR-46): the note now says Administrators manage Actions Taken;
+    // every Lab 3 ticket control below stays absent.
+    await expect(page.getByText("Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.")).toBeVisible();
     await expect(controls.getByRole("combobox")).toHaveCount(0);
     await expect(controls.getByRole("button")).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: /Add a public comment|Add an internal note/ })).toHaveCount(0);

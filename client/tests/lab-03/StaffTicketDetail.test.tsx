@@ -14,8 +14,9 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 const STAFF: api.AuthUser = { id: 8, name: "Pimchanok Srisuk", email: "pimchanok.srisuk@kmutt.ac.th", role: "IT_STAFF", isActive: true, mustChangePassword: false };
 const ADMIN: api.AuthUser = { ...STAFF, id: 9, name: "Siriporn Boonmee", email: "siriporn.boonmee@kmutt.ac.th", role: "ADMINISTRATOR" };
 const person = (id: number, name: string, role: api.Role = "IT_STAFF", isActive = true) => ({ id, name, role, isActive });
-const ALL_CAPS = { canAssign: true, canChangePriority: true, canChangeStatus: true, canPostComment: true, canPostNote: true };
-const NO_CAPS = { canAssign: false, canChangePriority: false, canChangeStatus: false, canPostComment: false, canPostNote: false };
+// Lab 4 BR-46 (setup only): the payload now always carries canWriteActions.
+const ALL_CAPS = { canAssign: true, canChangePriority: true, canChangeStatus: true, canPostComment: true, canPostNote: true, canWriteActions: true };
+const NO_CAPS = { canAssign: false, canChangePriority: false, canChangeStatus: false, canPostComment: false, canPostNote: false, canWriteActions: false };
 
 function ticket(over: Partial<Detail> = {}): Detail {
   return {

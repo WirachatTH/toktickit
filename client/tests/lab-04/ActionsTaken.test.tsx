@@ -139,8 +139,11 @@ describe("UI-01 list mode (FR-01, ui-spec §1.5, §4.2)", () => {
     expect(within(done).getByText("battery-report.pdf on this ticket")).toBeInTheDocument();
     expect(within(done).getByText("Follow-up needed")).toBeInTheDocument();
     expect(within(done).getByText("Check again in a week.")).toBeInTheDocument();
-    // An empty value is a dash, never a blank.
-    expect(within(card("Replace the laptop battery.")).getAllByText("—").length).toBeGreaterThan(0);
+    // An empty value is a dash, never a blank — for each field, not just somewhere on the card.
+    const planned = card("Replace the laptop battery.");
+    const valueOf = (label: string) => within(planned).getByText(label).nextElementSibling?.textContent;
+    expect(valueOf("Result")).toBe("—");
+    expect(valueOf("Attachment notes")).toBe("—");
   });
 
   it("shows the empty state", async () => {
@@ -191,6 +194,12 @@ describe("UI-02 create mode (FR-02, BR-04, BR-11, ui-spec §4.3)", () => {
 
     await userEvent.click(within(panel).getByRole("radio", { name: "Plan this work" }));
     await userEvent.type(within(panel).getByLabelText(/Action description/), "Replace the laptop battery.");
+    // Follow-up ticked without a note: refused under the note, nothing sent (BR-04).
+    await userEvent.click(within(panel).getByRole("checkbox", { name: "Follow-up required?" }));
+    await userEvent.click(within(panel).getByRole("button", { name: "Save action" }));
+    expect(within(panel).getByText("Enter a follow-up note.")).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+    await userEvent.click(within(panel).getByRole("checkbox", { name: "Follow-up required?" }));
     await userEvent.type(within(panel).getByLabelText(/Attachment notes/), "photo-1.jpg");
     await userEvent.click(within(panel).getByRole("button", { name: "Save action" }));
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
@@ -268,6 +277,25 @@ describe("UI-05 complete and cancel dialogs (FR-04, ui-spec §4.5)", () => {
     expect(await screen.findByText("Action completed")).toBeInTheDocument();
     // FR-09 — the ticket and its controls reload with the change.
     await waitFor(() => expect(loadTicket).toHaveBeenCalledTimes(2));
+  });
+
+  it("starts a future-dated planned action's completion date at now, and keeps a past date as planned", async () => {
+    const future = action({ id: 119, description: "Due next week.", actionAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() });
+    renderStaff(staffTicket(), [PLANNED, future]);
+    await screen.findByRole("heading", { name: "Actions taken (2)" });
+    const dateIn = async (description: string) => {
+      await userEvent.click(within(card(description)).getByRole("button", { name: "Complete" }));
+      const dialog = await screen.findByRole("dialog", { name: "Complete this action?" });
+      const value = (within(dialog).getByLabelText(/Action date & time/) as HTMLInputElement).value;
+      await userEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      return Date.parse(`${value}:00+07:00`);
+    };
+    const now = Date.now();
+    const fromFuture = await dateIn("Due next week.");
+    expect(fromFuture).toBeLessThanOrEqual(now + 60_000);
+    expect(fromFuture).toBeGreaterThan(now - 120_000);
+    expect(await dateIn("Replace the laptop battery.")).toBe(Date.parse("2026-10-03T03:30:00.000Z"));
   });
 
   it("asks for a reason of at least 10 characters before cancelling", async () => {
@@ -356,6 +384,9 @@ describe("UI-08 repeated clicks and failures (BR-43, BR-44)", () => {
     const create = vi.spyOn(api, "createActionTaken").mockImplementationOnce(() => new Promise((_resolve, reject) => (fail = reject)));
     const save = within(panel).getByRole("button", { name: "Save action" });
     await userEvent.click(save);
+    // The button shows it is working and takes no more clicks (ui-spec §4.3).
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("Saving…");
     await userEvent.click(save);
     await userEvent.click(save);
     expect(create).toHaveBeenCalledTimes(1);
@@ -419,6 +450,11 @@ describe("UI-10 the Administrator (BR-17, ui-spec §4.7)", () => {
     const controls = screen.getByRole("region", { name: "Ticket controls" });
     expect(within(controls).getByText("Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.")).toBeInTheDocument();
     expect(within(controls).queryByRole("combobox")).not.toBeInTheDocument();
+    // They choose an assignee from the same eligible list (BR-08).
+    await userEvent.click(screen.getByRole("button", { name: "Add action" }));
+    const select = within(await screen.findByRole("dialog", { name: "Add action" })).getByLabelText(/Assigned to/);
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["Pimchanok Srisuk", "Chanon Rattanakorn", "Siriporn Boonmee"]);
+    expect(select).toHaveValue("9");
   });
 });
 
