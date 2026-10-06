@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import * as api from "../../src/api.js";
@@ -211,6 +211,19 @@ describe("UI-02 create mode (FR-02, BR-04, BR-11, ui-spec §4.3)", () => {
     expect(await screen.findByText("Action added")).toBeInTheDocument();
   });
 
+  it("moves focus to the new card once it is listed (ui-spec §4.6; PR #76 review)", async () => {
+    const { loadActions } = renderStaff(staffTicket(), []);
+    await userEvent.click(await screen.findByRole("button", { name: "Add action" }));
+    const panel = await screen.findByRole("dialog", { name: "Add action" });
+    await userEvent.type(within(panel).getByLabelText(/Action description/), "Replace the laptop battery.");
+    vi.spyOn(api, "createActionTaken").mockResolvedValue(PLANNED);
+    // The reload takes a moment, as it does over a network: the card appears
+    // only after the save has finished.
+    loadActions.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve([PLANNED]), 50)));
+    await userEvent.click(within(panel).getByRole("button", { name: "Save action" }));
+    await waitFor(() => expect(document.activeElement?.id).toBe("action-118"));
+  });
+
   it("offers a follow-up link only to completed actions still needing one", async () => {
     renderStaff(staffTicket(), [COMPLETED, PLANNED]);
     await userEvent.click(await screen.findByRole("button", { name: "Add action" }));
@@ -296,6 +309,17 @@ describe("UI-05 complete and cancel dialogs (FR-04, ui-spec §4.5)", () => {
     expect(fromFuture).toBeLessThanOrEqual(now + 60_000);
     expect(fromFuture).toBeGreaterThan(now - 120_000);
     expect(await dateIn("Replace the laptop battery.")).toBe(Date.parse("2026-10-03T03:30:00.000Z"));
+
+    // Completing it sends that date, since the stored one is in the future (BR-07).
+    await userEvent.click(within(card("Due next week.")).getByRole("button", { name: "Complete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete this action?" });
+    const send = vi.spyOn(api, "changeActionStatus").mockResolvedValue({ ...future, status: "COMPLETED", result: "Done early.", performedBy: PIM, version: 2 });
+    await userEvent.type(within(dialog).getByLabelText(/Result/), "Done early.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mark as completed" }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    const sent = Date.parse(String((send.mock.calls[0][2] as { actionAt?: string }).actionAt));
+    expect(sent).toBeLessThanOrEqual(Date.now() + 60_000);
+    expect(sent).toBeGreaterThan(Date.now() - 180_000);
   });
 
   it("asks for a reason of at least 10 characters before cancelling", async () => {
@@ -370,6 +394,71 @@ describe("UI-07 a stale edit (BR-25, BR-44, ui-spec §4.6)", () => {
     expect(await screen.findByText("This action was already completed or cancelled.")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(loadActions).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("UI-07 nothing changed, nothing sent (BR-23, ui-spec §4.4; PR #76 review)", () => {
+  // Seeded and API-made actions carry seconds; the date field shows minutes only.
+  const SECONDS = action({ actionAt: "2026-10-03T03:30:19.700Z" });
+
+  it("an unchanged edit sends no date and says there was nothing to save", async () => {
+    renderStaff(staffTicket(), [SECONDS]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Edit" }));
+    const panel = await screen.findByRole("dialog", { name: "Edit action" });
+    const update = vi.spyOn(api, "updateActionTaken").mockResolvedValue(SECONDS);
+    await userEvent.click(within(panel).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][2]).not.toHaveProperty("actionAt");
+    expect(await screen.findByText("No changes to save.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("an edited date is sent, as Bangkok time", async () => {
+    renderStaff(staffTicket(), [SECONDS]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Edit" }));
+    const panel = await screen.findByRole("dialog", { name: "Edit action" });
+    const update = vi.spyOn(api, "updateActionTaken").mockResolvedValue({ ...SECONDS, version: 2 });
+    const date = within(panel).getByLabelText(/Action date & time/);
+    fireEvent.change(date, { target: { value: "2026-10-04T09:15" } });
+    await userEvent.click(within(panel).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][2]).toMatchObject({ actionAt: "2026-10-04T09:15:00+07:00" });
+  });
+
+  it("completing a past-dated action keeps its stored time unless the date is changed", async () => {
+    renderStaff(staffTicket(), [SECONDS]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Complete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete this action?" });
+    const send = vi.spyOn(api, "changeActionStatus").mockResolvedValue({ ...SECONDS, status: "COMPLETED", result: "Done.", performedBy: PIM, version: 2 });
+    await userEvent.type(within(dialog).getByLabelText(/Result/), "Done.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mark as completed" }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect(send.mock.calls[0][2]).not.toHaveProperty("actionAt");
+  });
+});
+
+describe("UI-07 a stale conflict in a dialog keeps what was typed (BR-44; PR #76 review)", () => {
+  it("reloads the action under the Cancel dialog, keeps the reason, and retries with the new version", async () => {
+    const { loadActions } = renderStaff(staffTicket(), [PLANNED]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Cancel action" }));
+    const dialog = await screen.findByRole("dialog", { name: "Cancel this action?" });
+    await userEvent.type(within(dialog).getByLabelText(/Reason/), "The Requester bought a new laptop.");
+    loadActions.mockResolvedValue([{ ...PLANNED, description: "Edited meanwhile", version: 2 }]);
+    const send = vi
+      .spyOn(api, "changeActionStatus")
+      .mockRejectedValueOnce(new ApiError(409, "STALE_STATE", "Changed by someone else."))
+      .mockResolvedValueOnce({ ...CANCELLED, id: 118, version: 3 });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel action" }));
+    const again = await screen.findByRole("dialog", { name: "Cancel this action?" });
+    expect(await within(again).findByText("This action was changed by someone else. It has been reloaded.")).toBeInTheDocument();
+    expect(within(again).getByLabelText(/Reason/)).toHaveValue("The Requester bought a new laptop.");
+    await userEvent.click(within(again).getByRole("button", { name: "Cancel action" }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(send.mock.calls[1][2]).toMatchObject({ expectedVersion: 2, reason: "The Requester bought a new laptop." });
   });
 });
 

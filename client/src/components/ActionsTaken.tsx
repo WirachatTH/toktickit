@@ -173,7 +173,11 @@ export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, c
   // After a save, focus moves to the card it changed (ui-spec §4.6).
   useEffect(() => {
     if (focusId === null || !actions || editor || confirm) return;
-    document.getElementById(`action-${focusId}`)?.focus();
+    // A new card appears only once the list has reloaded, so the request waits
+    // for it rather than being used up on the list before (PR #76 review).
+    const card = document.getElementById(`action-${focusId}`);
+    if (!card) return;
+    card.focus();
     setFocusId(null);
   }, [focusId, actions, editor, confirm]);
 
@@ -289,9 +293,12 @@ export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, c
           clientRequestId: editor.requestId,
         });
       } else {
+        // The date field shows minutes only; sending it back unchanged would cut
+        // the seconds off a stored time and record an edit nobody made.
+        const dateChanged = form.actionAt !== toBangkokInput(new Date(editor.action.actionAt));
         saved = await updateActionTaken(ticketId, editor.action.id, {
           expectedVersion: editor.action.version,
-          actionAt: fromBangkokInput(form.actionAt),
+          ...(dateChanged ? { actionAt: fromBangkokInput(form.actionAt) } : {}),
           description: trimmed(form.description),
           assigneeId: Number(form.assigneeId),
           result: trimmed(form.result) || null,
@@ -498,7 +505,7 @@ export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, c
 
       {confirm && (
         <ConfirmDialog
-          key={`${confirm.kind}-${confirm.action.id}-${confirm.action.version}`}
+          key={`${confirm.kind}-${confirm.action.id}`}
           confirm={confirm}
           banner={panelBanner}
           busy={busy}
@@ -650,7 +657,7 @@ function ActionCard({ action: a, staff, editable, currentUserId, followUpOf, his
   );
 }
 
-type StatusBody = { status: "COMPLETED"; result: string; followUpRequired: boolean; followUpNote: string | null; actionAt: string } | { status: "CANCELLED"; reason: string };
+type StatusBody = { status: "COMPLETED"; result: string; followUpRequired: boolean; followUpNote: string | null; actionAt?: string } | { status: "CANCELLED"; reason: string };
 
 function ConfirmDialog({
   confirm,
@@ -672,7 +679,11 @@ function ConfirmDialog({
   const [note, setNote] = useState(a.followUpNote ?? "");
   // Completed work can't be dated ahead (BR-07): planned work dated in the
   // future starts from now, so completing it needs no date edit.
-  const [at, setAt] = useState(() => toBangkokInput(new Date(Math.min(Date.parse(a.actionAt), Date.now()))));
+  const [initialAt] = useState(() => toBangkokInput(new Date(Math.min(Date.parse(a.actionAt), Date.now()))));
+  const [at, setAt] = useState(initialAt);
+  // A date is sent only when it differs from the stored one: when the user
+  // changed it, or when planned work dated ahead has to be completed as of now.
+  const sendDate = at !== initialAt || Date.parse(a.actionAt) > Date.now();
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const titleId = completing ? "complete-dialog-title" : "cancel-dialog-title";
@@ -691,7 +702,7 @@ function ConfirmDialog({
     setErrors(found);
     if (Object.keys(found).length) return;
     const body: StatusBody = completing
-      ? { status: "COMPLETED", result: result.trim(), followUpRequired: followUp, followUpNote: followUp ? note.trim() : null, actionAt: fromBangkokInput(at) }
+      ? { status: "COMPLETED", result: result.trim(), followUpRequired: followUp, followUpNote: followUp ? note.trim() : null, ...(sendDate ? { actionAt: fromBangkokInput(at) } : {}) }
       : { status: "CANCELLED", reason: reason.trim() };
     const fields = await onSubmit(body);
     if (fields) setErrors(fields);
