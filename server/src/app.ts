@@ -21,6 +21,7 @@ import { registerDiscussionRoutes } from "./discussion.js";
 import { registerStaffQueueRoutes } from "./staffQueue.js";
 import { registerStaffTicketRoutes } from "./staffTicket.js";
 import { registerAdminUserRoutes } from "./adminUsers.js";
+import { registerActionsTakenRoutes } from "./actionsTaken.js";
 import { canMarkAppearsResolved } from "./ticketWorkflow.js";
 import { isClosedStatus } from "./ticketStatus.js";
 import {
@@ -797,6 +798,9 @@ registerStaffTicketRoutes(app);
 
 // Lab 3, Issue 9 — Administrator user management (adminUsers.ts).
 registerAdminUserRoutes(app);
+
+// Lab 4, Issue 2 — Actions Taken (docs/lab-04/api-spec.md §1).
+registerActionsTakenRoutes(app);
 
 // Lab 3, Issue 4 — the end of the chain (§6.2). A classified route whose
 // handler a later issue adds answers 404 until then; an error that escaped a

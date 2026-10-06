@@ -73,6 +73,17 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { method: "POST", path: "/api/admin/users", access: roles(A) },
   { method: "PATCH", path: "/api/admin/users/:id", access: roles(A) },
   { method: "POST", path: "/api/admin/users/:id/initial-password", access: roles(A) },
+
+  // Lab 4 (docs/lab-04/api-spec.md §5, specification.md BR-15). The dashboard
+  // routes are guarded already; their handlers arrive in Issue 5.
+  { method: "GET", path: "/api/tickets/:id/actions-taken", access: roles(R, S, A) },
+  { method: "POST", path: "/api/tickets/:id/actions-taken", access: roles(S, A) },
+  { method: "PATCH", path: "/api/tickets/:id/actions-taken/:actionId", access: roles(S, A) },
+  { method: "PATCH", path: "/api/tickets/:id/actions-taken/:actionId/status", access: roles(S, A) },
+  { method: "GET", path: "/api/tickets/:id/actions-taken/:actionId/history", access: roles(S, A) },
+  { method: "GET", path: "/api/dashboard/requester", access: roles(R) },
+  { method: "GET", path: "/api/dashboard/staff", access: roles(S) },
+  { method: "GET", path: "/api/dashboard/admin", access: roles(A) },
 ];
 
 // Matched the way Express matches a route: case-insensitively, one path

@@ -381,6 +381,6 @@ breakpoint `desktop`, `tablet`, or `mobile`. Captured from seeded data with
 
 | Folder | States |
 | :--- | :--- |
-| `staff-dashboard/` | `staff-default`, `staff-zero` (the IT Staff account with no work), `staff-loading`, `staff-failure`, `staff-drilldown-queue`, `admin-default`, `admin-users-drilldown` |
+| `staff-dashboard/` | `staff-default`, `admin-zero-mine` (Krit Wattana: zero "my" metrics), `staff-loading`, `staff-failure`, `staff-drilldown-queue`, `admin-default`, `admin-users-drilldown` |
 | `requester-dashboard/` | `requester-default`, `requester-empty` (brand-new Requester), `requester-drilldown-my-tickets`, `requester-failure` |
 | `actions-taken/` | `list-several`, `create-planned`, `create-completed`, `create-validation`, `edit`, `complete-confirm`, `cancel-confirm`, `history`, `stale-conflict`, `gate-blocked`, `gate-passed-resolved`, `requester-view`, `admin-view`, `closed-ticket` |

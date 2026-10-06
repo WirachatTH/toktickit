@@ -136,13 +136,15 @@ describe("GET /api/staff/tickets/:id (§5.2)", () => {
     expect((await detail(2_000_000_000)).status).toBe(404);
   });
 
-  it("API-42 gives an Administrator the same ticket with no transitions and no capabilities (BR-21)", async () => {
+  // Lab 4 BR-17 (BR-46): Administrators may now write Actions Taken, so their one
+  // capability is canWriteActions; every Lab 3 ticket operation stays closed (BR-21).
+  it("API-42 gives an Administrator the same ticket with no transitions and no Lab 3 ticket capabilities (BR-21)", async () => {
     const { id } = await ticketWithAttachments();
     const staff = (await detail(id)).body;
     const admin = await detail(id, "admin");
     expect(admin.status).toBe(200);
     expect(admin.body.permittedTransitions).toEqual([]);
-    expect(admin.body.capabilities).toEqual({ canAssign: false, canChangePriority: false, canChangeStatus: false, canPostComment: false, canPostNote: false });
+    expect(admin.body.capabilities).toEqual({ canAssign: false, canChangePriority: false, canChangeStatus: false, canPostComment: false, canPostNote: false, canWriteActions: true });
     const { permittedTransitions: _a, capabilities: _b, ...staffData } = staff;
     const { permittedTransitions: _c, capabilities: _d, ...adminData } = admin.body;
     expect(adminData).toEqual(staffData);

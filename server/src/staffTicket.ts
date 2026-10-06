@@ -98,6 +98,9 @@ export async function staffTicketPayload(prisma: PrismaClient | Prisma.Transacti
       canChangeStatus: transitions.length > 0,
       canPostComment: isStaff && !terminal,
       canPostNote: isStaff,
+      // Lab 4 BR-17, BR-20 — IT Staff and Administrators write Actions Taken
+      // while the ticket is being worked (not resolved, closed, or cancelled).
+      canWriteActions: !terminal && ticket.currentStatus !== "RESOLVED",
     },
   };
 }

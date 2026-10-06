@@ -61,6 +61,13 @@ model User {
   publicComments   PublicComment[]
   internalNotes    InternalNote[]
 
+  // Lab 4 — Actions Taken (docs/lab-04/specification.md §7.2).
+  actionsAssigned  ActionTaken[]      @relation("ActionAssignee")
+  actionsCreated   ActionTaken[]      @relation("ActionCreator")
+  actionsPerformed ActionTaken[]      @relation("ActionPerformer")
+  actionsCancelled ActionTaken[]      @relation("ActionCanceller")
+  actionEvents     ActionTakenEvent[]
+
   // The assignable-owner list, the Administrator role filter, and the
   // last-Administrator count (§7.3).
   @@index([role, isActive])
@@ -112,7 +119,7 @@ enum TicketStatus {
 }
 
 model Ticket {
-  id     Int    @id @default(autoincrement())
+  id           Int    @id @default(autoincrement())
   // Backend-generated after insert, format TCK-###### derived from `id`
   // (Lab 2 BR-01). Stored (not just computed on read) so it can carry a real
   // unique constraint and be searched/sorted on directly.
@@ -129,18 +136,21 @@ model Ticket {
   relatedSystemId Int
   relatedSystem   RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
 
-  summary           String       @db.VarChar(120)
-  description       String       @db.VarChar(2000)
+  summary             String       @db.VarChar(120)
+  description         String       @db.VarChar(2000)
   // BR-33 — the Requester's value, immutable for every role.
-  requestedPriority Priority     @default(MEDIUM)
+  requestedPriority   Priority     @default(MEDIUM)
   // BR-34 — copied from requestedPriority at creation, then IT Staff's to change.
   // No database default: it must always equal the Requester's value at creation.
-  itPriority        Priority
-  currentStatus     TicketStatus @default(NEW)
+  itPriority          Priority
+  currentStatus       TicketStatus @default(NEW)
   // BR-47 — the Requester's "Problem Appears Resolved" signal.
   requesterResolvedAt DateTime?
   // BR-44 — required for RESOLVED, visible to the Requester.
-  resolutionSummary   String?    @db.VarChar(2000)
+  resolutionSummary   String?      @db.VarChar(2000)
+  // Lab 4 BR-31 — set on RESOLVED, cleared on REOPENED, kept on CLOSED; the
+  // migration backfills it from updatedAt for tickets already resolved (D-04).
+  resolvedAt          DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -148,11 +158,16 @@ model Ticket {
   attachments    Attachment[]
   publicComments PublicComment[]
   internalNotes  InternalNote[]
+  actionsTaken   ActionTaken[]
 
   @@index([requesterId])
   @@index([requesterId, createdAt])
   @@index([ownerId])
   @@index([currentStatus, itPriority, createdAt])
+  // Lab 4 §7.3 — the dashboards' counts and lists.
+  @@index([requesterId, currentStatus])
+  @@index([updatedAt])
+  @@index([resolvedAt])
 }
 
 model Attachment {
@@ -163,9 +178,9 @@ model Attachment {
   originalFilename String
   // Generated, collision-proof, path-traversal-safe on-disk name (Lab 2 BR-33) —
   // unrelated to originalFilename on purpose.
-  storedFilename String @unique
-  mimeType       String
-  sizeBytes      Int
+  storedFilename   String @unique
+  mimeType         String
+  sizeBytes        Int
 
   uploadedAt    DateTime  @default(now())
   isRemoved     Boolean   @default(false)
@@ -203,4 +218,92 @@ model InternalNote {
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Actions Taken (docs/lab-04/specification.md §7, BR-01 to BR-26).
+// An action is a planned task and a record at once (D-01): it has an assignee
+// and a status, and the server sets who performed it. Its history lives in a
+// separate append-only table (D-03). CHECK constraints in the migration back up
+// BR-04, BR-11, and BR-12 if application code is ever wrong (§7.3).
+// ---------------------------------------------------------------------------
+
+enum ActionTakenStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+enum ActionTakenEventType {
+  CREATED
+  UPDATED
+  COMPLETED
+  CANCELLED
+}
+
+model ActionTaken {
+  id       Int    @id @default(autoincrement())
+  // BR-01 — exactly one ticket, fixed at creation. The cascade only serves test
+  // clean-up: no route deletes a ticket.
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actionAt    DateTime
+  description String            @db.VarChar(2000)
+  result      String?           @db.VarChar(2000)
+  status      ActionTakenStatus @default(PLANNED)
+
+  // Users are deactivated, never deleted, so every user link restricts.
+  assigneeId    Int
+  assignee      User  @relation("ActionAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  createdById   Int
+  createdBy     User  @relation("ActionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  performedById Int?
+  performedBy   User? @relation("ActionPerformer", fields: [performedById], references: [id], onDelete: Restrict)
+  cancelledById Int?
+  cancelledBy   User? @relation("ActionCanceller", fields: [cancelledById], references: [id], onDelete: Restrict)
+
+  followUpRequired Boolean       @default(false)
+  followUpNote     String?       @db.VarChar(1000)
+  attachmentNotes  String?       @db.VarChar(1000)
+  // BR-14 — the earlier action whose follow-up this one handles; fixed at creation.
+  // NO ACTION, not RESTRICT: it is checked at the end of the statement, so a
+  // ticket's cascade can delete a whole follow-up chain at once.
+  followUpOfId     Int?
+  followUpOf       ActionTaken?  @relation("FollowUp", fields: [followUpOfId], references: [id], onDelete: NoAction)
+  followUps        ActionTaken[] @relation("FollowUp")
+
+  cancelReason String?   @db.VarChar(1000)
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+
+  // BR-25 — optimistic concurrency (D-02).
+  version         Int     @default(1)
+  // BR-43 — duplicate-create protection, unique per creator.
+  clientRequestId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events ActionTakenEvent[]
+
+  @@unique([createdById, clientRequestId])
+  @@index([ticketId, actionAt, id])
+  @@index([ticketId, status])
+  @@index([assigneeId, status, actionAt])
+  @@index([followUpOfId])
+}
+
+model ActionTakenEvent {
+  id            Int                  @id @default(autoincrement())
+  actionTakenId Int
+  actionTaken   ActionTaken          @relation(fields: [actionTakenId], references: [id], onDelete: Cascade)
+  type          ActionTakenEventType
+  actorId       Int
+  actor         User                 @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  // { field: { from, to } } for every field the change set (BR-22).
+  changes       Json
+  createdAt     DateTime             @default(now())
+
+  @@index([actionTakenId, createdAt, id])
 }

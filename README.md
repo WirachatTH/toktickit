@@ -278,7 +278,41 @@ role gets a Dashboard as its home screen, and the whole application is hardened.
 engineering contract lives in `docs/lab-04/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issue 1 (the contract) is in review. Nothing in Lab 4 is implemented
-> yet; the Lab 3 instructions above still describe the running application. This
-> section gains the migration (and rollback), seed, test, and demonstration steps
-> as each issue lands.
+> **Status:** Issues 1–2 are in: the contract, and the Actions Taken data model,
+> migration, seed, and API. The screens, the resolution gate, and the dashboards
+> follow in Issues 3–6; until then the Lab 3 screens are what you see. This section
+> gains the remaining test and demonstration steps as each issue lands.
+
+### Applying the Lab 4 migration and seed
+Back up first, as for Lab 3. The migration only adds, but a backup is what makes the
+rollback below a choice:
+```bash
+docker exec toktickit-db pg_dump -U toktickit -d toktickit -Fc > pre-lab4.dump
+docker-compose exec server npx prisma migrate deploy
+docker-compose exec server npm run prisma:seed
+docker-compose restart server        # regenerates the Prisma client for the Lab 4 schema
+```
+*Expected result:* `migrate deploy` applies `…_lab4_actions_taken_dashboards`, which
+adds the `ActionTaken` and `ActionTakenEvent` tables and `Ticket.resolvedAt`, and
+fills `resolvedAt` for tickets that are already resolved or closed (from their last
+update, the closest time Lab 3 recorded; `specification.md` D-04). No other Lab 1–3
+value changes. The seed prints `Actions Taken created: 15` on a database seeded in
+Lab 3 whose seed tickets are untouched, and `0` on every later run. It adds a seed
+ticket's actions only while that ticket has none and still has its seeded status, so
+tickets you changed in a demo are left alone.
+
+### Rolling back the Lab 4 migration
+Either restore the backup, streaming the dump from the host into the database
+container as the `toktickit` user:
+```bash
+docker exec -i toktickit-db pg_restore -U toktickit --clean --if-exists -d toktickit < pre-lab4.dump
+```
+or apply the reviewed down-script, which removes exactly what the migration added and
+returns the schema to Lab 3:
+```bash
+docker-compose exec server npx prisma db execute --file prisma/rollback/lab4_down.sql --schema prisma/schema.prisma
+```
+This drops every Action Taken and its history; every Lab 1–3 row stays. Check out a
+Lab 3 commit before restarting the server, because the Lab 4 code expects the new
+tables. MIG-04 in `server/tests/lab-04/migration-seed.test.ts` applies, rolls back,
+and re-applies the migration on a throwaway schema to prove it.
