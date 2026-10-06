@@ -14,8 +14,9 @@ import { ROUTER_FUTURE } from "./routerFuture.js";
 const STAFF: api.AuthUser = { id: 8, name: "Pimchanok Srisuk", email: "pimchanok.srisuk@kmutt.ac.th", role: "IT_STAFF", isActive: true, mustChangePassword: false };
 const ADMIN: api.AuthUser = { ...STAFF, id: 9, name: "Siriporn Boonmee", email: "siriporn.boonmee@kmutt.ac.th", role: "ADMINISTRATOR" };
 const person = (id: number, name: string, role: api.Role = "IT_STAFF", isActive = true) => ({ id, name, role, isActive });
-const ALL_CAPS = { canAssign: true, canChangePriority: true, canChangeStatus: true, canPostComment: true, canPostNote: true };
-const NO_CAPS = { canAssign: false, canChangePriority: false, canChangeStatus: false, canPostComment: false, canPostNote: false };
+// Lab 4 BR-46 (setup only): the payload now always carries canWriteActions.
+const ALL_CAPS = { canAssign: true, canChangePriority: true, canChangeStatus: true, canPostComment: true, canPostNote: true, canWriteActions: true };
+const NO_CAPS = { canAssign: false, canChangePriority: false, canChangeStatus: false, canPostComment: false, canPostNote: false, canWriteActions: false };
 
 function ticket(over: Partial<Detail> = {}): Detail {
   return {
@@ -48,6 +49,8 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
   vi.spyOn(api, "fetchInternalNotes").mockResolvedValue([]);
+  // Lab 4, Issue 3 — the screen now also loads its Actions Taken (setup only, BR-46).
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
   vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([person(8, "Pimchanok Srisuk"), person(10, "Chanon Rattanakorn"), person(9, "Siriporn Boonmee", "ADMINISTRATOR")]);
 });
 
@@ -211,7 +214,9 @@ describe("UI-25 the Administrator's view (FR-30, BR-21)", () => {
   it("shows everything read-only: no controls, no composers, and the note", async () => {
     renderDetail(ticket({ permittedTransitions: [], capabilities: NO_CAPS }), ADMIN);
     const panel = await screen.findByRole("region", { name: "Ticket controls" });
-    expect(within(panel).getByText("Administrators can view tickets but not change them.")).toBeInTheDocument();
+    // Lab 4 BR-17 (BR-46): Administrators now manage Actions Taken, and the note says so;
+    // every Lab 3 ticket control stays read-only, as asserted around it.
+    expect(within(panel).getByText("Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.")).toBeInTheDocument();
     expect(within(panel).getByText("Chanon Rattanakorn")).toBeInTheDocument();
     expect(within(panel).queryByRole("combobox")).toBeNull();
     expect(within(panel).queryByRole("button")).toBeNull();

@@ -23,6 +23,7 @@ import { Modal } from "../components/Modal.js";
 import { ErrorState } from "../components/ErrorState.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
 import { DiscussionPanel } from "../components/DiscussionPanel.js";
+import { ActionsTaken } from "../components/ActionsTaken.js";
 import { ROUTES } from "../routes.js";
 
 // Lab 3, Issue 8 — IT Staff Ticket Detail (docs/lab-03/ui-spec.md §7, FR-25 to
@@ -96,9 +97,11 @@ export function StaffTicketDetail() {
     };
   }, [ticketId, reloadToken]);
 
+  // The owner select (IT Staff) and the Actions Taken assignee select (IT Staff
+  // and Administrators, Lab 4 BR-08) both choose from the assignable users.
   useEffect(() => {
-    if (isStaff) fetchAssignableUsers().then(setPeople).catch(() => setPeople([]));
-  }, [isStaff]);
+    fetchAssignableUsers().then(setPeople).catch(() => setPeople([]));
+  }, []);
 
   // The controls start from the ticket as shown.
   useEffect(() => {
@@ -219,7 +222,7 @@ export function StaffTicketDetail() {
           <h2 className="h5 mb-3">Ticket controls</h2>
           {!isStaff ? (
             <>
-              <p className="small" style={{ color: "var(--zg-text-muted)" }}>Administrators can view tickets but not change them.</p>
+              <p className="small" style={{ color: "var(--zg-text-muted)" }}>Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.</p>
               <dl className="mb-0">
                 <dt className="zg-label">Owner</dt>
                 <dd>{t.owner ? t.owner.name : <em style={{ color: "var(--zg-text-muted)" }}>Unassigned</em>}</dd>
@@ -337,6 +340,18 @@ export function StaffTicketDetail() {
               onAttachmentsChange={(attachments: TicketDetailAttachment[]) => setTicket({ ...t, attachments })}
             />
           </section>
+
+          {/* Lab 4, Issue 3 — between Attachments and the conversation (ui-spec §4.1). */}
+          <ActionsTaken
+            key={t.id}
+            ticketId={t.id}
+            mode="staff"
+            canWrite={caps.canWriteActions}
+            ticketStatus={t.currentStatus}
+            people={people}
+            currentUserId={user.id}
+            onChanged={() => setReloadToken((n) => n + 1)}
+          />
 
           <DiscussionPanel key={`${t.id}-${threadVersion}`} ticketId={t.id} canComment={caps.canPostComment} canPost={isStaff} />
         </div>

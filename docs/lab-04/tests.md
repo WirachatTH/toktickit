@@ -150,7 +150,7 @@ Planned until the issue that owns the row runs it green.
 | REG-02 | AC-33, BR-46 | Regression | Lab 1–3 client suites and the Lab 2–3 Playwright suites on the Lab 4 build | Pass; home-route and navigation expectations updated to `/dashboard` (named in the Issue 6 PR) | `client/tests/lab-04/Navigation.test.tsx` | Planned |
 | REG-03 | BR-45, D-13 | Regression | `GET /api/tickets`, the queue, and `GET /api/admin/users`, each without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL`, `ACTIVE`, and every user) | `server/tests/lab-04/regression.api.test.ts` | Planned |
 | REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED` and `?status=WAITING_FOR_REQUESTER`; the queue with `status=UNRESOLVED`; `GET /api/admin/users` with `status=active`, `status=inactive`, combined with `role`, and with an unknown value | Only matching own tickets, matching tickets, or matching users; pagination metadata correct; an unknown user `status` returns every user, as in Lab 3 | `server/tests/lab-04/regression.api.test.ts` | Planned |
-| REG-05 | FR-20 | Regression | `apiCredentials.test.ts` coverage check with the new API functions | Every new client API function is listed and sends credentials | `client/tests/lab-04/apiCredentials.lab4.test.ts` | Planned |
+| REG-05 | FR-20 | Regression | `apiCredentials.test.ts` coverage check with the new API functions | Every new client API function is listed and sends credentials | `client/tests/lab-04/apiCredentials.lab4.test.ts` | Pass |
 | REG-06 | AC-34, FR-17 | Regression | Double submit on Create Ticket, Post comment, Add internal note, Create user (UI busy state) | One request per click burst; one row created | `client/tests/lab-04/Hardening.test.tsx` | Planned |
 | REG-07 | AC-34, FR-18 | Regression | Recoverable failure on Create Ticket, comment, note, user panels, and Actions Taken | Typed input kept after `400`, `409`, network error, and `500` | `client/tests/lab-04/Hardening.test.tsx` | Planned |
 | REG-08 | AC-33 | Regression | Lab 1 feature: health check, the public Categories list, and the System Status page | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-01/health.test.ts` | Planned |
@@ -177,17 +177,17 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UI-01 | AC-28, FR-01 | UI | Actions Taken list mode: several cards in API order, every field labelled, "—" for empty values, empty state | Cards in order with labels; empty message when none | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-02 | AC-28, BR-04 | UI | Create panel: follow-up note appears and is required only while the checkbox is ticked; Result required for "Record work already done" | Note hidden until ticked; untick clears its error; submit without required values shows errors below fields and sends nothing | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-03 | AC-28, BR-08 | UI | Assignee select options | Only the active IT Staff and Administrators from the assignable-users API; defaults to the caller | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-04 | AC-28, BR-13 | UI | Planned vs completed vs cancelled cards | Edit, Complete, Cancel only on planned; completed shows Performed by; cancelled shows reason and badge | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-05 | AC-28 | UI | Complete and cancel dialogs: required result and reason; Escape; focus return | Errors below fields; Escape closes; focus returns to the opening button | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-06 | AC-28, FR-05 | UI | History disclosure | `aria-expanded` toggles; events oldest first with names resolved | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-07 | AC-30, BR-44 | UI | `409 STALE_STATE` on save | Banner shown; list reloaded; unsaved text kept in the panel | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-08 | AC-30, BR-43 | UI | Double click Save action; retry after a network failure | One request in flight; the retry reuses the same `clientRequestId`; input kept after failure | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-09 | AC-29, BR-19 | UI | Requester Ticket Detail "Work on your request" | Every field shown read-only; no Add, Edit, Complete, Cancel, or History control | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-10 | AC-02, BR-17 | UI | Administrator on IT Staff Ticket Detail | Actions Taken controls present; owner, priority, status, and composers still read-only | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-11 | AC-10, BR-20 | UI | Resolved, closed, and cancelled tickets | Add action replaced by the reopen or closed message; no Edit, Complete, or Cancel buttons | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
+| UI-01 | AC-28, FR-01 | UI | Actions Taken list mode: several cards in API order, every field labelled, "—" for empty values, empty state | Cards in order with labels; empty message when none | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-02 | AC-28, BR-04 | UI | Create panel: follow-up note appears and is required only while the checkbox is ticked; Result required for "Record work already done" | Note hidden until ticked; untick clears its error; submit without required values shows errors below fields and sends nothing | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-03 | AC-28, BR-08 | UI | Assignee select options | Only the active IT Staff and Administrators from the assignable-users API; defaults to the caller | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-04 | AC-28, BR-13 | UI | Planned vs completed vs cancelled cards | Edit, Complete, Cancel only on planned; completed shows Performed by; cancelled shows reason and badge | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-05 | AC-28 | UI | Complete and cancel dialogs: required result and reason; Escape; focus return | Errors below fields; Escape closes; focus returns to the opening button | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-06 | AC-28, FR-05 | UI | History disclosure | `aria-expanded` toggles; events oldest first with names resolved | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-07 | AC-30, BR-44 | UI | `409 STALE_STATE` on save | Banner shown; list reloaded; unsaved text kept in the panel | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-08 | AC-30, BR-43 | UI | Double click Save action; retry after a network failure | One request in flight; the retry reuses the same `clientRequestId`; input kept after failure | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-09 | AC-29, BR-19 | UI | Requester Ticket Detail "Work on your request" | Every field shown read-only; no Add, Edit, Complete, Cancel, or History control | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-10 | AC-02, BR-17 | UI | Administrator on IT Staff Ticket Detail | Actions Taken controls present; owner, priority, status, and composers still read-only | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-11 | AC-10, BR-20 | UI | Resolved, closed, and cancelled tickets | Add action replaced by the reopen or closed message; no Edit, Complete, or Cancel buttons | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-12 | AC-16, FR-08 | UI | Status select with the gate failing and passing | Resolved absent while failing; gate notice lists only the unmet conditions with counts; Resolved present once passing | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-13 | AC-16, FR-09 | UI | Successful status change and successful action completion | Header badge, controls, gate notice, and actions list refresh from the responses with no full reload | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-14 | AC-14, FR-08 | UI | `409 RESOLUTION_BLOCKED` returned on submit | Message under the status select; ticket and actions reloaded | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
@@ -204,9 +204,9 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| STYLE-01 | AC-35 | Style | Action status badges and follow-up pills: classes and contrast computed from the CSS | Each pair ≥ 4.5:1 and matches ui-spec §1 | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
+| STYLE-01 | AC-35 | Style | Action status badges and follow-up pills: classes and contrast computed from the CSS | Each pair ≥ 4.5:1 and matches ui-spec §1 | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 | STYLE-02 | AC-35 | Style | No ad hoc hex values in Lab 4 component styles | Only `--zg-*` tokens outside `:root` | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
-| STYLE-03 | AC-35, BR-19 | Style | Actions Taken caption vs Internal region | Actions Taken uses the public caption, never the Internal region class | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
+| STYLE-03 | AC-35, BR-19 | Style | Actions Taken caption vs Internal region | Actions Taken uses the public caption, never the Internal region class | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 
 ### 2.11 Responsive and accessibility
 

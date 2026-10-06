@@ -529,7 +529,15 @@ export interface StaffTicketDetail {
   updatedAt: string;
   attachments: TicketDetailAttachment[];
   permittedTransitions: TicketStatus[];
-  capabilities: { canAssign: boolean; canChangePriority: boolean; canChangeStatus: boolean; canPostComment: boolean; canPostNote: boolean };
+  capabilities: {
+    canAssign: boolean;
+    canChangePriority: boolean;
+    canChangeStatus: boolean;
+    canPostComment: boolean;
+    canPostNote: boolean;
+    /** Lab 4 BR-17, BR-20 — IT Staff and Administrators, while the ticket is being worked. */
+    canWriteActions: boolean;
+  };
 }
 
 async function patchStaffTicket(ticketId: number, what: string, body: object): Promise<StaffTicketDetail> {
@@ -609,4 +617,106 @@ export async function setInitialPassword(id: number, initialPassword: string): P
   const res = await apiFetch(`/api/admin/users/${id}/initial-password`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ initialPassword }) });
   if (!res.ok) throw await toApiError(res);
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 3 — Actions Taken (docs/lab-04/api-spec.md §1). Every edit and
+// status change states the version the screen showed, so a change made
+// meanwhile by someone else is refused (409 STALE_STATE), not overwritten. A
+// create carries the form's clientRequestId, so a retry never makes a second action.
+// ---------------------------------------------------------------------------
+
+export type ActionTakenStatus = "PLANNED" | "COMPLETED" | "CANCELLED";
+
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  actionAt: string;
+  description: string;
+  result: string | null;
+  status: ActionTakenStatus;
+  assignee: PersonRef;
+  createdBy: PersonRef;
+  performedBy: PersonRef | null;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  /** Whether a completed follow-up links to this action; null without the flag (BR-14). */
+  followUpHandled: boolean | null;
+  followUpOfId: number | null;
+  attachmentNotes: string | null;
+  cancelReason: string | null;
+  cancelledBy: PersonRef | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActionTakenEvent {
+  id: number;
+  type: "CREATED" | "UPDATED" | "COMPLETED" | "CANCELLED";
+  actor: PersonRef;
+  createdAt: string;
+  changes: Record<string, { from: unknown; to: unknown }>;
+}
+
+export interface NewActionTaken {
+  status: "PLANNED" | "COMPLETED";
+  actionAt: string;
+  description: string;
+  assigneeId: number;
+  result?: string | null;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+  followUpOfId?: number | null;
+  clientRequestId?: string;
+}
+
+export interface ActionTakenChanges {
+  expectedVersion: number;
+  actionAt?: string;
+  description?: string;
+  assigneeId?: number;
+  result?: string | null;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+}
+
+export type ActionTakenStatusChange =
+  | { status: "COMPLETED"; expectedVersion: number; result?: string; followUpRequired?: boolean; followUpNote?: string | null; actionAt?: string }
+  | { status: "CANCELLED"; expectedVersion: number; reason: string };
+
+const actionsPath = (ticketId: number) => `/api/tickets/${ticketId}/actions-taken`;
+
+async function sendAction(path: string, method: "POST" | "PATCH", body: object): Promise<ActionTaken> {
+  const res = await apiFetch(path, { method, headers: JSON_HEADERS, body: JSON.stringify(body) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function fetchActionsTaken(ticketId: number): Promise<ActionTaken[]> {
+  const res = await apiFetch(actionsPath(ticketId));
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+export function createActionTaken(ticketId: number, body: NewActionTaken): Promise<ActionTaken> {
+  return sendAction(actionsPath(ticketId), "POST", body);
+}
+
+export function updateActionTaken(ticketId: number, actionId: number, body: ActionTakenChanges): Promise<ActionTaken> {
+  return sendAction(`${actionsPath(ticketId)}/${actionId}`, "PATCH", body);
+}
+
+export function changeActionStatus(ticketId: number, actionId: number, body: ActionTakenStatusChange): Promise<ActionTaken> {
+  return sendAction(`${actionsPath(ticketId)}/${actionId}/status`, "PATCH", body);
+}
+
+export async function fetchActionHistory(ticketId: number, actionId: number): Promise<ActionTakenEvent[]> {
+  const res = await apiFetch(`${actionsPath(ticketId)}/${actionId}/history`);
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
 }

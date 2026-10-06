@@ -10,12 +10,14 @@ import { TextArea } from "../components/TextArea.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
 import { DiscussionThread } from "../components/DiscussionThread.js";
 import { CLOSED_COMMENT_NOTE } from "../components/DiscussionPanel.js";
+import { ActionsTaken } from "../components/ActionsTaken.js";
 import { ROUTES } from "../routes.js";
 
 // Requester Ticket Detail (Lab 2 ui-spec.md §6.5, extended by Lab 3 ui-spec.md
-// §5). It never renders Internal Notes, IT Priority, Actions Taken, or any
-// status-change control, whatever a ticket's data looks like (Lab 3 BR-71; Lab
-// 2 BR-46 also kept out Public Comments, which Lab 3 adds below — BR-68).
+// §5 and Lab 4 ui-spec.md §6). It never renders Internal Notes, IT Priority, or
+// any status-change control, whatever a ticket's data looks like (Lab 3 BR-71;
+// Lab 2 BR-46 also kept out Public Comments, which Lab 3 adds below — BR-68).
+// Lab 4 adds the ticket's Actions Taken, read-only, with every field (FR-06, BR-19).
 //
 // Lab 3, Issue 5: the ticket is fetched as the signed-in Requester (the server
 // scopes it to them), the header band shows the owner or "Not yet assigned"
@@ -216,6 +218,19 @@ export function RequesterTicketDetail() {
         attachments={ticket.attachments}
         onAttachmentsChange={handleAttachmentsChange}
       />
+
+      <div className="mt-4">
+        <ActionsTaken
+          key={ticket.id}
+          ticketId={ticket.id}
+          mode="requester"
+          canWrite={false}
+          ticketStatus={ticket.currentStatus}
+          people={[]}
+          currentUserId={0}
+          onChanged={() => setRetryToken((t) => t + 1)}
+        />
+      </div>
 
       <section className="zg-card mt-4" aria-labelledby="comments-heading">
         <h2 id="comments-heading" className="h5 mb-1">
