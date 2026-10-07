@@ -43,6 +43,8 @@ function staffTicket(over: Partial<Detail> = {}): Detail {
     attachments: [],
     permittedTransitions: ["WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"],
     capabilities: CAPS,
+    resolvedAt: null,
+    resolutionGate: { passes: true, completedCount: 1, plannedCount: 0, openFollowUpCount: 0 },
     ...over,
   };
 }
@@ -459,6 +461,52 @@ describe("UI-07 a stale conflict in a dialog keeps what was typed (BR-44; PR #76
     await userEvent.click(within(again).getByRole("button", { name: "Cancel action" }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     expect(send.mock.calls[1][2]).toMatchObject({ expectedVersion: 2, reason: "The Requester bought a new laptop." });
+  });
+});
+
+describe("UI-07 a stale Complete dialog refreshes what the user left alone (PR #76 follow-up)", () => {
+  it("takes the colleague's follow-up and keeps the result the user typed, then retries with the new version", async () => {
+    const { loadActions } = renderStaff(staffTicket(), [PLANNED]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Complete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete this action?" });
+    await userEvent.type(within(dialog).getByLabelText(/Result/), "My result");
+
+    // Meanwhile a colleague ticked Follow-up required and wrote a result.
+    loadActions.mockResolvedValue([{ ...PLANNED, followUpRequired: true, followUpNote: "Their note", result: "Their result", actionAt: "2026-10-02T01:00:00.000Z", version: 2 }]);
+    const send = vi
+      .spyOn(api, "changeActionStatus")
+      .mockRejectedValueOnce(new ApiError(409, "STALE_STATE", "Changed by someone else."))
+      .mockResolvedValueOnce({ ...PLANNED, status: "COMPLETED", result: "My result", performedBy: PIM, version: 3 });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mark as completed" }));
+
+    const again = await screen.findByRole("dialog", { name: "Complete this action?" });
+    expect(await within(again).findByText("This action was changed by someone else. It has been reloaded.")).toBeInTheDocument();
+    // Untouched fields now show the colleague's values; the typed one is kept.
+    await waitFor(() => expect(within(again).getByRole("checkbox", { name: "Follow-up required?" })).toBeChecked());
+    expect(within(again).getByLabelText(/Follow-up note/)).toHaveValue("Their note");
+    expect(within(again).getByLabelText(/Result/)).toHaveValue("My result");
+    // The colleague also moved the date: the field shows it (08:00 in Bangkok).
+    expect(within(again).getByLabelText(/Action date & time/)).toHaveValue("2026-10-02T08:00");
+
+    await userEvent.click(within(again).getByRole("button", { name: "Mark as completed" }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(send.mock.calls[1][2]).toMatchObject({ expectedVersion: 2, result: "My result", followUpRequired: true, followUpNote: "Their note" });
+    // Untouched and in the past, the date is the stored one: nothing to send.
+    expect(send.mock.calls[1][2]).not.toHaveProperty("actionAt");
+  });
+
+  it("sends a completion date the user changed (PR #76 follow-up)", async () => {
+    renderStaff(staffTicket(), [PLANNED]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Complete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete this action?" });
+    const send = vi.spyOn(api, "changeActionStatus").mockResolvedValue({ ...PLANNED, status: "COMPLETED", result: "Done.", performedBy: PIM, version: 2 });
+    await userEvent.type(within(dialog).getByLabelText(/Result/), "Done.");
+    fireEvent.change(within(dialog).getByLabelText(/Action date & time/), { target: { value: "2026-10-04T08:00" } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mark as completed" }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect(send.mock.calls[0][2]).toMatchObject({ actionAt: "2026-10-04T08:00:00+07:00" });
   });
 });
 

@@ -99,6 +99,21 @@ describe("UNIT-02 the Action Date/Time window (BR-07)", () => {
     expect(fieldsOf(parseCreateBody({ ...valid, actionAt: "2026-10-06T09:00:00" })).actionAt).toBeTruthy();
   });
 
+  it("says a well-formed but impossible date doesn't exist, rather than asking for a time zone (PR #75 follow-up)", () => {
+    const MISSING = "That date doesn't exist.";
+    const FORMAT = "Enter the date and time with its time zone.";
+    for (const impossible of ["2026-11-31T09:00:00Z", "2026-02-29T09:00:00+07:00", "2026-13-01T09:00:00Z", "2026-10-00T09:00:00Z"]) {
+      expect(fieldsOf(parseCreateBody({ ...valid, actionAt: impossible })).actionAt, impossible).toBe(MISSING);
+      const edit = parseEditBody({ expectedVersion: 1, actionAt: impossible });
+      expect("fields" in edit && edit.fields.actionAt, impossible).toBe(MISSING);
+      const done = parseStatusBody({ status: "COMPLETED", expectedVersion: 1, actionAt: impossible });
+      expect("fields" in done && done.fields.actionAt, impossible).toBe(MISSING);
+    }
+    for (const malformed of ["2026-10-06T09:00:00", "yesterday", 42]) {
+      expect(fieldsOf(parseCreateBody({ ...valid, actionAt: malformed })).actionAt, String(malformed)).toBe(FORMAT);
+    }
+  });
+
   it("never allows a time before the ticket was created", () => {
     const opts = { now: NOW, ticketCreatedAt: CREATED };
     expect(actionAtError(new Date(CREATED.getTime() - 1), "PLANNED", opts)).toBeTruthy();

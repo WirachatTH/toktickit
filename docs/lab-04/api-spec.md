@@ -150,6 +150,10 @@ same caller repeats a `clientRequestId` (BR-43); in that case nothing is written
 4. assignee, `followUpOfId`, and `actionAt` eligibility;
 5. `TICKET_RESOLVED` / `TICKET_CLOSED`.
 
+`fields.actionAt` says "That date doesn't exist." for a well-formed timestamp that is not on
+the calendar (31 November), and asks for the date and time with its time zone for anything
+else that fails to parse. The same messages apply in §1.4 and §1.5.
+
 ### 1.4 `PATCH /api/tickets/:id/actions-taken/:actionId`
 **Roles:** IT Staff, Administrator (BR-16: any of them, not only the assignee).
 **Body:** `expectedVersion` (required integer), plus any subset of `actionAt`,

@@ -24,6 +24,7 @@ import { ErrorState } from "../components/ErrorState.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
 import { DiscussionPanel } from "../components/DiscussionPanel.js";
 import { ActionsTaken } from "../components/ActionsTaken.js";
+import { GateNotice } from "../components/GateNotice.js";
 import { ROUTES } from "../routes.js";
 
 // Lab 3, Issue 8 — IT Staff Ticket Detail (docs/lab-03/ui-spec.md §7, FR-25 to
@@ -73,6 +74,9 @@ export function StaffTicketDetail() {
   // Bumped when a status change posts a reason as a Public Comment, so the
   // conversation shows it (BR-45); otherwise the panel keeps its drafts.
   const [threadVersion, setThreadVersion] = useState(0);
+  // Lab 4 — bumped to reload the Actions Taken list when the ticket learns it
+  // changed underneath (a 409 RESOLUTION_BLOCKED).
+  const [actionsVersion, setActionsVersion] = useState(0);
 
   const [ownerChoice, setOwnerChoice] = useState("");
   const [priorityChoice, setPriorityChoice] = useState<Priority>("MEDIUM");
@@ -154,6 +158,13 @@ export function StaffTicketDetail() {
         setBanner(STALE_MESSAGE);
         setConfirming(null);
         setReloadToken((n) => n + 1);
+      } else if (err?.code === "RESOLUTION_BLOCKED") {
+        // Lab 4 BR-28 — an action changed after this screen loaded: say why under
+        // the status select, and reload the ticket and its actions (ui-spec §5).
+        setConfirming(null);
+        setControlError({ control: "status", message: err.message });
+        setReloadToken((n) => n + 1);
+        setActionsVersion((n) => n + 1);
       } else if (err && err.status === 400 && err.fields) {
         const message = Object.values(err.fields)[0];
         if (control === "status" && confirming) setConfirmError(message);
@@ -299,6 +310,7 @@ export function StaffTicketDetail() {
                   ))}
                 </Select>
                 {!t.owner && <div className="small mt-1" style={{ color: "var(--zg-text-muted)" }}>Assign an owner to move this ticket forward.</div>}
+                <GateNotice status={t.currentStatus} gate={t.resolutionGate} />
                 <Button className="mt-2" disabled={busy || !statusChoice} onClick={startStatusChange}>Update status</Button>
                 {controlError?.control === "status" && <span className="zg-field-error d-block" role="alert">{controlError.message}</span>}
               </div>
@@ -351,6 +363,7 @@ export function StaffTicketDetail() {
             people={people}
             currentUserId={user.id}
             onChanged={() => setReloadToken((n) => n + 1)}
+            reloadSignal={actionsVersion}
           />
 
           <DiscussionPanel key={`${t.id}-${threadVersion}`} ticketId={t.id} canComment={caps.canPostComment} canPost={isStaff} />

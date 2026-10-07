@@ -99,7 +99,8 @@ so its order is announced.
 
 ### 1.6 Gate notice
 A small callout inside the Ticket controls panel, under the status select, styled
-like Lab 2's warning (`--zg-warning-bg` / `--zg-warning-text`, info icon):
+like Lab 2's warning (`--zg-warning-bg` / `--zg-warning-text`). It has no icon: the glyph is
+missing from some system fonts, and the text carries the meaning:
 - **Shown when** the ticket's row in the transition matrix includes `RESOLVED` but
   `resolutionGate.passes` is false (BR-30).
 - **Text:** "Resolved is available once:", followed by a list of only the unmet

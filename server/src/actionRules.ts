@@ -63,6 +63,16 @@ export function isActionEditable(status: ActionTakenStatus): boolean {
 // guesses a time zone (api-spec §0.3).
 const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/;
 
+const FORMAT_MESSAGE = "Enter the date and time with its time zone.";
+const MISSING_DATE_MESSAGE = "That date doesn't exist.";
+
+// The field message for an actionAt that did not parse: a well-formed date that
+// is not on the calendar (31 November) says so, rather than asking for a time
+// zone (PR #75 review).
+function actionAtMessage(raw: unknown): string {
+  return typeof raw === "string" && ISO_WITH_OFFSET.test(raw) ? MISSING_DATE_MESSAGE : FORMAT_MESSAGE;
+}
+
 export function parseActionAt(raw: unknown): Date | null {
   if (typeof raw !== "string" || !ISO_WITH_OFFSET.test(raw)) return null;
   const date = new Date(raw);
@@ -109,7 +119,7 @@ export function parseCreateBody(raw: unknown): Parsed<CreateInput> {
   if (status !== "PLANNED" && status !== "COMPLETED") fields.status = "Choose Planned or Completed.";
 
   const actionAt = parseActionAt(body.actionAt);
-  if (!actionAt) fields.actionAt = "Enter the date and time with its time zone.";
+  if (!actionAt) fields.actionAt = actionAtMessage(body.actionAt);
 
   const description = text(body.description, ACTION_LIMITS.description, true, "a description");
   if ("error" in description) fields.description = description.error;
@@ -173,7 +183,7 @@ export function parseEditBody(raw: unknown): Parsed<{ expectedVersion: number; c
   if ("actionAt" in body) {
     const at = parseActionAt(body.actionAt);
     if (at) changes.actionAt = at;
-    else fields.actionAt = "Enter the date and time with its time zone.";
+    else fields.actionAt = actionAtMessage(body.actionAt);
   }
   if ("description" in body) {
     const v = text(body.description, ACTION_LIMITS.description, true, "a description");
@@ -246,7 +256,7 @@ export function parseStatusBody(raw: unknown): Parsed<StatusInput> {
   if ("actionAt" in body) {
     const at = parseActionAt(body.actionAt);
     if (at) value.actionAt = at;
-    else fields.actionAt = "Enter the date and time with its time zone.";
+    else fields.actionAt = actionAtMessage(body.actionAt);
   }
   if (Object.keys(fields).length > 0) return { fields };
   return { value };

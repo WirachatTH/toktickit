@@ -839,3 +839,14 @@ textarea.zg-field {
   .zg-action-card__fields { grid-template-columns: 1fr; }
   .zg-action-card__buttons .btn { flex: 1 1 100%; }
 }
+
+/* Lab 4, Issue 4 — the gate notice under the status select (docs/lab-04/ui-spec.md §1.6),
+   styled like Lab 2's warning; its text, not its colour, says what is missing. */
+.zg-gate-notice {
+  background: var(--zg-warning-bg);
+  color: var(--zg-warning-text);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+.zg-gate-notice ul { padding-left: 1.25rem; }

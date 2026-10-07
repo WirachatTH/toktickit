@@ -41,6 +41,9 @@ function ticket(over: Partial<Detail> = {}): Detail {
     ],
     permittedTransitions: ["WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"],
     capabilities: ALL_CAPS,
+    // Lab 4 BR-46 (setup only): the payload now always reports the gate.
+    resolvedAt: null,
+    resolutionGate: { passes: true, completedCount: 1, plannedCount: 0, openFollowUpCount: 0 },
     ...over,
   };
 }

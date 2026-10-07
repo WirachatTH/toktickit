@@ -764,6 +764,8 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
       owner: ticket.owner,
       resolutionSummary: ticket.resolutionSummary,
       requesterResolvedAt: ticket.requesterResolvedAt,
+      // Lab 4 BR-31 — when IT Staff resolved it (api-spec §2.3).
+      resolvedAt: ticket.resolvedAt,
       // Lab 3, Issue 6 — whether the Comments composer accepts a post (BR-52).
       canComment: !isClosedStatus(ticket.currentStatus),
       // Lab 3, Issue 8 — whether "Problem appears resolved" is offered (BR-47).

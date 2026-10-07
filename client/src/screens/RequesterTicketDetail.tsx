@@ -10,7 +10,7 @@ import { TextArea } from "../components/TextArea.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
 import { DiscussionThread } from "../components/DiscussionThread.js";
 import { CLOSED_COMMENT_NOTE } from "../components/DiscussionPanel.js";
-import { ActionsTaken } from "../components/ActionsTaken.js";
+import { ActionsTaken, formatBangkok } from "../components/ActionsTaken.js";
 import { ROUTES } from "../routes.js";
 
 // Requester Ticket Detail (Lab 2 ui-spec.md §6.5, extended by Lab 3 ui-spec.md
@@ -208,6 +208,9 @@ export function RequesterTicketDetail() {
       {ticket.resolutionSummary && (
         <section className="zg-card mb-4" aria-label="Resolution">
           <h2 className="h5 mb-2">Resolution</h2>
+          {ticket.resolvedAt && (
+            <p className="small mb-2" style={{ color: "var(--zg-text-muted)" }}>Resolved on {formatBangkok(ticket.resolvedAt)}</p>
+          )}
           <p className="mb-0" style={{ whiteSpace: "pre-wrap" }}>{ticket.resolutionSummary}</p>
         </section>
       )}
