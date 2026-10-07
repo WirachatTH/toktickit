@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import * as api from "../../src/api.js";
 import { AppRoutes } from "../../src/AppRoutes.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
-import { LocationProbe } from "../lab-03/authTestUtils.js";
 import { ROUTER_FUTURE } from "../lab-03/routerFuture.js";
 import { ADMIN, REQUESTER, STAFF } from "./dashboardFixtures.js";
 
@@ -15,6 +14,12 @@ import { ADMIN, REQUESTER, STAFF } from "./dashboardFixtures.js";
 configure({ asyncUtilTimeout: 5000 }); // whole-app render; cold start (see TicketWorkflow.test.tsx)
 
 const EMPTY_PAGE = { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 };
+
+// Lab 3's LocationProbe shows only the path; these filters live in the query string.
+function UrlProbe() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="location">{pathname + search}</output>;
+}
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -29,7 +34,7 @@ function renderAt(path: string, user: api.AuthUser) {
     <AuthProvider>
       <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
         <AppRoutes />
-        <LocationProbe />
+        <UrlProbe />
       </MemoryRouter>
     </AuthProvider>,
   );
@@ -111,5 +116,20 @@ describe("UI-21 User Management reads role and activation from the URL (D-13)", 
     await userEvent.selectOptions(screen.getByLabelText("Role"), "REQUESTER");
     await waitFor(() => expect(location()).toHaveTextContent(/role=REQUESTER/));
     await waitFor(() => expect(lastCall(users)).toEqual({ role: "REQUESTER", status: "inactive" }));
+  });
+});
+
+describe("UI-21 the filters reach the API as query parameters (api-spec §4)", () => {
+  it("sends status to My Tickets and to the user list, and leaves it out when absent", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response(JSON.stringify({ data: [], pagination: EMPTY_PAGE }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    await api.fetchTickets({ status: "UNRESOLVED", page: 1 });
+    await api.fetchTickets({ page: 1 });
+    await api.fetchAdminUsers({ role: "IT_STAFF", status: "inactive" });
+    const urls = fetchSpy.mock.calls.map(([url]) => String(url));
+    expect(new URLSearchParams(urls[0].split("?")[1]).get("status")).toBe("UNRESOLVED");
+    expect(urls[1]).not.toContain("status=");
+    expect(Object.fromEntries(new URLSearchParams(urls[2].split("?")[1]))).toEqual({ role: "IT_STAFF", status: "inactive" });
   });
 });

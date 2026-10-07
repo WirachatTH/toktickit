@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AdminUser, ApiError, createUser, fetchAdminUsers, Role, setInitialPassword, updateUser } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
 import { RoleBadge } from "../components/Badge.js";
@@ -280,7 +280,21 @@ export function UserManagement() {
   const [state, setState] = useState<LoadState>("loading");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState<Role | "">("");
+  // Lab 4, Issue 6 — the role filter and the activation filter live in the URL,
+  // so a dashboard user count opens exactly its users (ui-spec §7, D-13). The
+  // activation filter shows as a removable chip, not as a second toolbar control.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roleParam = searchParams.get("role");
+  const role: Role | "" = ROLE_OPTIONS.some((o) => o.value === roleParam) ? (roleParam as Role) : "";
+  const statusParam = searchParams.get("status");
+  const activation: "active" | "inactive" | null = statusParam === "active" || statusParam === "inactive" ? statusParam : null;
+  const writeUrl = (nextRole: Role | "", nextStatus: "active" | "inactive" | null) => {
+    const next = new URLSearchParams();
+    if (nextRole) next.set("role", nextRole);
+    if (nextStatus) next.set("status", nextStatus);
+    setSearchParams(next, { replace: true });
+  };
+  const setRole = (next: Role | "") => writeUrl(next, activation);
   const [reload, setReload] = useState(0);
   const [panel, setPanel] = useState<{ editing: AdminUser | null } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -293,9 +307,10 @@ export function UserManagement() {
   useEffect(() => {
     let cancelled = false;
     setState("loading");
-    const params: { search?: string; role?: Role } = {};
+    const params: { search?: string; role?: Role; status?: "active" | "inactive" } = {};
     if (search) params.search = search;
     if (role) params.role = role;
+    if (activation) params.status = activation;
     fetchAdminUsers(params)
       .then((data) => {
         if (cancelled) return;
@@ -306,7 +321,7 @@ export function UserManagement() {
     return () => {
       cancelled = true;
     };
-  }, [search, role, reload]);
+  }, [search, role, activation, reload]);
 
   useEffect(() => {
     if (!toast) return;
@@ -315,12 +330,13 @@ export function UserManagement() {
   }, [toast]);
 
   if (!user) return null;
-  const filtered = Boolean(search || role);
+  const filtered = Boolean(search || role || activation);
   const clear = () => {
     setSearchInput("");
     setSearch("");
-    setRole("");
+    writeUrl("", null);
   };
+  const chipLabel = activation === "active" ? "Active only" : "Inactive only";
   const editButton = (u: AdminUser) => (
     <Button variant="tertiary" aria-label={`Edit ${u.name}`} onClick={() => setPanel({ editing: u })}>Edit</Button>
   );
@@ -348,6 +364,14 @@ export function UserManagement() {
             ))}
           </Select>
         </div>
+        {activation && (
+          <span className="zg-filter-chip">
+            {chipLabel}
+            <button type="button" className="zg-filter-chip__remove" aria-label={`Remove the ${chipLabel} filter`} onClick={() => writeUrl(role, null)}>
+              <span aria-hidden="true">✕</span>
+            </button>
+          </span>
+        )}
       </div>
 
       {state === "loading" && (

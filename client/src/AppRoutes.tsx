@@ -13,6 +13,7 @@ import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
 import { UserManagement } from "./screens/UserManagement.js";
+import { Dashboard } from "./screens/Dashboard.js";
 import { ROUTES, SCREEN_ROLES, STAFF_TICKET_PATTERN } from "./routes.js";
 
 // The actual route table the app ships, extracted out of App.tsx so tests
@@ -96,6 +97,15 @@ function AppRouteTable() {
         element={
           <Protected roles={SCREEN_ROLES.staffTicket}>
             <StaffTicketDetail />
+          </Protected>
+        }
+      />
+      {/* Lab 4, Issue 6 — every role's home (D-08). */}
+      <Route
+        path={ROUTES.dashboard}
+        element={
+          <Protected roles={SCREEN_ROLES.dashboard}>
+            <Dashboard />
           </Protected>
         }
       />

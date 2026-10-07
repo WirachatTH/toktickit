@@ -147,6 +147,9 @@ test.describe("user administration", () => {
     await admin.dispose();
 
     await signIn(page, ACCOUNTS.admin.email);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens User Management.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/admin/users");
     await page.getByLabel("Search").fill(`E2E`);
     await (await editButton(page, info, leaving.name)).click();
     const edit = page.getByRole("dialog", { name: `Edit ${leaving.name}` });
@@ -215,6 +218,9 @@ test.describe("user administration", () => {
 
   test("RESP-03 a failed load says so, with Retry, and Retry loads the list", async ({ page }, info) => {
     await signIn(page, ACCOUNTS.admin.email);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens User Management.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/admin/users");
     await expect(list(page, info).getByText(ACCOUNTS.admin.name)).toBeVisible();
     // A server failure, stubbed in the browser for this one request.
     await page.route(/\/api\/admin\/users(\?|$)/, (route) =>

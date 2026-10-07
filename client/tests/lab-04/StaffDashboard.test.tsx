@@ -38,8 +38,9 @@ describe("UI-15 the IT Staff Dashboard shows the API's values (FR-11, BR-34)", (
     const load = vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
     renderDashboard(STAFF);
     expect(await screen.findByRole("heading", { level: 1, name: "Welcome back, Pimchanok" })).toBeInTheDocument();
+    // The heading shows while the data loads; the data time arrives with it.
+    expect(await screen.findByText("Updated 16:12 (Bangkok time)")).toBeInTheDocument();
     expect(load).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Updated 16:12 (Bangkok time)")).toBeInTheDocument();
 
     const cards = screen.getAllByRole("group").filter((g) => g.classList.contains("zg-metric-card"));
     expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Unassigned", "My tickets", "My planned actions", "Requester says resolved", "Created today", "Resolved today"]);
@@ -123,6 +124,16 @@ describe("UI-16 loading, empty lists, failure, and refresh (FR-15, ui-spec §3.5
     expect(load).toHaveBeenCalledTimes(2);
   });
 
+  it("never shows an earlier load's values or time beside a failed refresh", async () => {
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValueOnce(staffDashboard()).mockRejectedValueOnce(new Error("network down"));
+    renderDashboard(STAFF);
+    await screen.findByText("Updated 16:12 (Bangkok time)");
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText("We couldn't load your dashboard.")).toBeInTheDocument();
+    expect(screen.queryByText("Updated 16:12 (Bangkok time)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Unassigned" })).not.toBeInTheDocument();
+  });
+
   it("keeps the values on screen while refreshing, and shows the new ones after", async () => {
     let finish!: (d: api.StaffDashboard) => void;
     const next = staffDashboard();
@@ -148,6 +159,7 @@ describe("UI-17 the Administrator Dashboard (FR-13, BR-41, ui-spec §3.4)", () =
     const staffLoad = vi.spyOn(api, "fetchStaffDashboard");
     renderDashboard(ADMIN);
     expect(await screen.findByRole("heading", { level: 1, name: "Welcome back, Siriporn" })).toBeInTheDocument();
+    await screen.findByRole("group", { name: "Unassigned" });
     expect(load).toHaveBeenCalledTimes(1);
     expect(staffLoad).not.toHaveBeenCalled();
     expect(screen.getByText("Ticket metrics are read-only for Administrators")).toHaveClass("zg-pill", "zg-pill--readonly");

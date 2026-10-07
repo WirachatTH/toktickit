@@ -223,6 +223,8 @@ export function StaffTicketQueue() {
           <label htmlFor={`${prefix}-status`} className="zg-label">Status</label>
           <Select id={`${prefix}-status`} value={params.status ?? "ACTIVE"} onChange={(e) => update({ status: e.target.value })}>
             <option value="ACTIVE">Active</option>
+            {/* Lab 4 D-13 — the Unresolved group the dashboard drills down to. */}
+            <option value="UNRESOLVED">Unresolved</option>
             <option value="ALL">All</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>{statusLabel(s)}</option>

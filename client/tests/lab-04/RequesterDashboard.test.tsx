@@ -34,6 +34,7 @@ describe("UI-18 the Requester's own summary (FR-12, AC-18)", () => {
     vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(requesterDashboard());
     renderDashboard();
     expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Somchai" })).toBeInTheDocument();
+    await screen.findByRole("group", { name: "Open requests" }); // the data arrives after the heading
     for (const m of requesterDashboard().metrics) {
       expect(within(card(m.label)).getByRole("link", { name: `View ${m.label} (${m.value})` })).toHaveAttribute("href", m.href);
     }

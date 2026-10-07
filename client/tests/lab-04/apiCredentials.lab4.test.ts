@@ -18,7 +18,7 @@ describe("REG-05 every Lab 4 API call carries the session cookie", () => {
     await call();
     expect(fetchSpy).toHaveBeenCalled();
     for (const [url, init] of fetchSpy.mock.calls) {
-      expect(String(url)).toMatch(/^\/api\/tickets\/42\/actions-taken/);
+      expect(String(url)).toMatch(/^\/api\/(tickets\/42\/actions-taken|dashboard\/(requester|staff|admin)$)/);
       expect(init?.credentials).toBe("include");
     }
   });

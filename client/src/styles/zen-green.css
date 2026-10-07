@@ -850,3 +850,86 @@ textarea.zg-field {
   font-size: 0.875rem;
 }
 .zg-gate-notice ul { padding-left: 1.25rem; }
+
+/* ---------------------------------------------------------------------
+   Lab 4, Issue 6 — the Dashboard (docs/lab-04/ui-spec.md §1.3, §1.4, §3, §10).
+   Cards: 4 columns at desktop, 2 at tablet, 1 at mobile. Lists in a main
+   column beside Quick actions at desktop; everything stacks below it.
+   --------------------------------------------------------------------- */
+
+.zg-dashboard-cards { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+@media (min-width: 768px) { .zg-dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 992px) { .zg-dashboard-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.zg-metric-card {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.zg-metric-card--attention { background: var(--zg-warning-bg); border-color: var(--zg-warning-text); }
+.zg-metric-card--skeleton { min-height: 7.5rem; background: var(--zg-border); opacity: 0.6; }
+.zg-metric-card__label { font-size: 0.875rem; color: var(--zg-text-muted); }
+.zg-metric-card__value { font-size: 2rem; font-weight: 600; line-height: 1.1; color: var(--zg-metric-value); }
+.zg-metric-card__note { font-size: 0.875rem; font-weight: 600; color: var(--zg-warning-text); }
+.zg-metric-card__helper { font-size: 0.75rem; color: var(--zg-text-muted); }
+.zg-metric-card .btn { align-self: flex-start; } /* the View link lines up with the label and value */
+
+.zg-count-strip { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+.zg-count-strip__link { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px; color: var(--zg-text); text-decoration: none; }
+.zg-count-strip__link:hover .zg-count-strip__value { text-decoration: underline; }
+.zg-count-strip__value { font-weight: 600; }
+
+.zg-dashboard-layout { display: flex; flex-direction: column; gap: 0 1.5rem; }
+.zg-dashboard-main, .zg-dashboard-side { min-width: 0; }
+@media (min-width: 992px) {
+  .zg-dashboard-layout { flex-direction: row; align-items: flex-start; }
+  .zg-dashboard-main { flex: 2 1 0; }
+  .zg-dashboard-side { flex: 1 1 0; }
+}
+
+.zg-dashboard-list { list-style: none; padding: 0; margin: 0; }
+.zg-dashboard-list li + li { border-top: 1px solid var(--zg-border); }
+.zg-dashboard-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 0;
+  min-height: 44px;
+  color: var(--zg-text);
+  text-decoration: none;
+}
+.zg-dashboard-row:hover .zg-dashboard-row__summary { text-decoration: underline; }
+.zg-dashboard-row__number { font-weight: 600; white-space: nowrap; }
+.zg-dashboard-row__summary { flex: 1 1 12rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zg-dashboard-row__time { font-size: 0.875rem; color: var(--zg-text-muted); white-space: nowrap; }
+
+.zg-quick-action { display: flex; flex-direction: column; padding: 0.5rem 0; min-height: 44px; color: var(--zg-secondary); text-decoration: none; }
+.zg-quick-action__label { font-weight: 600; }
+.zg-quick-action__note { font-size: 0.875rem; color: var(--zg-text-muted); }
+
+.zg-user-counts { margin: 0 0 0.5rem; }
+.zg-user-counts__row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.zg-user-counts__row dt { font-weight: 400; }
+.zg-user-counts__row dd { margin: 0; }
+.zg-user-counts__value { font-weight: 600; }
+
+/* The removable drill-down filter on User Management (ui-spec §7). */
+.zg-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--zg-pale);
+  color: var(--zg-secondary);
+  border-radius: 999px;
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.zg-filter-chip__remove { border: 0; background: transparent; color: inherit; min-width: 32px; min-height: 32px; border-radius: 999px; }
+.zg-filter-chip__remove:focus-visible { outline: 2px solid var(--zg-secondary); outline-offset: 1px; }

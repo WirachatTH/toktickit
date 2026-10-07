@@ -147,7 +147,7 @@ Planned until the issue that owns the row runs it green.
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | REG-01 | AC-33, BR-46 | Regression | Lab 1, Lab 2, and Lab 3 server suites on the Lab 4 build | Pass; only the BR-46 tests changed, each named in its PR | `server/tests/lab-04/regression.api.test.ts` | Planned |
-| REG-02 | AC-33, BR-46 | Regression | Lab 1–3 client suites and the Lab 2–3 Playwright suites on the Lab 4 build | Pass; home-route and navigation expectations updated to `/dashboard` (named in the Issue 6 PR) | `client/tests/lab-04/Navigation.test.tsx` | Planned |
+| REG-02 | AC-33, BR-46 | Regression | Lab 1–3 client suites and the Lab 2–3 Playwright suites on the Lab 4 build | Pass; home-route and navigation expectations updated to `/dashboard` (named in the Issue 6 PR) | `client/tests/lab-04/Navigation.test.tsx` | Pass |
 | REG-03 | BR-45, D-13 | Regression | `GET /api/tickets`, the queue, and `GET /api/admin/users`, each without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL`, `ACTIVE`, and every user) | `server/tests/lab-04/regression.api.test.ts` | Pass |
 | REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED` and `?status=WAITING_FOR_REQUESTER`; the queue with `status=UNRESOLVED`; `GET /api/admin/users` with `status=active`, `status=inactive`, combined with `role`, and with an unknown value | Only matching own tickets, matching tickets, or matching users; pagination metadata correct; an unknown user `status` returns every user, as in Lab 3 | `server/tests/lab-04/regression.api.test.ts` | Pass |
 | REG-05 | FR-20 | Regression | `apiCredentials.test.ts` coverage check with the new API functions | Every new client API function is listed and sends credentials | `client/tests/lab-04/apiCredentials.lab4.test.ts` | Pass |
@@ -191,13 +191,13 @@ Planned until the issue that owns the row runs it green.
 | UI-12 | AC-16, FR-08 | UI | Status select with the gate failing and passing | Resolved absent while failing; gate notice lists only the unmet conditions with counts; Resolved present once passing | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-13 | AC-16, FR-09 | UI | Successful status change and successful action completion | Header badge, controls, gate notice, and actions list refresh from the responses with no full reload | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-14 | AC-14, FR-08 | UI | `409 RESOLUTION_BLOCKED` returned on submit | Message under the status select; ticket and actions reloaded | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
-| UI-15 | AC-27, BR-34 | UI | IT Staff Dashboard renders the API's metrics, strips, and lists | Each card shows label and exact value; links go to each `href`; nothing computed client-side (values differ from list lengths in the fixture) | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-16 | AC-27, FR-15 | UI | IT Staff Dashboard loading, empty lists, failure with Retry, refresh | Skeleton with `aria-busy`; per-list empty sentences; error banner; Retry refetches; refresh keeps values visible | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-17 | AC-27, BR-41 | UI | Administrator Dashboard | Read-only pill; ticket metrics; User accounts card with role-filtered links | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-18 | AC-27, AC-18 | UI | Requester Dashboard renders metrics and lists | Exact values; "Waiting for you" emphasised with text when above 0; no IT Priority shown | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-19 | AC-27, FR-15 | UI | Requester Dashboard empty (brand-new Requester), failure, Retry | Zeros plus the Create Ticket empty state; error banner; Retry refetches | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-20 | AC-26, FR-10 | UI | Navigation for each role and the post-login landing | Dashboard first with `aria-current` on `/dashboard`; landing `/dashboard`; forbidden callout shown there | `client/tests/lab-04/Navigation.test.tsx` | Planned |
-| UI-21 | AC-23, D-13 | UI | Drill-down targets: My Tickets `?status=`, queue `status=UNRESOLVED`, User Management `?role=` with `?status=active` and `?status=inactive` | Each screen opens with the filter applied and requests it from the API; User Management shows the removable activation chip, and removing it drops the parameter | `client/tests/lab-04/DrillDownFilters.test.tsx` | Planned |
+| UI-15 | AC-27, BR-34 | UI | IT Staff Dashboard renders the API's metrics, strips, and lists | Each card shows label and exact value; links go to each `href`; nothing computed client-side (values differ from list lengths in the fixture) | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-16 | AC-27, FR-15 | UI | IT Staff Dashboard loading, empty lists, failure with Retry, refresh | Skeleton with `aria-busy`; per-list empty sentences; error banner; Retry refetches; refresh keeps values visible | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-17 | AC-27, BR-41 | UI | Administrator Dashboard | Read-only pill; ticket metrics; User accounts card with role-filtered links | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-18 | AC-27, AC-18 | UI | Requester Dashboard renders metrics and lists | Exact values; "Waiting for you" emphasised with text when above 0; no IT Priority shown | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-19 | AC-27, FR-15 | UI | Requester Dashboard empty (brand-new Requester), failure, Retry | Zeros plus the Create Ticket empty state; error banner; Retry refetches | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-20 | AC-26, FR-10 | UI | Navigation for each role and the post-login landing | Dashboard first with `aria-current` on `/dashboard`; landing `/dashboard`; forbidden callout shown there | `client/tests/lab-04/Navigation.test.tsx` | Pass |
+| UI-21 | AC-23, D-13 | UI | Drill-down targets: My Tickets `?status=`, queue `status=UNRESOLVED`, User Management `?role=` with `?status=active` and `?status=inactive` | Each screen opens with the filter applied and requests it from the API; User Management shows the removable activation chip, and removing it drops the parameter | `client/tests/lab-04/DrillDownFilters.test.tsx` | Pass |
 | UI-22 | AC-34, FR-16 | UI | Feedback consistency sweep: each screen's not-found, forbidden, and failure states use the shared components | Shared `EmptyState`/`ErrorState`/callout rendered with the screen's message | `client/tests/lab-04/Hardening.test.tsx` | Planned |
 
 ### 2.10 UI style
@@ -205,7 +205,7 @@ Planned until the issue that owns the row runs it green.
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | STYLE-01 | AC-35 | Style | Action status badges and follow-up pills: classes and contrast computed from the CSS | Each pair ≥ 4.5:1 and matches ui-spec §1 | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
-| STYLE-02 | AC-35 | Style | No ad hoc hex values in Lab 4 component styles | Only `--zg-*` tokens outside `:root` | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
+| STYLE-02 | AC-35 | Style | No ad hoc hex values in Lab 4 component styles | Only `--zg-*` tokens outside `:root` | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 | STYLE-03 | AC-35, BR-19 | Style | Actions Taken caption vs Internal region | Actions Taken uses the public caption, never the Internal region class | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 
 ### 2.11 Responsive and accessibility
