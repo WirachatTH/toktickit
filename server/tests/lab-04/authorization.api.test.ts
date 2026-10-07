@@ -243,3 +243,39 @@ describe("SEC-06 Administrators still cannot change a ticket (BR-17, Lab 3 BR-21
     expect([ticket.currentStatus, ticket.ownerId]).toEqual(["IN_PROGRESS", null]);
   });
 });
+
+describe("SEC-07 no Lab 4 response leaks what must stay on the server (BR-36, D-15)", () => {
+  it("never returns a password or token hash, a clientRequestId, an Internal Note, or (to a Requester) IT Priority", async () => {
+    const note = `Internal SEC-07 ${stamp}`;
+    await prisma.internalNote.create({ data: { ticketId: ownTicket, authorId: users.staff, body: note } });
+    const key = crypto.randomUUID();
+    const made = await request(app).post(`/api/tickets/${ownTicket}/actions-taken`).set("Cookie", cookies.staff)
+      .send({ status: "PLANNED", actionAt: new Date().toISOString(), description: "SEC-07 action", assigneeId: users.staff, clientRequestId: key });
+    expect(made.status).toBe(201);
+    const actionId = made.body.id;
+
+    const responses: { who: string; text: string }[] = [];
+    const fetch = async (who: keyof typeof users, path: string) => {
+      const res = await request(app).get(path).set("Cookie", cookies[who]);
+      expect(res.status, `${who} ${path}`).toBe(200);
+      responses.push({ who, text: res.text });
+    };
+    await fetch("requester", "/api/dashboard/requester");
+    await fetch("requester", `/api/tickets/${ownTicket}/actions-taken`);
+    await fetch("requester", `/api/tickets/${ownTicket}`);
+    await fetch("staff", "/api/dashboard/staff");
+    await fetch("staff", `/api/tickets/${ownTicket}/actions-taken`);
+    await fetch("staff", `/api/tickets/${ownTicket}/actions-taken/${actionId}/history`);
+    await fetch("staff", `/api/staff/tickets/${ownTicket}`);
+    await fetch("admin", "/api/dashboard/admin");
+    responses.push({ who: "staff", text: made.text });
+
+    for (const { who, text } of responses) {
+      expect(text, who).not.toMatch(/passwordHash|tokenHash|scrypt\$/i);
+      expect(text, who).not.toContain(key);
+      expect(text, who).not.toMatch(/clientRequestId/);
+      expect(text, who).not.toContain(note);
+      if (who === "requester") expect(text, who).not.toMatch(/itPriority/);
+    }
+  });
+});

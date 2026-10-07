@@ -496,6 +496,30 @@ describe("UI-07 a stale Complete dialog refreshes what the user left alone (PR #
     expect(send.mock.calls[1][2]).not.toHaveProperty("actionAt");
   });
 
+  it("keeps a date the user typed through a stale conflict, and sends it on the retry (PR #77 follow-up)", async () => {
+    const { loadActions } = renderStaff(staffTicket(), [PLANNED]);
+    await screen.findByRole("heading", { name: "Actions taken (1)" });
+    await userEvent.click(within(card("Replace the laptop battery.")).getByRole("button", { name: "Complete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete this action?" });
+    await userEvent.type(within(dialog).getByLabelText(/Result/), "Done.");
+    fireEvent.change(within(dialog).getByLabelText(/Action date & time/), { target: { value: "2026-10-04T08:00" } });
+
+    // Meanwhile a colleague moved the date.
+    loadActions.mockResolvedValue([{ ...PLANNED, actionAt: "2026-10-02T01:00:00.000Z", version: 2 }]);
+    const send = vi
+      .spyOn(api, "changeActionStatus")
+      .mockRejectedValueOnce(new ApiError(409, "STALE_STATE", "Changed by someone else."))
+      .mockResolvedValueOnce({ ...PLANNED, status: "COMPLETED", result: "Done.", performedBy: PIM, version: 3 });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mark as completed" }));
+
+    const again = await screen.findByRole("dialog", { name: "Complete this action?" });
+    expect(await within(again).findByText("This action was changed by someone else. It has been reloaded.")).toBeInTheDocument();
+    expect(within(again).getByLabelText(/Action date & time/)).toHaveValue("2026-10-04T08:00");
+    await userEvent.click(within(again).getByRole("button", { name: "Mark as completed" }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(send.mock.calls[1][2]).toMatchObject({ expectedVersion: 2, actionAt: "2026-10-04T08:00:00+07:00" });
+  });
+
   it("sends a completion date the user changed (PR #76 follow-up)", async () => {
     renderStaff(staffTicket(), [PLANNED]);
     await screen.findByRole("heading", { name: "Actions taken (1)" });

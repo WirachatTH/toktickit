@@ -4,8 +4,8 @@ import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { endTestSessions, sessionCookieFor } from "../lab-03/helpers/sessions.js";
 
-// Performance smoke (docs/lab-04/specification.md D-17). PERF-03 covers the
-// Actions Taken list; PERF-01 and PERF-02 (the dashboards) join this file in Issue 5.
+// Performance smoke (docs/lab-04/specification.md D-17, AC-25): PERF-01 and
+// PERF-02 for the three dashboards, PERF-03 for the Actions Taken list.
 //
 // Prisma operations are counted with a client middleware on the shared client,
 // so the count includes every query the handler makes. Vitest gives each test
@@ -77,5 +77,64 @@ describe("PERF-03 the Actions Taken list", () => {
     expect([a.rows, b.rows]).toEqual([3, 30]);
     expect(b.ops).toBe(a.ops);
     expect(b.ms).toBeLessThan(500);
+  });
+});
+
+describe("the dashboards (D-17, AC-25)", () => {
+  const ENDPOINTS = ["/api/dashboard/requester", "/api/dashboard/staff", "/api/dashboard/admin"] as const;
+  const roles = { "/api/dashboard/requester": "REQUESTER", "/api/dashboard/staff": "IT_STAFF", "/api/dashboard/admin": "ADMINISTRATOR" } as const;
+  const cookieFor: Record<string, string> = {};
+  const extraUsers: number[] = [];
+
+  beforeAll(async () => {
+    for (const path of ENDPOINTS) {
+      const role = roles[path];
+      const u = role === "REQUESTER"
+        ? requester
+        : role === "IT_STAFF"
+          ? staff
+          : (await prisma.user.create({ data: { name: `Perf admin ${stamp}`, email: `perf.admin.${stamp}@kmutt.ac.th`, role, mustChangePassword: false } })).id;
+      if (role === "ADMINISTRATOR") extraUsers.push(u);
+      cookieFor[path] = await sessionCookieFor(prisma, u);
+    }
+  });
+
+  afterAll(async () => {
+    await prisma.session.deleteMany({ where: { userId: { in: extraUsers } } });
+    await prisma.user.deleteMany({ where: { id: { in: extraUsers } } });
+  });
+
+  it("PERF-01 each answers 20 sequential calls with a 95th percentile under 500 ms, and no list longer than 5", async () => {
+    for (const path of ENDPOINTS) {
+      await request(app).get(path).set("Cookie", cookieFor[path]); // warm-up
+      const times: number[] = [];
+      for (let i = 0; i < 20; i++) {
+        const started = performance.now();
+        const res = await request(app).get(path).set("Cookie", cookieFor[path]);
+        times.push(performance.now() - started);
+        expect(res.status, path).toBe(200);
+        for (const [key, list] of Object.entries(res.body.lists as Record<string, unknown[]>)) expect(list.length, `${path} ${key}`).toBeLessThanOrEqual(5);
+      }
+      times.sort((a, b) => a - b);
+      const p95 = times[Math.ceil(0.95 * times.length) - 1];
+      expect(p95, `${path} p95 ${p95.toFixed(0)} ms`).toBeLessThan(500);
+    }
+  });
+
+  it("PERF-02 runs the same number of queries before and after 50 more tickets with actions", async () => {
+    const measure = async (path: (typeof ENDPOINTS)[number]) => {
+      operations = 0;
+      const res = await request(app).get(path).set("Cookie", cookieFor[path]);
+      expect(res.status).toBe(200);
+      return operations;
+    };
+    // One at a time: the counter is shared.
+    const before: [(typeof ENDPOINTS)[number], number][] = [];
+    for (const p of ENDPOINTS) before.push([p, await measure(p)]);
+    for (let i = 0; i < 50; i++) {
+      const id = await ticketWithActions(2);
+      await prisma.ticket.update({ where: { id }, data: { ownerId: staff } });
+    }
+    for (const [path, ops] of before) expect(await measure(path), path).toBe(ops);
   });
 });

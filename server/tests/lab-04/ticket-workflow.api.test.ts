@@ -120,7 +120,7 @@ describe("the resolution gate (BR-28)", () => {
       const res = await move(id, "RESOLVED", "IN_PROGRESS");
       expect(res.status).toBe(409);
       expect(res.body.error).toMatchObject({ code: "RESOLUTION_BLOCKED", details: { completedCount: 0, plannedCount: 0, openFollowUpCount: 0 } });
-      expect(res.body.error.message).toEqual(expect.any(String));
+      expect(res.body.error.message).toBe("This ticket can't be resolved yet: no action has been completed yet.");
       const t = await row(id);
       expect([t.currentStatus, t.resolutionSummary, t.resolvedAt]).toEqual(["IN_PROGRESS", null, null]);
     }
@@ -133,6 +133,8 @@ describe("the resolution gate (BR-28)", () => {
     const blocked = await move(id, "RESOLVED", "IN_PROGRESS");
     expect(blocked.status).toBe(409);
     expect(blocked.body.error).toMatchObject({ code: "RESOLUTION_BLOCKED", details: { completedCount: 1, plannedCount: 1, openFollowUpCount: 0 } });
+    // The message names what is outstanding (PR #77 review).
+    expect(blocked.body.error.message).toBe("This ticket can't be resolved yet: 1 planned action is still open.");
 
     const done = await request(app).patch(`/api/tickets/${id}/actions-taken/${planned}/status`).set("Cookie", cookies.staff).send({ status: "COMPLETED", expectedVersion: 1, result: "Finished the remaining work." });
     expect(done.status).toBe(200);
@@ -148,6 +150,7 @@ describe("the resolution gate (BR-28)", () => {
     const needs = await addAction(id, "COMPLETED", { followUpRequired: true });
     const blocked = await move(id, "RESOLVED", "WAITING_FOR_REQUESTER");
     expect(blocked.body.error).toMatchObject({ code: "RESOLUTION_BLOCKED", details: { completedCount: 1, plannedCount: 0, openFollowUpCount: 1 } });
+    expect(blocked.body.error.message).toBe("This ticket can't be resolved yet: 1 follow-up is not handled.");
     await addAction(id, "COMPLETED", { followUpOfId: needs });
     expect((await move(id, "RESOLVED", "WAITING_FOR_REQUESTER")).status).toBe(200);
   });
