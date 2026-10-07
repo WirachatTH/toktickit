@@ -58,6 +58,17 @@ async function ticket(status: TicketStatus = "NEW", owner: number | null = null,
     },
   });
   ticketIds.push(row.id);
+  // Lab 4 BR-46 (setup only): an owned ticket being worked has its work on
+  // record, so the resolution gate (Lab 4 BR-28) lets the Lab 3 workflow
+  // tests resolve it exactly as before.
+  if (owner !== null && ["OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"].includes(status)) {
+    await prisma.actionTaken.create({
+      data: {
+        ticketId: row.id, actionAt: new Date(), description: "Work done (fixture)", status: "COMPLETED", result: "Done.",
+        assigneeId: owner, createdById: owner, performedById: owner, completedAt: new Date(),
+      },
+    });
+  }
   return row.id;
 }
 const row = (id: number) => prisma.ticket.findUniqueOrThrow({ where: { id } });

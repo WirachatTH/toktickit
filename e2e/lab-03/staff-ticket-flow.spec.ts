@@ -230,6 +230,13 @@ test.describe("the staff ticket flow", () => {
     // the ticket reloads (BR-31).
     const staffApi = await apiAs(ACCOUNTS.staff.email);
     const me = (await (await staffApi.get("/api/auth/me")).json()).user;
+    // Lab 4 BR-46 (setup only): the work is on record before the ticket is
+    // resolved below, as the resolution gate requires (Lab 4 BR-28). The stale
+    // reload that follows brings it onto this screen.
+    const work = await staffApi.post(`/api/tickets/${ticketId}/actions-taken`, {
+      data: { status: "COMPLETED", actionAt: new Date().toISOString(), description: "Reseated the laptop battery connector.", result: "The battery charges normally.", assigneeId: me.id },
+    });
+    expect(work.status()).toBe(201);
     const moved = await staffApi.patch(`/api/staff/tickets/${ticketId}/status`, { data: { status: "WAITING_FOR_REQUESTER", expectedStatus: "IN_PROGRESS", expectedOwnerId: me.id } });
     expect(moved.status()).toBe(200);
     await controls.getByLabel("IT Priority").selectOption("MEDIUM");
