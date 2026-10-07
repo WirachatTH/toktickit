@@ -29,7 +29,7 @@ async function ticketWithActions(n: number) {
   const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
   const ticket = await prisma.ticket.create({
     data: {
-      ticketNumber: `PERF-${stamp}-${n}`, requesterId: requester, categoryId: category.id, relatedSystemId: system.id,
+      ticketNumber: `PERF-${stamp}-${ticketIds.length}`, requesterId: requester, categoryId: category.id, relatedSystemId: system.id,
       summary: "Performance fixture", description: "Created by the Lab 4 performance smoke.", itPriority: "LOW", currentStatus: "IN_PROGRESS",
     },
   });

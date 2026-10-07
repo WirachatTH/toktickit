@@ -149,6 +149,8 @@ describe("with tickets", () => {
     // Seven urgent candidates, oldest first by creation.
     for (let i = 0; i < 7; i++) urgent.push(await ticket({ status: i % 2 ? "IN_PROGRESS" : "OPEN", it: "HIGH", createdAt: new Date(now - (60 - i) * DAY) }));
     await ticket({ status: "RESOLVED", it: "HIGH" }); // HIGH but resolved: not urgent
+    await ticket({ status: "OPEN", it: "MEDIUM", createdAt: new Date(now - 200 * DAY) }); // oldest of all, but not HIGH: not urgent
+    await ticket({ status: "CLOSED", appearsResolved: true }); // flagged, but closed: not counted
     // Seven freshly updated active tickets, newest first.
     for (let i = 0; i < 7; i++) recent.push(await ticket({ status: "IN_PROGRESS", updatedAt: new Date(now + (10 - i) * 60_000) }));
     // My planned actions: seven on working tickets, plus ones that never count.
@@ -163,6 +165,9 @@ describe("with tickets", () => {
     const today = bangkokToday(new Date());
     beforeMidnight = await ticket({ status: "RESOLVED", createdAt: new Date(today.start.getTime() - 1000), resolvedAt: new Date(today.start.getTime() - 1000) });
     afterMidnight = await ticket({ status: "CLOSED", createdAt: new Date(today.start.getTime() + 1000), resolvedAt: new Date(today.start.getTime() + 1000) });
+    // A resolve time today on a ticket that is no longer resolved or closed is
+    // not "resolved today" (BR-39 counts tickets now RESOLVED or CLOSED).
+    await ticket({ status: "CANCELLED", resolvedAt: new Date(today.start.getTime() + 2000) });
     // A legacy-shaped ticket: no actions, resolvedAt backfilled from updatedAt (BR-42, BR-47).
     await ticket({ status: "CLOSED", resolvedAt: new Date(now - 40 * DAY), updatedAt: new Date(now - 40 * DAY) });
   }, 240_000);
@@ -226,6 +231,8 @@ describe("with tickets", () => {
 
   it("DASH-07 the Administrator sees the IT Staff payload for themselves, plus user counts equal to SQL (BR-41, AC-20)", async () => {
     const owned = await ticket({ status: "OPEN", owner: users.admin });
+    // An inactive account counts as inactive, never under its role (BR-41).
+    const idle = await prisma.user.create({ data: { name: "SDB idle", email: "idle@sdb.test", role: "IT_STAFF", isActive: false, mustChangePassword: false } });
     const res = await get("/api/dashboard/admin", "admin");
     expect(res.status).toBe(200);
     const body = res.body;
@@ -239,7 +246,10 @@ describe("with tickets", () => {
       { key: "activeAdministrators", label: "Active Administrators", value: await userSql("ADMINISTRATOR"), href: "/admin/users?role=ADMINISTRATOR&status=active" },
       { key: "inactive", label: "Inactive accounts", value: await count(`"User" WHERE NOT "isActive"`), href: "/admin/users?status=inactive" },
     ]);
+    expect(byKey(body.users, "activeItStaff").value).toBe(2);
+    expect(byKey(body.users, "inactive").value).toBeGreaterThanOrEqual(1);
     await prisma.ticket.delete({ where: { id: owned } });
+    await prisma.user.delete({ where: { id: idle.id } });
   });
 
   it("DASH-08 counts 'today' by the Bangkok day: a ticket one second before midnight is yesterday's (BR-33, AC-21)", async () => {
@@ -249,7 +259,7 @@ describe("with tickets", () => {
     expect(created).toContain(afterMidnight);
     expect(created).not.toContain(beforeMidnight);
     expect(byKey(body.metrics, "createdToday").value).toBe(created.length);
-    const resolved = await ids(`"Ticket" WHERE "resolvedAt" >= $1 AND "resolvedAt" < $2`, today.start, today.end);
+    const resolved = await ids(`"Ticket" WHERE "resolvedAt" >= $1 AND "resolvedAt" < $2 AND "currentStatus"::text IN ('RESOLVED', 'CLOSED')`, today.start, today.end);
     expect(resolved).toEqual([afterMidnight]);
     expect(byKey(body.metrics, "resolvedToday").value).toBe(1);
   });

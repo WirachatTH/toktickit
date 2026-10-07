@@ -110,15 +110,18 @@ describe("DASH-03 the lists: content, order, and limit (BR-37, BR-40)", () => {
       const now = Date.now();
       const waiting: number[] = [];
       for (let i = 0; i < 7; i++) waiting.push(await makeTicket(carol.id, "WAITING_FOR_REQUESTER", { updatedAt: new Date(now - (i + 1) * 3600_000) }));
+      // The newest change of all is on a ticket that is not waiting for her.
+      const newest = await makeTicket(carol.id, "IN_PROGRESS", { updatedAt: new Date(now - 60_000) });
+      // Three resolved within the 7-day window, one just outside it.
       const resolved: number[] = [];
-      for (let i = 0; i < 7; i++) resolved.push(await makeTicket(carol.id, i % 2 ? "CLOSED" : "RESOLVED", { resolvedAt: new Date(now - (i + 1) * 12 * 3600_000), updatedAt: new Date(now - 10 * DAY) }));
-      await makeTicket(carol.id, "RESOLVED", { resolvedAt: new Date(now - 8 * DAY), updatedAt: new Date(now - 10 * DAY) });
+      for (let i = 0; i < 3; i++) resolved.push(await makeTicket(carol.id, i % 2 ? "CLOSED" : "RESOLVED", { resolvedAt: new Date(now - (i + 1) * 24 * 3600_000), updatedAt: new Date(now - 10 * DAY) }));
+      await makeTicket(carol.id, "RESOLVED", { resolvedAt: new Date(now - 7 * DAY - 3600_000), updatedAt: new Date(now - 10 * DAY) });
 
       const { body } = await request(app).get("/api/dashboard/requester").set("Cookie", cookie);
       const ids = (key: string) => body.lists[key].map((t: { id: number }) => t.id);
       expect(ids("needsAttention")).toEqual(waiting.slice(0, 5));
-      expect(ids("recentlyUpdated")).toEqual(waiting.slice(0, 5));
-      expect(ids("recentlyResolved")).toEqual(resolved.slice(0, 5));
+      expect(ids("recentlyUpdated")).toEqual([newest, ...waiting.slice(0, 4)]);
+      expect(ids("recentlyResolved")).toEqual(resolved);
       expect(body.lists.recentlyResolved[0]).toEqual({
         id: resolved[0], ticketNumber: expect.stringMatching(/^RDB-/), summary: expect.any(String), currentStatus: "RESOLVED",
         updatedAt: expect.any(String), resolvedAt: expect.any(String), href: `/tickets/${resolved[0]}`,

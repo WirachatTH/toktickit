@@ -55,8 +55,8 @@ Planned until the issue that owns the row runs it green.
 | UNIT-03 | AC-03, BR-04 | Unit | Follow-up normalisation: flag true without note, flag false with a note, flag turned off on edit | Missing note rejected; a note sent with the flag off is stored as `null`; turning the flag off clears the stored note | `server/tests/lab-04/action-rules.test.ts` | Pass |
 | UNIT-04 | AC-06, BR-10, BR-13 | Unit | Action status transitions: every (from, to) pair of the 3×3 grid, and edit permission per status | Only `PLANNED → COMPLETED` and `PLANNED → CANCELLED` permitted; edit allowed only while `PLANNED` | `server/tests/lab-04/action-rules.test.ts` | Pass |
 | UNIT-05 | AC-14, BR-28, BR-14 | Unit | Gate function over action sets: none; only planned; completed + planned; completed with an unhandled follow-up; follow-up handled by a completed action; follow-up whose only follow-up action was cancelled; only cancelled | Passes only for ≥1 completed, 0 planned, 0 open follow-ups; reports the three counts exactly | `server/tests/lab-04/resolution-gate.test.ts` | Pass |
-| UNIT-06 | AC-21, BR-33 | Unit | Bangkok day boundaries for instants at 16:59:59.999Z, 17:00:00.000Z, and across a month and year end; the 7-day window start | "Today" starts at 17:00Z of the previous UTC day; 16:59:59.999Z belongs to the earlier Bangkok day; the 7-day window starts at 00:00 Bangkok six days back | `server/tests/lab-04/dashboard-time.test.ts` | Planned |
-| UNIT-07 | AC-23, BR-38, D-13 | Unit | Status-filter parsing for My Tickets and the queue: `UNRESOLVED`, each status, unknown values | `UNRESOLVED` maps to the five BR-35 statuses; unknown values fall back to `ALL` (My Tickets) or `ACTIVE` (queue), never `400` | `server/tests/lab-04/regression.api.test.ts` | Planned |
+| UNIT-06 | AC-21, BR-33 | Unit | Bangkok day boundaries for instants at 16:59:59.999Z, 17:00:00.000Z, and across a month and year end; the 7-day window start | "Today" starts at 17:00Z of the previous UTC day; 16:59:59.999Z belongs to the earlier Bangkok day; the 7-day window starts at 00:00 Bangkok six days back | `server/tests/lab-04/dashboard-time.test.ts` | Pass |
+| UNIT-07 | AC-23, BR-38, D-13 | Unit | Status-filter parsing for My Tickets and the queue: `UNRESOLVED`, each status, unknown values | `UNRESOLVED` maps to the five BR-35 statuses; unknown values fall back to `ALL` (My Tickets) or `ACTIVE` (queue), never `400` | `server/tests/lab-04/regression.api.test.ts` | Pass |
 
 ### 2.2 API — Actions Taken
 
@@ -105,18 +105,18 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| DASH-01 | AC-18, BR-36, BR-40 | API | Two Requesters with tickets in every status; each calls `GET /api/dashboard/requester`, also with `?requesterId=<other>` | Each sees only their own counts and items; the query parameter changes nothing; no `itPriority` anywhere in the body | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| DASH-02 | AC-19, BR-40 | API | Requester metrics against independent SQL counts for each BR-40 definition | Every `value` equals its SQL count; `href`s match BR-40 | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| DASH-03 | AC-19, BR-40, BR-37 | API | Requester lists: content, order, and limit with 7 matching tickets each | At most 5 items each, in BR-40 order; `recentlyResolved` only within the 7-day window | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| DASH-04 | AC-19, BR-39 | API | IT Staff metrics, `byStatus`, and `byItPriority` against independent SQL counts on a throwaway schema with known data | Every value equals its SQL count; `href`s match BR-39 | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-05 | AC-19, BR-39, D-18 | API | "My planned actions": mine vs a colleague's; on a cancelled ticket; completed and cancelled actions | Counts and lists only my `PLANNED` actions on non-terminal tickets; ordered `actionAt`, `id`; ≤5 | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-06 | AC-19, BR-39 | API | `urgent` and `recentlyUpdated` lists with 7 candidates each | ≤5 items in BR-39 order; `urgent` only Unresolved `HIGH` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-07 | AC-20, BR-41 | API | Administrator dashboard | Contains the BR-39 metrics for the Administrator and user counts equal to SQL counts per role and inactive | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-08 | AC-21, BR-33 | API | Tickets created and resolved at 16:59:59Z and 17:00:01Z around a Bangkok midnight (throwaway schema, clock fixed) | `createdToday` and `resolvedToday` count only the post-midnight ticket; the 7-day window includes and excludes at the right instants | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-09 | AC-22, BR-37 | API | All three dashboards on an empty throwaway schema, and a Requester with no tickets | `200`; every `value` 0; every list `[]`; no field missing or `null` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-10 | AC-24, BR-15 | API | Each dashboard endpoint called by the two other roles and with no session | `403 FORBIDDEN` with no metrics; `401` without a session | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| DASH-11 | AC-23, BR-38 | API | For each metric, ticket and user alike, follow its `href` query against the queue, My Tickets, or user-list API | Exact metrics, every user count included: the list's size equals the metric and it holds exactly the counted ids; the two "today" supersets: the list includes every counted ticket and is sorted by recency | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-12 | BR-42, BR-34 | API | Legacy-shaped tickets (no actions, backfilled `resolvedAt`) in the counts | Counted like any ticket; no `500`; values still equal SQL counts | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
+| DASH-01 | AC-18, BR-36, BR-40 | API | Two Requesters with tickets in every status; each calls `GET /api/dashboard/requester`, also with `?requesterId=<other>` | Each sees only their own counts and items; the query parameter changes nothing; no `itPriority` anywhere in the body | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-02 | AC-19, BR-40 | API | Requester metrics against independent SQL counts for each BR-40 definition | Every `value` equals its SQL count; `href`s match BR-40 | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-03 | AC-19, BR-40, BR-37 | API | Requester lists: content, order, and limit with 7 matching tickets each | At most 5 items each, in BR-40 order; `recentlyResolved` only within the 7-day window | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-04 | AC-19, BR-39 | API | IT Staff metrics, `byStatus`, and `byItPriority` against independent SQL counts on a throwaway schema with known data | Every value equals its SQL count; `href`s match BR-39 | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-05 | AC-19, BR-39, D-18 | API | "My planned actions": mine vs a colleague's; on a cancelled ticket; completed and cancelled actions | Counts and lists only my `PLANNED` actions on non-terminal tickets; ordered `actionAt`, `id`; ≤5 | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-06 | AC-19, BR-39 | API | `urgent` and `recentlyUpdated` lists with 7 candidates each | ≤5 items in BR-39 order; `urgent` only Unresolved `HIGH` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-07 | AC-20, BR-41 | API | Administrator dashboard | Contains the BR-39 metrics for the Administrator and user counts equal to SQL counts per role and inactive | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-08 | AC-21, BR-33 | API | Tickets created and resolved one second before and one second after the Bangkok midnight that started today (throwaway schema) | `createdToday` and `resolvedToday` count only the post-midnight ticket; the 7-day window includes and excludes at the right instants | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-09 | AC-22, BR-37 | API | All three dashboards on an empty throwaway schema, and a Requester with no tickets | `200`; every `value` 0; every list `[]`; no field missing or `null` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-10 | AC-24, BR-15 | API | Each dashboard endpoint called by the two other roles and with no session | `403 FORBIDDEN` with no metrics; `401` without a session | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-11 | AC-23, BR-38 | API | For each metric, ticket and user alike, follow its `href` query against the queue, My Tickets, or user-list API | Exact metrics, every user count included: the list's size equals the metric and it holds exactly the counted ids; the two "today" supersets: the list includes every counted ticket and is sorted by recency | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-12 | BR-42, BR-34 | API | Legacy-shaped tickets (no actions, backfilled `resolvedAt`) in the counts | Counted like any ticket; no `500`; values still equal SQL counts | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
 
 ### 2.5 Security and authorization
 
@@ -128,7 +128,7 @@ Planned until the issue that owns the row runs it green.
 | SEC-04 | AC-36 | Security | Each new state-changing route with a foreign `Origin` and with `Origin: null` | `403 FORBIDDEN_ORIGIN`; nothing changed | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-05 | AC-36 | Security | Every route in the route-policy table has a row in api-spec §5 and the reverse; an unknown method on an action route | Tables match; unknown method `404` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-06 | AC-02, BR-17 | Security | Administrator calls owner, IT Priority, status, comment, and note routes after Lab 4 | Still `403` (Lab 3 BR-21 kept) | `server/tests/lab-04/authorization.api.test.ts` | Pass |
-| SEC-07 | AC-36, BR-36 | Security | Scan every JSON response the Lab 4 suites produce | No `passwordHash`, token, `clientRequestId`, Internal Note content, or (in Requester responses) `itPriority` | `server/tests/lab-04/authorization.api.test.ts` | Planned |
+| SEC-07 | AC-36, BR-36 | Security | Scan every JSON response the Lab 4 suites produce | No `passwordHash`, token, `clientRequestId`, Internal Note content, or (in Requester responses) `itPriority` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 
 ### 2.6 Migration and seed
 
@@ -148,8 +148,8 @@ Planned until the issue that owns the row runs it green.
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | REG-01 | AC-33, BR-46 | Regression | Lab 1, Lab 2, and Lab 3 server suites on the Lab 4 build | Pass; only the BR-46 tests changed, each named in its PR | `server/tests/lab-04/regression.api.test.ts` | Planned |
 | REG-02 | AC-33, BR-46 | Regression | Lab 1–3 client suites and the Lab 2–3 Playwright suites on the Lab 4 build | Pass; home-route and navigation expectations updated to `/dashboard` (named in the Issue 6 PR) | `client/tests/lab-04/Navigation.test.tsx` | Planned |
-| REG-03 | BR-45, D-13 | Regression | `GET /api/tickets`, the queue, and `GET /api/admin/users`, each without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL`, `ACTIVE`, and every user) | `server/tests/lab-04/regression.api.test.ts` | Planned |
-| REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED` and `?status=WAITING_FOR_REQUESTER`; the queue with `status=UNRESOLVED`; `GET /api/admin/users` with `status=active`, `status=inactive`, combined with `role`, and with an unknown value | Only matching own tickets, matching tickets, or matching users; pagination metadata correct; an unknown user `status` returns every user, as in Lab 3 | `server/tests/lab-04/regression.api.test.ts` | Planned |
+| REG-03 | BR-45, D-13 | Regression | `GET /api/tickets`, the queue, and `GET /api/admin/users`, each without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL`, `ACTIVE`, and every user) | `server/tests/lab-04/regression.api.test.ts` | Pass |
+| REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED` and `?status=WAITING_FOR_REQUESTER`; the queue with `status=UNRESOLVED`; `GET /api/admin/users` with `status=active`, `status=inactive`, combined with `role`, and with an unknown value | Only matching own tickets, matching tickets, or matching users; pagination metadata correct; an unknown user `status` returns every user, as in Lab 3 | `server/tests/lab-04/regression.api.test.ts` | Pass |
 | REG-05 | FR-20 | Regression | `apiCredentials.test.ts` coverage check with the new API functions | Every new client API function is listed and sends credentials | `client/tests/lab-04/apiCredentials.lab4.test.ts` | Pass |
 | REG-06 | AC-34, FR-17 | Regression | Double submit on Create Ticket, Post comment, Add internal note, Create user (UI busy state) | One request per click burst; one row created | `client/tests/lab-04/Hardening.test.tsx` | Planned |
 | REG-07 | AC-34, FR-18 | Regression | Recoverable failure on Create Ticket, comment, note, user panels, and Actions Taken | Typed input kept after `400`, `409`, network error, and `500` | `client/tests/lab-04/Hardening.test.tsx` | Planned |
@@ -169,8 +169,8 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| PERF-01 | AC-25, D-17 | Performance | Each dashboard endpoint 20 times sequentially on the seeded data | 95th percentile < 500 ms; every list ≤ 5 items | `server/tests/lab-04/dashboard-performance.test.ts` | Planned |
-| PERF-02 | AC-25, D-17 | Performance | Query count per dashboard request before and after adding 50 tickets with actions | Identical query count (no N+1) | `server/tests/lab-04/dashboard-performance.test.ts` | Planned |
+| PERF-01 | AC-25, D-17 | Performance | Each dashboard endpoint 20 times sequentially on the seeded data | 95th percentile < 500 ms; every list ≤ 5 items | `server/tests/lab-04/dashboard-performance.test.ts` | Pass |
+| PERF-02 | AC-25, D-17 | Performance | Query count per dashboard request before and after adding 50 tickets with actions | Identical query count (no N+1) | `server/tests/lab-04/dashboard-performance.test.ts` | Pass |
 | PERF-03 | AC-25 | Performance | Actions Taken list for a ticket with 30 actions | One request, < 500 ms, query count independent of the number of actions | `server/tests/lab-04/dashboard-performance.test.ts` | Pass |
 
 ### 2.9 UI component
@@ -337,6 +337,7 @@ that output is the Part 3 evidence (labsheet §14).
   depend on machine speed.
 - **`resolvedAt` for Lab 3 tickets is approximate** (D-04). MIG-02 checks the backfill rule, not
   the true historical resolution time, which Lab 3 never stored.
-- **The Bangkok-midnight tests fix the clock** (DASH-08, UNIT-06) rather than waiting for a real
-  midnight.
+- **The Bangkok-midnight boundary is tested without waiting for midnight.** UNIT-06 feeds the
+  boundary function fixed instants, and DASH-08 places tickets one second either side of the
+  Bangkok midnight that started the current day, so the server runs on its real clock.
 - **Cross-browser coverage** stays at Playwright's Chromium projects, as in Labs 2 and 3.
