@@ -112,6 +112,10 @@ describe("DASH-03 the lists: content, order, and limit (BR-37, BR-40)", () => {
       for (let i = 0; i < 7; i++) waiting.push(await makeTicket(carol.id, "WAITING_FOR_REQUESTER", { updatedAt: new Date(now - (i + 1) * 3600_000) }));
       // The newest change of all is on a ticket that is not waiting for her.
       const newest = await makeTicket(carol.id, "IN_PROGRESS", { updatedAt: new Date(now - 60_000) });
+      // Two tickets updated at the same moment: the higher id comes first (PR #78 review).
+      const tieAt = new Date(now - 30_000);
+      const tieLow = await makeTicket(carol.id, "OPEN", { updatedAt: tieAt });
+      const tieHigh = await makeTicket(carol.id, "OPEN", { updatedAt: tieAt });
       // Three resolved within the 7-day window, one just outside it.
       const resolved: number[] = [];
       for (let i = 0; i < 3; i++) resolved.push(await makeTicket(carol.id, i % 2 ? "CLOSED" : "RESOLVED", { resolvedAt: new Date(now - (i + 1) * 24 * 3600_000), updatedAt: new Date(now - 10 * DAY) }));
@@ -120,7 +124,7 @@ describe("DASH-03 the lists: content, order, and limit (BR-37, BR-40)", () => {
       const { body } = await request(app).get("/api/dashboard/requester").set("Cookie", cookie);
       const ids = (key: string) => body.lists[key].map((t: { id: number }) => t.id);
       expect(ids("needsAttention")).toEqual(waiting.slice(0, 5));
-      expect(ids("recentlyUpdated")).toEqual([newest, ...waiting.slice(0, 4)]);
+      expect(ids("recentlyUpdated")).toEqual([tieHigh, tieLow, newest, ...waiting.slice(0, 2)]);
       expect(ids("recentlyResolved")).toEqual(resolved);
       expect(body.lists.recentlyResolved[0]).toEqual({
         id: resolved[0], ticketNumber: expect.stringMatching(/^RDB-/), summary: expect.any(String), currentStatus: "RESOLVED",

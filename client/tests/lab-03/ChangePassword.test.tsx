@@ -40,7 +40,8 @@ describe("UI-06 forced mode", () => {
 
     await fill("Initial-pass-1", "Brand-new-pass-2", "Brand-new-pass-2");
     await userEvent.click(save());
-    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/tickets"));
+    // Lab 4 BR-46 (1): the Requester's home is now the Dashboard.
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
     expect(spy).toHaveBeenCalledWith("Initial-pass-1", "Brand-new-pass-2");
   });
 

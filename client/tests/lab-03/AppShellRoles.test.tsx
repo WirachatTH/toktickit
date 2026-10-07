@@ -28,6 +28,11 @@ beforeEach(() => {
   vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([]);
   // Issue 9 — the Administrator home is now the real User Management list (setup only).
   vi.spyOn(api, "fetchAdminUsers").mockResolvedValue([]);
+  // Lab 4 BR-46 (1): every home is now the Dashboard, which loads its own data (setup only).
+  const dashboard = { generatedAt: "2026-10-07T09:00:00.000Z", timeZone: "Asia/Bangkok", today: { start: "2026-10-06T17:00:00.000Z", end: "2026-10-07T17:00:00.000Z" }, metrics: [], lists: {} };
+  vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue({ ...dashboard, lists: { needsAttention: [], recentlyUpdated: [], recentlyResolved: [] } });
+  vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue({ ...dashboard, byStatus: [], byItPriority: [], lists: { myPlannedActions: [], urgent: [], recentlyUpdated: [] } });
+  vi.spyOn(api, "fetchAdminDashboard").mockResolvedValue({ ...dashboard, byStatus: [], byItPriority: [], lists: { myPlannedActions: [], urgent: [], recentlyUpdated: [] }, users: [] });
 });
 
 function renderAppAt(path: string) {
@@ -54,10 +59,11 @@ function destinations() {
 }
 
 describe("UI-09 the app shell for each role", () => {
+  // Lab 4 BR-46 (1): Dashboard is every role's first destination (D-08).
   it.each([
-    ["Requester", REQUESTER, "/tickets", "zg-badge--role-requester", [["My Tickets", "/tickets"], ["Create Ticket", "/tickets/new"]]],
-    ["IT Staff", STAFF, "/staff/queue", "zg-badge--role-it-staff", [["Ticket Queue", "/staff/queue"]]],
-    ["Administrator", ADMIN, "/admin/users", "zg-badge--role-administrator", [["User Management", "/admin/users"], ["Ticket Queue", "/staff/queue"]]],
+    ["Requester", REQUESTER, "/tickets", "zg-badge--role-requester", [["Dashboard", "/dashboard"], ["My Tickets", "/tickets"], ["Create Ticket", "/tickets/new"]]],
+    ["IT Staff", STAFF, "/staff/queue", "zg-badge--role-it-staff", [["Dashboard", "/dashboard"], ["Ticket Queue", "/staff/queue"]]],
+    ["Administrator", ADMIN, "/admin/users", "zg-badge--role-administrator", [["Dashboard", "/dashboard"], ["User Management", "/admin/users"], ["Ticket Queue", "/staff/queue"]]],
   ] as const)("shows an %s exactly its destinations, name, role badge, Change password and Log out", async (badgeText, user, home, badgeClass, expected) => {
     signedInAs(user);
     renderAppAt(home);
@@ -84,12 +90,13 @@ describe("UI-09 the app shell for each role", () => {
 });
 
 describe("UI-10 routes a role may not open, and routes that need a sign-in", () => {
+  // Lab 4 BR-46 (1): every role's home is now the Dashboard (D-08).
   it.each([
-    ["a Requester", "/admin/users", "/tickets", REQUESTER],
-    ["a Requester", "/staff/queue", "/tickets", REQUESTER],
-    ["IT Staff", "/tickets/new", "/staff/queue", STAFF],
-    ["IT Staff", "/admin/users", "/staff/queue", STAFF],
-    ["an Administrator", "/tickets", "/admin/users", ADMIN],
+    ["a Requester", "/admin/users", "/dashboard", REQUESTER],
+    ["a Requester", "/staff/queue", "/dashboard", REQUESTER],
+    ["IT Staff", "/tickets/new", "/dashboard", STAFF],
+    ["IT Staff", "/admin/users", "/dashboard", STAFF],
+    ["an Administrator", "/tickets", "/dashboard", ADMIN],
   ] as const)("sends %s from %s to its home %s with a dismissible forbidden callout", async (_who, path, home, user) => {
     signedInAs(user);
     renderAppAt(path);
@@ -125,7 +132,8 @@ describe("UI-10 routes a role may not open, and routes that need a sign-in", () 
     await userEvent.type(screen.getByLabelText(/^Email/), REQUESTER.email);
     await userEvent.type(screen.getByLabelText(/^Password/), "Some-password-1");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    await waitFor(() => expect(location()).toHaveTextContent(/^\/tickets$/));
+    // Lab 4 BR-46 (1): the Requester's home is now the Dashboard.
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/dashboard$/));
     // Sent home by Login itself, not bounced off the forbidden route: no callout.
     await screen.findByRole("group", { name: "Account" });
     expect(screen.queryByText("You don't have access to that page.")).not.toBeInTheDocument();

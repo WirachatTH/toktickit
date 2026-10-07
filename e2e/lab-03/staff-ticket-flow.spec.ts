@@ -77,7 +77,9 @@ test.describe("the staff ticket flow", () => {
   // First, while the queue holds only seeded tickets (this file's flow adds one).
   test("RESP-01 the queue's states at each width: default, filtered, sorted, page 2, unassigned, no results, empty, failure", async ({ page }, info) => {
     await signIn(page, ACCOUNTS.staff.email);
-    await expect(page).toHaveURL(/\/staff\/queue$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens the queue.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/staff/queue");
     await expect(queueRows(page, info)).toBeVisible();
     await expectQueueLayout(page, info);
     await shot(page, info, "staff-queue", "default");
@@ -139,7 +141,8 @@ test.describe("the staff ticket flow", () => {
 
     // --- E2E-04: the Requester creates a ticket with an attachment, finds it, comments, marks it appears resolved.
     await signIn(page, ACCOUNTS.requester.email);
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
     await clickNav(page, "Create Ticket");
     for (const label of ["Category", "Related System"]) {
       const select = page.getByLabel(label);
@@ -178,7 +181,9 @@ test.describe("the staff ticket flow", () => {
 
     // --- E2E-05: IT Staff filter the queue to unassigned and claim the NEW ticket.
     await signIn(page, ACCOUNTS.staff.email);
-    await expect(page).toHaveURL(/\/staff\/queue$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens the queue.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/staff/queue");
     await expect(queueRows(page, info)).toBeVisible();
     await expectQueueLayout(page, info);
     await queueFilter(page, info, "owner", "unassigned");

@@ -99,6 +99,9 @@ async function signInAsRequester(page: Page, index: number): Promise<string> {
   await page.getByLabel(/^Email/).fill(REQUESTER_ACCOUNTS[index]);
   await page.getByLabel(/^Password/).fill(DEV_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
+  // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens My Tickets.
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/tickets");
   await expect(page).toHaveURL(/\/tickets$/);
   // The shell's account block holds the signed-in Requester's name. Wait for it
   // to exist first: isVisible() does not wait, and right after the URL changes
