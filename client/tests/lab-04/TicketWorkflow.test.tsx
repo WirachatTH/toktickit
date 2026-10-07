@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import * as api from "../../src/api.js";
@@ -38,6 +38,12 @@ const PLANNED: ActionTaken = {
   attachmentNotes: null, cancelReason: null, cancelledBy: null, completedAt: null, cancelledAt: null, version: 1,
   createdAt: "2026-10-02T03:00:00.000Z", updatedAt: "2026-10-02T03:00:00.000Z",
 };
+
+// These tests render the whole app; its first render in a file is a cold start.
+// In a full parallel run on a busy machine that took just over the default
+// 1 s wait twice (UI-01 here, UI-02 in a reviewer's run; the page showed the
+// shell still loading the screen), so the wait is longer. No assertion changes.
+configure({ asyncUtilTimeout: 5000 });
 
 beforeEach(() => {
   vi.restoreAllMocks();

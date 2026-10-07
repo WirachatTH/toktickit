@@ -1,4 +1,5 @@
 import type { Prisma, Priority, TicketStatus } from "@prisma/client";
+import { UNRESOLVED_STATUSES } from "./ticketFilters.js";
 
 // Lab 3, Issue 7 — the IT Staff Ticket Queue's query: normalisation, filters,
 // and ordering (docs/lab-03/api-spec.md §5.1, specification.md BR-61 to BR-66).
@@ -9,7 +10,8 @@ import type { Prisma, Priority, TicketStatus } from "@prisma/client";
 
 export type QueueSort = "itPriority" | "createdAt" | "updatedAt" | "ticketNumber" | "status";
 export type QueueOrder = "asc" | "desc";
-export type QueueStatus = "ACTIVE" | "ALL" | TicketStatus;
+// Lab 4 D-13 adds UNRESOLVED (BR-35), for the dashboards' drill-down links.
+export type QueueStatus = "ACTIVE" | "ALL" | "UNRESOLVED" | TicketStatus;
 export type QueueOwner = "any" | "unassigned" | "me" | number;
 
 export interface QueueQuery {
@@ -79,7 +81,7 @@ export function parseQueueQuery(raw: Record<string, unknown>): QueueQuery {
   const owner = text(raw.owner);
   return {
     search: (text(raw.search) ?? "").trim(),
-    status: oneOf(raw.status, ["ACTIVE", "ALL", ...STATUSES] as const) ?? DEFAULT_QUEUE_QUERY.status,
+    status: oneOf(raw.status, ["ACTIVE", "ALL", "UNRESOLVED", ...STATUSES] as const) ?? DEFAULT_QUEUE_QUERY.status,
     itPriority: oneOf(raw.itPriority, PRIORITIES) ?? null,
     categoryId: positiveId(raw.categoryId) ?? null,
     owner: owner === "any" || owner === "unassigned" || owner === "me" ? owner : (positiveId(owner) ?? "any"),
@@ -112,6 +114,7 @@ export function escapeLike(value: string): string {
 export function queueWhere(query: QueueQuery, currentUserId: number): Prisma.TicketWhereInput {
   const and: Prisma.TicketWhereInput[] = [];
   if (query.status === "ACTIVE") and.push({ currentStatus: { notIn: TERMINAL } });
+  else if (query.status === "UNRESOLVED") and.push({ currentStatus: { in: [...UNRESOLVED_STATUSES] } });
   else if (query.status !== "ALL") and.push({ currentStatus: query.status });
   if (query.itPriority) and.push({ itPriority: query.itPriority });
   if (query.categoryId !== null) and.push({ categoryId: query.categoryId });

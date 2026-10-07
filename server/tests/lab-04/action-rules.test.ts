@@ -109,7 +109,8 @@ describe("UNIT-02 the Action Date/Time window (BR-07)", () => {
       const done = parseStatusBody({ status: "COMPLETED", expectedVersion: 1, actionAt: impossible });
       expect("fields" in done && done.fields.actionAt, impossible).toBe(MISSING);
     }
-    for (const malformed of ["2026-10-06T09:00:00", "yesterday", 42]) {
+    // The date exists; only the time or the offset is wrong (PR #77 review).
+    for (const malformed of ["2026-10-06T09:00:00", "yesterday", 42, "2026-10-05T25:61:00Z", "2026-10-05T10:00:00+99:99"]) {
       expect(fieldsOf(parseCreateBody({ ...valid, actionAt: malformed })).actionAt, String(malformed)).toBe(FORMAT);
     }
   });

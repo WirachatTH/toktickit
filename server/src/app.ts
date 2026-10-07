@@ -22,6 +22,8 @@ import { registerStaffQueueRoutes } from "./staffQueue.js";
 import { registerStaffTicketRoutes } from "./staffTicket.js";
 import { registerAdminUserRoutes } from "./adminUsers.js";
 import { registerActionsTakenRoutes } from "./actionsTaken.js";
+import { registerDashboardRoutes } from "./dashboard.js";
+import { parseRequesterStatus, statusCondition } from "./ticketFilters.js";
 import { canMarkAppearsResolved } from "./ticketWorkflow.js";
 import { isClosedStatus } from "./ticketStatus.js";
 import {
@@ -403,6 +405,9 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
       ...(categoryId !== undefined ? { categoryId } : {}),
       ...(relatedSystemId !== undefined ? { relatedSystemId } : {}),
       ...(requestedPriority !== undefined ? { requestedPriority } : {}),
+      // Lab 4 D-13 — an optional status filter for the dashboard's drill-down;
+      // without it (or with an unknown value) the list is exactly Lab 2's.
+      ...(statusCondition(parseRequesterStatus(req.query.status)) ?? {}),
     };
 
     // BR-17 — id desc is a stable secondary tiebreaker so equal-value rows
@@ -803,6 +808,9 @@ registerAdminUserRoutes(app);
 
 // Lab 4, Issue 2 — Actions Taken (docs/lab-04/api-spec.md §1).
 registerActionsTakenRoutes(app);
+
+// Lab 4, Issue 5 — the dashboards (docs/lab-04/api-spec.md §3).
+registerDashboardRoutes(app);
 
 // Lab 3, Issue 4 — the end of the chain (§6.2). A classified route whose
 // handler a later issue adds answers 404 until then; an error that escaped a

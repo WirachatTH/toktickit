@@ -69,8 +69,14 @@ const MISSING_DATE_MESSAGE = "That date doesn't exist.";
 // The field message for an actionAt that did not parse: a well-formed date that
 // is not on the calendar (31 November) says so, rather than asking for a time
 // zone (PR #75 review).
+// Only the date part decides: an impossible time or offset (25:61, +99:99) on a
+// real date still asks for the date and time with its time zone (PR #77 review).
 function actionAtMessage(raw: unknown): string {
-  return typeof raw === "string" && ISO_WITH_OFFSET.test(raw) ? MISSING_DATE_MESSAGE : FORMAT_MESSAGE;
+  if (typeof raw !== "string" || !ISO_WITH_OFFSET.test(raw)) return FORMAT_MESSAGE;
+  const day = raw.slice(0, 10);
+  const calendar = new Date(`${day}T00:00:00Z`);
+  const missing = Number.isNaN(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== day;
+  return missing ? MISSING_DATE_MESSAGE : FORMAT_MESSAGE;
 }
 
 export function parseActionAt(raw: unknown): Date | null {
