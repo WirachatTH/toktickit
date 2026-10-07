@@ -5,6 +5,7 @@ import { findAccessibleTicket, isValidId, sessionUser } from "./authorization.js
 import type { SessionUser } from "./session.js";
 import { isClosedStatus } from "./ticketStatus.js";
 import { isPermittedTransition, isTicketStatus, permittedTransitions, requiredText, requiresOwner, statusTextError } from "./ticketWorkflow.js";
+import { gateMessage, resolutionGate } from "./resolutionGate.js";
 
 // Lab 3, Issue 8 — IT Staff Ticket Detail and the ticket workflow
 // (docs/lab-03/api-spec.md §5.2, §5.4 to §5.6; BR-29 to BR-48, BR-80, BR-81).
@@ -26,7 +27,13 @@ const PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 const UNASSIGNABLE_FROM: TicketStatus[] = ["NEW", "OPEN"]; // BR-36
 
 class Refusal extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly fields?: Record<string, string>) {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly fields?: Record<string, string>,
+    readonly details?: Record<string, number>,
+  ) {
     super(message);
   }
 }
@@ -36,6 +43,7 @@ const closed = () => new Refusal(409, "TICKET_CLOSED", "This ticket is closed, s
 function send(res: Response, refusal: Refusal) {
   const error: Record<string, unknown> = { code: refusal.code, message: refusal.message };
   if (refusal.fields) error.fields = refusal.fields;
+  if (refusal.details) error.details = refusal.details; // Lab 4 api-spec §0.2
   return res.status(refusal.status).json({ error });
 }
 
@@ -77,8 +85,11 @@ export async function staffTicketPayload(prisma: PrismaClient | Prisma.Transacti
       owner: PERSON,
       resolutionSummary: true,
       requesterResolvedAt: true,
+      resolvedAt: true,
       createdAt: true,
       updatedAt: true,
+      // Lab 4 BR-30 — what the gate needs, for the report below.
+      actionsTaken: { select: { id: true, status: true, followUpRequired: true, followUpOfId: true } },
       attachments: {
         orderBy: [{ uploadedAt: "asc" }, { id: "asc" }],
         select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, uploadedAt: true, isRemoved: true, removedAt: true, removedReason: true },
@@ -87,9 +98,14 @@ export async function staffTicketPayload(prisma: PrismaClient | Prisma.Transacti
   });
   const isStaff = user.role === "IT_STAFF";
   const terminal = isClosedStatus(ticket.currentStatus);
-  const transitions = isStaff ? permittedTransitions(ticket.currentStatus) : [];
+  const { actionsTaken, ...rest } = ticket;
+  // Lab 4 BR-30 — Resolved is offered only while the gate passes; the server
+  // still re-checks the gate on every status change.
+  const gate = resolutionGate(actionsTaken);
+  const transitions = isStaff ? permittedTransitions(ticket.currentStatus).filter((s) => s !== "RESOLVED" || gate.passes) : [];
   return {
-    ...ticket,
+    ...rest,
+    resolutionGate: gate,
     permittedTransitions: transitions,
     // An Administrator may look at everything and change nothing (BR-21).
     capabilities: {
@@ -219,13 +235,23 @@ const changeStatus = handle(async (req, res) => {
     if (requiresOwner(to) && locked.ownerId === null) {
       throw new Refusal(409, "OWNER_REQUIRED", "Assign an owner to move this ticket forward.");
     }
+    // Lab 4 BR-28 — the resolution gate, read under the ticket lock that every
+    // Action Taken write also takes (BR-26), so no action can change in between.
+    if (to === "RESOLVED") {
+      const actions = await tx.actionTaken.findMany({ where: { ticketId: ticket.id }, select: { id: true, status: true, followUpRequired: true, followUpOfId: true } });
+      const gate = resolutionGate(actions);
+      if (!gate.passes) {
+        const { passes: _passes, ...details } = gate;
+        throw new Refusal(409, "RESOLUTION_BLOCKED", gateMessage(gate), undefined, details);
+      }
+    }
     await tx.ticket.update({
       where: { id: ticket.id },
       data: {
         currentStatus: to,
         requesterResolvedAt: null, // BR-48
-        ...(to === "RESOLVED" ? { resolutionSummary: value } : {}),
-        ...(to === "REOPENED" ? { resolutionSummary: null } : {}), // BR-44
+        ...(to === "RESOLVED" ? { resolutionSummary: value, resolvedAt: new Date() } : {}), // Lab 4 BR-31
+        ...(to === "REOPENED" ? { resolutionSummary: null, resolvedAt: null } : {}), // BR-44, Lab 4 BR-31
       },
     });
     // BR-45 — the reason reaches the Requester as the actor's Public Comment,

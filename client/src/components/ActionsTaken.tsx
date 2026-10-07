@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionTaken,
   ActionTakenEvent,
@@ -127,9 +127,11 @@ export interface ActionsTakenProps {
   currentUserId: number;
   /** A change was saved, or the ticket changed under us: reload the ticket (FR-09). */
   onChanged: () => void;
+  /** Bumped by the screen to reload the list (Lab 4, Issue 4: after RESOLUTION_BLOCKED). */
+  reloadSignal?: number;
 }
 
-export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, currentUserId, onChanged }: ActionsTakenProps) {
+export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, currentUserId, onChanged, reloadSignal = 0 }: ActionsTakenProps) {
   const staff = mode === "staff";
   const [actions, setActions] = useState<ActionTaken[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -162,7 +164,7 @@ export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, c
 
   useEffect(() => {
     void load();
-  }, [load, reload]);
+  }, [load, reload, reloadSignal]);
 
   useEffect(() => {
     if (!toast) return;
@@ -679,8 +681,28 @@ function ConfirmDialog({
   const [note, setNote] = useState(a.followUpNote ?? "");
   // Completed work can't be dated ahead (BR-07): planned work dated in the
   // future starts from now, so completing it needs no date edit.
-  const [initialAt] = useState(() => toBangkokInput(new Date(Math.min(Date.parse(a.actionAt), Date.now()))));
+  const [initialAt, setInitialAt] = useState(() => toBangkokInput(new Date(Math.min(Date.parse(a.actionAt), Date.now()))));
   const [at, setAt] = useState(initialAt);
+  // PR #76 follow-up: after a stale reload the dialog shows the reloaded action
+  // for every field the user has not touched, and keeps the ones they changed,
+  // so a retry neither loses their text nor quietly undoes a colleague's edit.
+  const touched = useRef(new Set<string>());
+  const touch = (field: string) => touched.current.add(field);
+  const version = a.version;
+  const firstVersion = useRef(version);
+  useEffect(() => {
+    if (version === firstVersion.current) return;
+    const fresh = toBangkokInput(new Date(Math.min(Date.parse(a.actionAt), Date.now())));
+    if (!touched.current.has("result")) setResult(a.result ?? "");
+    if (!touched.current.has("followUp")) setFollowUp(a.followUpRequired);
+    if (!touched.current.has("note")) setNote(a.followUpNote ?? "");
+    if (!touched.current.has("at")) {
+      setAt(fresh);
+      setInitialAt(fresh);
+    }
+    // Only a new version of the action triggers this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
   // A date is sent only when it differs from the stored one: when the user
   // changed it, or when planned work dated ahead has to be completed as of now.
   const sendDate = at !== initialAt || Date.parse(a.actionAt) > Date.now();
@@ -717,19 +739,19 @@ function ConfirmDialog({
         {completing ? (
           <>
             <FormField htmlFor="complete-result" label="Result" required error={errors.result}>
-              <TextArea rows={3} value={result} maxLength={LIMITS.result} onChange={(e) => setResult(e.target.value)} />
+              <TextArea rows={3} value={result} maxLength={LIMITS.result} onChange={(e) => { touch("result"); setResult(e.target.value); }} />
             </FormField>
             <div className="form-check mb-3">
-              <input className="form-check-input" type="checkbox" id="complete-followup" checked={followUp} onChange={(e) => setFollowUp(e.target.checked)} />
+              <input className="form-check-input" type="checkbox" id="complete-followup" checked={followUp} onChange={(e) => { touch("followUp"); setFollowUp(e.target.checked); }} />
               <label className="form-check-label" htmlFor="complete-followup">Follow-up required?</label>
             </div>
             {followUp && (
               <FormField htmlFor="complete-followup-note" label="Follow-up note" required error={errors.followUpNote}>
-                <TextArea rows={2} value={note} maxLength={LIMITS.followUpNote} onChange={(e) => setNote(e.target.value)} />
+                <TextArea rows={2} value={note} maxLength={LIMITS.followUpNote} onChange={(e) => { touch("note"); setNote(e.target.value); }} />
               </FormField>
             )}
             <FormField htmlFor="complete-at" label="Action date & time (Bangkok)" required error={errors.actionAt}>
-              <TextInput type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
+              <TextInput type="datetime-local" value={at} onChange={(e) => { touch("at"); setAt(e.target.value); }} />
             </FormField>
           </>
         ) : (

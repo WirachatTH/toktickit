@@ -4,7 +4,7 @@ import { resolutionGate } from "../../src/resolutionGate.js";
 // UNIT-05 — the resolution gate over a ticket's actions
 // (docs/lab-04/specification.md BR-14, BR-28, BR-29).
 
-type A = { id: number; status: "PLANNED" | "COMPLETED" | "CANCELLED"; followUpRequired?: boolean; followUpOfId?: number | null };
+type A = { id: number; status: "PLANNED" | "COMPLETED" | "CANCELLED"; followUpRequired: boolean; followUpOfId: number | null };
 const act = (id: number, status: A["status"], extra: Partial<A> = {}): A => ({ id, status, followUpRequired: false, followUpOfId: null, ...extra });
 
 describe("UNIT-05 the resolution gate (BR-28)", () => {

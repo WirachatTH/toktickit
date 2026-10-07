@@ -186,7 +186,8 @@ describe("the resolution gate (BR-28)", () => {
         move(b, "RESOLVED", "IN_PROGRESS"),
       ]);
       // Exactly one of them wins; the loser is refused with its own conflict.
-      expect([add.status, resolveB.status].sort(), `run ${run}`).toEqual([201, 409]);
+      const outcome = `${add.status}/${resolveB.status}`;
+      expect(["201/409", "409/200"], `run ${run}`).toContain(outcome);
       if (add.status === 409) expect(add.body.error.code).toBe("TICKET_RESOLVED");
       else expect(resolveB.body.error.code).toBe("RESOLUTION_BLOCKED");
 

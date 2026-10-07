@@ -288,6 +288,8 @@ export interface TicketDetail {
   requesterResolvedAt: string | null;
   /** Lab 3, Issue 6 — false on a CLOSED or CANCELLED ticket (BR-52). */
   canComment: boolean;
+  /** Lab 4 BR-31 (api-spec §2.3) — when IT Staff resolved it. */
+  resolvedAt?: string | null;
   /** Lab 3, Issue 8 — whether "Problem appears resolved" is offered (BR-47). */
   canMarkAppearsResolved: boolean;
   createdAt: string;
@@ -528,6 +530,10 @@ export interface StaffTicketDetail {
   createdAt: string;
   updatedAt: string;
   attachments: TicketDetailAttachment[];
+  /** Lab 4 BR-31 — when the ticket was last resolved; null unless RESOLVED or CLOSED. */
+  resolvedAt: string | null;
+  /** Lab 4 BR-30 — the resolution gate; `permittedTransitions` leaves out RESOLVED while it fails. */
+  resolutionGate: { passes: boolean; completedCount: number; plannedCount: number; openFollowUpCount: number };
   permittedTransitions: TicketStatus[];
   capabilities: {
     canAssign: boolean;

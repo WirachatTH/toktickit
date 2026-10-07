@@ -127,6 +127,30 @@ describe("UI-13 the summary refreshes after a change (FR-09)", () => {
   });
 });
 
+describe("UI-13 the Requester sees when it was resolved (BR-31, ui-spec §6)", () => {
+  it("shows the Bangkok date and time beside the resolution summary", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue({ ...STAFF, id: 3, role: "REQUESTER" });
+    vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
+    vi.spyOn(api, "fetchTicket").mockResolvedValue({
+      id: 42, ticketNumber: "TCK-000042", requester: { id: 3, name: "Somchai Prasert", email: "somchai.prasert@kmutt.ac.th" },
+      category: { id: 1, name: "Hardware" }, relatedSystem: { id: 2, name: "Corporate Laptop" }, summary: "Laptop battery drains quickly",
+      description: "Battery drops quickly.", requestedPriority: "MEDIUM", currentStatus: "RESOLVED", owner: PIM,
+      resolutionSummary: "Replaced the battery and tested it.", requesterResolvedAt: null, resolvedAt: "2026-10-05T03:30:00.000Z",
+      canComment: true, canMarkAppearsResolved: false, createdAt: "2026-10-01T09:00:00.000Z", updatedAt: "2026-10-05T03:30:00.000Z", attachments: [],
+    });
+    render(
+      <AuthProvider>
+        <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/tickets/42"]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    const resolution = await screen.findByRole("region", { name: "Resolution" });
+    // 03:30 UTC is 10:30 in Bangkok.
+    expect(within(resolution).getByText(/^Resolved on .*5 Oct 2026, 10:30$/)).toBeInTheDocument();
+  });
+});
+
 describe("UI-14 a blocked resolution reported by the server (FR-08, BR-28)", () => {
   it("shows the server's reason under the status select and reloads the ticket and its actions", async () => {
     const { load, actions } = renderDetail(ticket(), BLOCKED);

@@ -473,7 +473,7 @@ describe("UI-07 a stale Complete dialog refreshes what the user left alone (PR #
     await userEvent.type(within(dialog).getByLabelText(/Result/), "My result");
 
     // Meanwhile a colleague ticked Follow-up required and wrote a result.
-    loadActions.mockResolvedValue([{ ...PLANNED, followUpRequired: true, followUpNote: "Their note", result: "Their result", version: 2 }]);
+    loadActions.mockResolvedValue([{ ...PLANNED, followUpRequired: true, followUpNote: "Their note", result: "Their result", actionAt: "2026-10-02T01:00:00.000Z", version: 2 }]);
     const send = vi
       .spyOn(api, "changeActionStatus")
       .mockRejectedValueOnce(new ApiError(409, "STALE_STATE", "Changed by someone else."))
@@ -486,10 +486,14 @@ describe("UI-07 a stale Complete dialog refreshes what the user left alone (PR #
     await waitFor(() => expect(within(again).getByRole("checkbox", { name: "Follow-up required?" })).toBeChecked());
     expect(within(again).getByLabelText(/Follow-up note/)).toHaveValue("Their note");
     expect(within(again).getByLabelText(/Result/)).toHaveValue("My result");
+    // The colleague also moved the date: the field shows it (08:00 in Bangkok).
+    expect(within(again).getByLabelText(/Action date & time/)).toHaveValue("2026-10-02T08:00");
 
     await userEvent.click(within(again).getByRole("button", { name: "Mark as completed" }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     expect(send.mock.calls[1][2]).toMatchObject({ expectedVersion: 2, result: "My result", followUpRequired: true, followUpNote: "Their note" });
+    // Untouched and in the past, the date is the stored one: nothing to send.
+    expect(send.mock.calls[1][2]).not.toHaveProperty("actionAt");
   });
 
   it("sends a completion date the user changed (PR #76 follow-up)", async () => {

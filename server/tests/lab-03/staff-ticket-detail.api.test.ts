@@ -189,7 +189,9 @@ describe("ownership (§5.4, BR-29 to BR-32, BR-36)", () => {
     const id = await ticket("NEW");
     const res = await claim(id);
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ currentStatus: "OPEN", owner: { id: users.staff }, permittedTransitions: BR_41.OPEN });
+    // Lab 4 BR-30 (BR-46): a ticket with no completed work is not offered
+    // Resolved yet; the rest of the Lab 3 OPEN row is unchanged.
+    expect(res.body).toMatchObject({ currentStatus: "OPEN", owner: { id: users.staff }, permittedTransitions: BR_41.OPEN.filter((s) => s !== "RESOLVED") });
     expect(await row(id)).toMatchObject({ ownerId: users.staff, currentStatus: "OPEN" });
   });
 
