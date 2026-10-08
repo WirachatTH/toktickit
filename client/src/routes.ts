@@ -19,13 +19,17 @@ export const ROUTES = {
   // screens arrive with Issues 7 and 9.
   staffQueue: "/staff/queue",
   adminUsers: "/admin/users",
+  // Lab 4, Issue 6 — every role's home (docs/lab-04/ui-spec.md §2, D-08).
+  dashboard: "/dashboard",
 } as const;
 
-// Each role's home screen (ui-spec.md §2).
+// Each role's home screen. Lab 4 makes it the Dashboard for every role
+// (docs/lab-04/ui-spec.md §2, D-08; Lab 3 homes were My Tickets, the queue,
+// and User Management).
 export const HOME_BY_ROLE: Record<Role, string> = {
-  REQUESTER: ROUTES.list,
-  IT_STAFF: ROUTES.staffQueue,
-  ADMINISTRATOR: ROUTES.adminUsers,
+  REQUESTER: ROUTES.dashboard,
+  IT_STAFF: ROUTES.dashboard,
+  ADMINISTRATOR: ROUTES.dashboard,
 };
 
 /** IT Staff Ticket Detail: the route pattern, and the path for one ticket. */
@@ -41,13 +45,19 @@ export function homeFor(role: Role): string {
 // Lab 3, Issue 4 — the navigation each role sees: exactly the screens it may
 // open, and nothing else (ui-spec.md §2, FR-10). Hiding a link is feedback,
 // not protection: the server refuses the same role on the same data (BR-27).
+// Lab 4: Dashboard first for every role (ui-spec §2).
 export const NAV_BY_ROLE: Record<Role, { label: string; to: string }[]> = {
   REQUESTER: [
+    { label: "Dashboard", to: ROUTES.dashboard },
     { label: "My Tickets", to: ROUTES.list },
     { label: "Create Ticket", to: ROUTES.create },
   ],
-  IT_STAFF: [{ label: "Ticket Queue", to: ROUTES.staffQueue }],
+  IT_STAFF: [
+    { label: "Dashboard", to: ROUTES.dashboard },
+    { label: "Ticket Queue", to: ROUTES.staffQueue },
+  ],
   ADMINISTRATOR: [
+    { label: "Dashboard", to: ROUTES.dashboard },
     { label: "User Management", to: ROUTES.adminUsers },
     { label: "Ticket Queue", to: ROUTES.staffQueue },
   ],
@@ -60,6 +70,7 @@ export const SCREEN_ROLES = {
   staffQueue: ["IT_STAFF", "ADMINISTRATOR"],
   staffTicket: ["IT_STAFF", "ADMINISTRATOR"],
   adminUsers: ["ADMINISTRATOR"],
+  dashboard: ["REQUESTER", "IT_STAFF", "ADMINISTRATOR"],
 } as const satisfies Record<string, readonly Role[]>;
 
 const PROTECTED_SCREENS: { pattern: string; roles: readonly Role[] }[] = [
@@ -69,6 +80,7 @@ const PROTECTED_SCREENS: { pattern: string; roles: readonly Role[] }[] = [
   { pattern: ROUTES.detailPattern, roles: SCREEN_ROLES.requester },
   { pattern: ROUTES.staffQueue, roles: SCREEN_ROLES.staffQueue },
   { pattern: ROUTES.adminUsers, roles: SCREEN_ROLES.adminUsers },
+  { pattern: ROUTES.dashboard, roles: SCREEN_ROLES.dashboard },
 ];
 
 /** Whether `role` may open `pathname`; screens without a role list (e.g. `/`) are open to all. */

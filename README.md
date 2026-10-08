@@ -278,11 +278,11 @@ role gets a Dashboard as its home screen, and the whole application is hardened.
 engineering contract lives in `docs/lab-04/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–5 are in: the contract; the Actions Taken model, migration,
-> seed, API, and screens; the resolution gate; and the dashboard APIs
-> (`/api/dashboard/requester`, `/staff`, `/admin`). The Dashboard screens follow in
-> Issue 6; until then sign-in still lands on the Lab 3 home screens. This section
-> gains the remaining test and demonstration steps as each issue lands.
+> **Status:** Issues 1–6 are in: the contract; the Actions Taken model, migration,
+> seed, API, and screens; the resolution gate; and the dashboards, which are now every
+> role's home after sign-in (`/dashboard`). Final hardening and the Lab 4 end-to-end
+> suites follow in Issues 7–8. This section gains the remaining test and demonstration
+> steps as each issue lands.
 
 ### Applying the Lab 4 migration and seed
 Back up first, as for Lab 3. The migration only adds, but a backup is what makes the

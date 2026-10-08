@@ -23,9 +23,10 @@ async function signIn(email: string, password: string) {
 
 describe("UI-01 a successful sign-in", () => {
   it.each([
-    ["REQUESTER", false, "/tickets"],
-    ["IT_STAFF", false, "/staff/queue"],
-    ["ADMINISTRATOR", false, "/admin/users"],
+    // Lab 4 BR-46 (1): every role now lands on the Dashboard (D-08).
+    ["REQUESTER", false, "/dashboard"],
+    ["IT_STAFF", false, "/dashboard"],
+    ["ADMINISTRATOR", false, "/dashboard"],
     ["IT_STAFF", true, "/change-password"],
   ] as const)("for a %s (must change: %s) calls login once and lands on %s", async (role, mustChangePassword, expected) => {
     const spy = vi.spyOn(api, "login").mockResolvedValue({ ...REQUESTER, role, mustChangePassword });
@@ -102,7 +103,8 @@ describe("UI-05 validation and duplicate submission", () => {
     expect(screen.getByRole("button", { name: /signing in/i })).toBeDisabled();
     expect(screen.getByLabelText(/^email/i)).toBeDisabled();
     finish(REQUESTER);
-    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/tickets"));
+    // Lab 4 BR-46 (1): the Requester's home is now the Dashboard.
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
   });
 
   it("lets the password be shown and hidden with an accessible toggle", async () => {

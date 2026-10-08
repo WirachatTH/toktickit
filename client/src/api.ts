@@ -230,6 +230,8 @@ export interface TicketListParams {
   sort?: TicketSortField;
   order?: SortOrder;
   page?: number;
+  /** Lab 4 D-13 — "UNRESOLVED" or one status; omit for every ticket. */
+  status?: "UNRESOLVED" | TicketStatus;
 }
 
 export async function fetchTickets(params: TicketListParams = {}): Promise<TicketListResponse> {
@@ -241,6 +243,7 @@ export async function fetchTickets(params: TicketListParams = {}): Promise<Ticke
   if (params.sort) query.set("sort", params.sort);
   if (params.order) query.set("order", params.order);
   if (params.page) query.set("page", String(params.page));
+  if (params.status) query.set("status", params.status);
 
   const res = await apiFetch(`/api/tickets?${query.toString()}`);
   if (!res.ok) throw await toApiError(res);
@@ -461,7 +464,7 @@ export type Priority = RequestedPriority;
 
 export interface QueueQuery {
   search: string;
-  status: "ACTIVE" | "ALL" | TicketStatus;
+  status: "ACTIVE" | "ALL" | "UNRESOLVED" | TicketStatus; // Lab 4 D-13 adds UNRESOLVED
   itPriority: Priority | null;
   categoryId: number | null;
   owner: "any" | "unassigned" | "me" | number;
@@ -600,7 +603,8 @@ export interface NewUserInput {
   initialPassword: string;
 }
 
-export async function fetchAdminUsers(params: { search?: string; role?: Role } = {}): Promise<AdminUser[]> {
+// Lab 4 D-13 adds the optional activation filter.
+export async function fetchAdminUsers(params: { search?: string; role?: Role; status?: "active" | "inactive" } = {}): Promise<AdminUser[]> {
   const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
   const res = await apiFetch(query ? `/api/admin/users?${query}` : "/api/admin/users");
   if (!res.ok) throw await toApiError(res);
@@ -725,4 +729,77 @@ export async function fetchActionHistory(ticketId: number, actionId: number): Pr
   const res = await apiFetch(`${actionsPath(ticketId)}/${actionId}/history`);
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).data;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 6 — the dashboards (docs/lab-04/api-spec.md §3). Every value is
+// counted by the server (BR-34); the screen only shows what arrives.
+// ---------------------------------------------------------------------------
+
+export interface DashboardMetric {
+  key: string;
+  label: string;
+  value: number;
+  /** A client route that lists what the metric counts (BR-38). */
+  href: string;
+}
+
+export interface DashboardTicket {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: TicketStatus;
+  updatedAt: string;
+  href: string;
+  /** IT Staff and Administrator lists only; never in a Requester's (BR-36). */
+  itPriority?: Priority;
+  owner?: PersonRef | null;
+  resolvedAt?: string | null;
+}
+
+export interface DashboardPlannedAction {
+  actionId: number;
+  actionAt: string;
+  description: string;
+  ticket: { id: number; ticketNumber: string; summary: string; currentStatus: TicketStatus };
+  href: string;
+}
+
+interface DashboardEnvelope {
+  generatedAt: string;
+  timeZone: string;
+  today: { start: string; end: string };
+  metrics: DashboardMetric[];
+}
+
+export interface RequesterDashboard extends DashboardEnvelope {
+  lists: { needsAttention: DashboardTicket[]; recentlyUpdated: DashboardTicket[]; recentlyResolved: DashboardTicket[] };
+}
+
+export interface StaffDashboard extends DashboardEnvelope {
+  byStatus: DashboardMetric[];
+  byItPriority: DashboardMetric[];
+  lists: { myPlannedActions: DashboardPlannedAction[]; urgent: DashboardTicket[]; recentlyUpdated: DashboardTicket[] };
+}
+
+export interface AdminDashboard extends StaffDashboard {
+  users: DashboardMetric[];
+}
+
+async function getDashboard<T>(which: "requester" | "staff" | "admin"): Promise<T> {
+  const res = await apiFetch(`/api/dashboard/${which}`);
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export function fetchRequesterDashboard(): Promise<RequesterDashboard> {
+  return getDashboard("requester");
+}
+
+export function fetchStaffDashboard(): Promise<StaffDashboard> {
+  return getDashboard("staff");
+}
+
+export function fetchAdminDashboard(): Promise<AdminDashboard> {
+  return getDashboard("admin");
 }

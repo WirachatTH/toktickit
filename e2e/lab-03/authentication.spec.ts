@@ -44,7 +44,8 @@ test.describe("authentication", () => {
     await shot(page, info, "authentication", "login");
 
     await signIn(page, ACCOUNTS.requester.email);
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
     await openNav(page);
     const nav = page.getByRole("navigation", { name: "Primary" });
     const account = nav.getByRole("group", { name: "Account" });
@@ -115,12 +116,13 @@ test.describe("authentication", () => {
     await page.getByLabel(/^Confirm new password/).fill(NEW_PASSWORD);
     await expect(rules).not.toContainText("(not met)");
     await page.getByRole("button", { name: "Save password" }).click();
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
 
     // The new password is the one that works now.
     await logOut(page);
     await signIn(page, email, NEW_PASSWORD);
-    await expect(page).toHaveURL(/\/tickets$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
   });
 
   test("E2E-03 a wrong password, an inactive account, and the throttle each show their own message", async ({ page }, info) => {
@@ -177,7 +179,8 @@ test.describe("authentication", () => {
     await expect(busy).toHaveAttribute("aria-busy", "true");
     await shot(page, info, "authentication", "login-submitting");
     release();
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
     await page.unroute("**/api/auth/login");
     await logOut(page);
 

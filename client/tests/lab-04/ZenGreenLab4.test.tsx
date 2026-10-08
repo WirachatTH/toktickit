@@ -98,3 +98,28 @@ describe("STYLE-03 Actions Taken are shared, not internal (BR-19, D-09)", () => 
     expect(container.querySelector(".zg-internal-region, [class*='zg-internal']")).toBeNull();
   });
 });
+
+describe("STYLE-02 the Lab 4 styles use the Zen Green tokens (ui-spec §1, §11)", () => {
+  it("writes a hex colour only in :root and the badge and pill classes, as Lab 3 STYLE-06 requires", () => {
+    const lab4 = css.slice(css.indexOf("Lab 4, Issue 3"));
+    expect(lab4.length).toBeGreaterThan(100);
+    const offenders: string[] = [];
+    for (const m of lab4.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const selector = m[1].replace(/\/\*[\s\S]*?\*\//g, "").trim();
+      if (/^:root$|\.zg-badge--|\.zg-pill--/.test(selector)) continue;
+      const hex = m[2].match(/#[0-9a-fA-F]{3,8}\b/g);
+      if (hex) offenders.push(`${selector} -> ${hex.join(", ")}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("styles the metric card and count strip with tokens (ui-spec §1.3, §1.4)", () => {
+    expect(declared(".zg-metric-card__value", "color")).toBe("#006b3c");
+    expect(ruleOf(".zg-metric-card__value")).toMatch(/color: var\(--zg-metric-value\)/);
+    expect(ruleOf(":root")).toMatch(/--zg-metric-value: #006b3c;/);
+    expect(ruleOf(".zg-metric-card")).toMatch(/background: var\(--zg-surface\)/);
+    expect(ruleOf(".zg-metric-card")).toMatch(/border: 1px solid var\(--zg-border\)/);
+    expect(contrast("#ffffff", "#006b3c")).toBeGreaterThanOrEqual(4.5);
+    expect(ruleOf(".zg-count-strip")).toMatch(/flex-wrap: wrap/);
+  });
+});

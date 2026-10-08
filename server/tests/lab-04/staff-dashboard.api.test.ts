@@ -129,7 +129,9 @@ describe("with tickets", () => {
   const planned: number[] = [];
   const urgent: number[] = [];
   const recent: number[] = [];
+  const recentTerminal: number[] = [];
   let beforeMidnight: number;
+  let atNextMidnight: number;
   let afterMidnight: number;
 
   beforeAll(async () => {
@@ -138,6 +140,9 @@ describe("with tickets", () => {
       await ticket({ status });
       await ticket({ status, it: "LOW" });
     }
+    // Terminal tickets updated most recently of all: never in "recently updated" (PR #78 review).
+    recentTerminal.push(await ticket({ status: "CLOSED", updatedAt: new Date(now + 60 * 60_000) }));
+    recentTerminal.push(await ticket({ status: "CANCELLED", updatedAt: new Date(now + 61 * 60_000) }));
     // Mine: three active, one closed (never counted as mine).
     await ticket({ status: "OPEN", owner: users.me });
     await ticket({ status: "WAITING_FOR_REQUESTER", owner: users.me, appearsResolved: true });
@@ -165,6 +170,8 @@ describe("with tickets", () => {
     const today = bangkokToday(new Date());
     beforeMidnight = await ticket({ status: "RESOLVED", createdAt: new Date(today.start.getTime() - 1000), resolvedAt: new Date(today.start.getTime() - 1000) });
     afterMidnight = await ticket({ status: "CLOSED", createdAt: new Date(today.start.getTime() + 1000), resolvedAt: new Date(today.start.getTime() + 1000) });
+    // Exactly the next Bangkok midnight belongs to tomorrow: the interval is half-open (PR #78 review).
+    atNextMidnight = await ticket({ status: "RESOLVED", createdAt: today.end, resolvedAt: today.end });
     // A resolve time today on a ticket that is no longer resolved or closed is
     // not "resolved today" (BR-39 counts tickets now RESOLVED or CLOSED).
     await ticket({ status: "CANCELLED", resolvedAt: new Date(today.start.getTime() + 2000) });
@@ -223,6 +230,8 @@ describe("with tickets", () => {
     expect(body.lists.urgent.map((t: { id: number }) => t.id)).toEqual(urgent.slice(0, 5));
     for (const t of body.lists.urgent) expect(t.itPriority).toBe("HIGH");
     expect(body.lists.recentlyUpdated.map((t: { id: number }) => t.id)).toEqual(recent.slice(0, 5));
+    // The two terminal tickets were updated last of all, yet "recently updated" is Active only (BR-39).
+    for (const id of recentTerminal) expect(body.lists.recentlyUpdated.map((t: { id: number }) => t.id)).not.toContain(id);
     expect(body.lists.recentlyUpdated[0]).toEqual({
       id: recent[0], ticketNumber: expect.any(String), summary: expect.any(String), currentStatus: "IN_PROGRESS", updatedAt: expect.any(String),
       itPriority: "MEDIUM", owner: { id: users.colleague, name: "SDB colleague", role: "IT_STAFF", isActive: true }, href: `/staff/tickets/${recent[0]}`,
@@ -262,6 +271,10 @@ describe("with tickets", () => {
     const resolved = await ids(`"Ticket" WHERE "resolvedAt" >= $1 AND "resolvedAt" < $2 AND "currentStatus"::text IN ('RESOLVED', 'CLOSED')`, today.start, today.end);
     expect(resolved).toEqual([afterMidnight]);
     expect(byKey(body.metrics, "resolvedToday").value).toBe(1);
+    // The end of today is the next midnight, excluded from both metrics.
+    expect(created).not.toContain(atNextMidnight);
+    expect(resolved).not.toContain(atNextMidnight);
+    expect(new Date(body.today.end).getTime()).toBe(today.end.getTime());
   });
 
   it("DASH-11 every drill-down lists exactly what its metric counts, or, for the two 'today' metrics, a superset sorted by recency (BR-38, AC-23)", async () => {

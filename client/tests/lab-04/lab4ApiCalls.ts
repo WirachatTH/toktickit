@@ -9,4 +9,7 @@ export const LAB4_CALLS: [string, () => Promise<unknown>][] = [
   ["updateActionTaken", () => api.updateActionTaken(42, 7, { expectedVersion: 1, description: "d" })],
   ["changeActionStatus", () => api.changeActionStatus(42, 7, { status: "CANCELLED", expectedVersion: 1, reason: "No longer needed." })],
   ["fetchActionHistory", () => api.fetchActionHistory(42, 7)],
+  ["fetchRequesterDashboard", () => api.fetchRequesterDashboard()],
+  ["fetchStaffDashboard", () => api.fetchStaffDashboard()],
+  ["fetchAdminDashboard", () => api.fetchAdminDashboard()],
 ];

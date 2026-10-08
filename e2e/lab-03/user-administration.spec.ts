@@ -75,7 +75,9 @@ test.describe("user administration", () => {
     const name = `E2E Created ${bp(info)}`;
 
     await signIn(page, ACCOUNTS.admin.email);
-    await expect(page).toHaveURL(/\/admin\/users$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens User Management.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/admin/users");
     await expect(list(page, info).getByText(ACCOUNTS.admin.name)).toBeVisible();
     await expectListLayout(page, info);
     await shot(page, info, "user-management", "list");
@@ -145,6 +147,9 @@ test.describe("user administration", () => {
     await admin.dispose();
 
     await signIn(page, ACCOUNTS.admin.email);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens User Management.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/admin/users");
     await page.getByLabel("Search").fill(`E2E`);
     await (await editButton(page, info, leaving.name)).click();
     const edit = page.getByRole("dialog", { name: `Edit ${leaving.name}` });
@@ -213,6 +218,9 @@ test.describe("user administration", () => {
 
   test("RESP-03 a failed load says so, with Retry, and Retry loads the list", async ({ page }, info) => {
     await signIn(page, ACCOUNTS.admin.email);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens User Management.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/admin/users");
     await expect(list(page, info).getByText(ACCOUNTS.admin.name)).toBeVisible();
     // A server failure, stubbed in the browser for this one request.
     await page.route(/\/api\/admin\/users(\?|$)/, (route) =>
@@ -230,7 +238,8 @@ test.describe("user administration", () => {
   test("E2E-11 a Requester is turned away from User Management, and the admin API refuses their session", async ({ page }, info) => {
     await signIn(page, ACCOUNTS.requester.email);
     await page.goto("/admin/users");
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Lab 4 BR-46 (1): a forbidden page now sends the Requester to the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole("alert").filter({ hasText: "You don't have access to that page." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "User Management" })).toHaveCount(0);
     await shot(page, info, "user-management", "forbidden");
@@ -261,7 +270,8 @@ test.describe("user administration", () => {
     await page.getByLabel(/^Email/).fill(ACCOUNTS.staff.email);
     await page.getByLabel(/^Password/).fill("TokTickIT-dev-2026");
     await page.getByLabel(/^Password/).press("Enter");
-    await expect(page).toHaveURL(/\/staff\/queue$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
 
     // The queue toolbar, in reading order. With a filter set, so Clear filters
     // is enabled (it is disabled, and skipped by Tab, when there is nothing to clear).
@@ -303,7 +313,9 @@ test.describe("user administration", () => {
     // The side panel: opened from the keyboard, traps Tab, closes on Escape,
     // and gives focus back to Create user (ui-spec §1.8).
     await signIn(page, ACCOUNTS.admin.email);
-    await expect(page).toHaveURL(/\/admin\/users$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens User Management.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/admin/users");
     const create = page.getByRole("button", { name: "Create user" });
     await create.focus();
     await page.keyboard.press("Enter");
