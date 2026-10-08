@@ -122,4 +122,18 @@ describe("STYLE-02 the Lab 4 styles use the Zen Green tokens (ui-spec §1, §11)
     expect(contrast("#ffffff", "#006b3c")).toBeGreaterThanOrEqual(4.5);
     expect(ruleOf(".zg-count-strip")).toMatch(/flex-wrap: wrap/);
   });
+
+  it("lays the dashboard cards out in 1, 2, then 4 columns (ui-spec §10)", () => {
+    expect(ruleOf(".zg-dashboard-cards")).toMatch(/grid-template-columns: 1fr/);
+    const at = (min: number) => css.match(new RegExp(String.raw`@media \(min-width: ${min}px\) \{ \.zg-dashboard-cards \{ grid-template-columns: repeat\((\d), minmax\(0, 1fr\)\); \} \}`))?.[1];
+    expect(at(768)).toBe("2");
+    expect(at(992)).toBe("4");
+  });
+
+  it("gives the filter chip's remove button a 44px touch target on mobile (ui-spec §9)", () => {
+    // Inside a mobile media block: nothing between the block's start and the rule opens another one.
+    const rule = css.match(/@media \(max-width: 767\.98px\) \{[^@]*?\.zg-filter-chip__remove\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/min-width: 44px/);
+    expect(rule).toMatch(/min-height: 44px/);
+  });
 });

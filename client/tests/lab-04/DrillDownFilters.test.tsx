@@ -70,6 +70,43 @@ describe("UI-21 My Tickets reads its status and sort from the URL (D-13)", () =>
     expect(screen.getByLabelText("Sort", { selector: "#mt-sort" })).toHaveValue("updatedAt:desc");
   });
 
+  it("writes a changed sort to the URL, and Clear filters empties the URL", async () => {
+    const list = vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
+    renderAt("/tickets?status=RESOLVED", REQUESTER);
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    await userEvent.selectOptions(screen.getByLabelText("Sort", { selector: "#mt-sort" }), "updatedAt:desc");
+    await waitFor(() => expect(location()).toHaveTextContent("/tickets?status=RESOLVED&sort=updatedAt&order=desc"));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", sort: "updatedAt", order: "desc" }));
+
+    await userEvent.click(screen.getAllByRole("button", { name: /clear filters/i })[0]);
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/tickets$/));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ sort: "createdAt", order: "desc" }));
+    expect(lastCall(list)).not.toHaveProperty("status");
+    expect(screen.getByLabelText("Status", { selector: "#mt-status" })).toHaveValue("ALL");
+  });
+
+  it("offers Clear filters when the only filter is the status from the URL", async () => {
+    vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
+    renderAt("/tickets?status=CLOSED", REQUESTER);
+    // With no tickets and a filter applied, the empty state offers to clear it.
+    expect(await screen.findByText(/no tickets match/i)).toBeInTheDocument();
+    for (const button of screen.getAllByRole("button", { name: /clear filters/i })) expect(button).toBeEnabled();
+  });
+
+  // PR #79 review: the sort was read from the URL only once, so leaving a
+  // filtered URL through the navigation reset the status but kept the old sort.
+  it("follows the URL when the My Tickets link leaves a filtered and sorted view", async () => {
+    const list = vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
+    renderAt("/tickets?status=RESOLVED&sort=updatedAt&order=desc", REQUESTER);
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", sort: "updatedAt", order: "desc" }));
+    await userEvent.click(screen.getAllByRole("link", { name: "My Tickets" })[0]);
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/tickets$/));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ sort: "createdAt", order: "desc" }));
+    expect(lastCall(list)).not.toHaveProperty("status");
+    expect(screen.getByLabelText("Sort", { selector: "#mt-sort" })).toHaveValue("createdAt:desc");
+    expect(screen.getByLabelText("Status", { selector: "#mt-status" })).toHaveValue("ALL");
+  });
+
   it("falls back to every ticket for an unknown status in the URL", async () => {
     const list = vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
     renderAt("/tickets?status=bogus", REQUESTER);
@@ -83,7 +120,7 @@ describe("UI-21 the queue offers Unresolved (D-13)", () => {
   it("opens /staff/queue?status=UNRESOLVED with Unresolved chosen, and asks the API for it", async () => {
     const queue = vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({
       data: [], pagination: EMPTY_PAGE,
-      appliedQuery: { search: "", status: "UNRESOLVED", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
+      appliedQuery: { search: "", status: "UNRESOLVED", itPriority: "HIGH", categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
     });
     renderAt("/staff/queue?status=UNRESOLVED&itPriority=HIGH", STAFF);
     await waitFor(() => expect(queue).toHaveBeenCalled());
@@ -106,6 +143,15 @@ describe("UI-21 User Management reads role and activation from the URL (D-13)", 
     await waitFor(() => expect(location()).toHaveTextContent(/^\/admin\/users\?role=IT_STAFF$/));
     await waitFor(() => expect(lastCall(users)).toEqual({ role: "IT_STAFF" }));
     expect(chip).not.toBeInTheDocument();
+  });
+
+  it("lists every user, with no chip, for an unknown status in the URL", async () => {
+    const users = vi.spyOn(api, "fetchAdminUsers").mockResolvedValue([]);
+    renderAt("/admin/users?status=bogus", ADMIN);
+    await waitFor(() => expect(users).toHaveBeenCalled());
+    expect(lastCall(users)).toEqual({});
+    expect(screen.queryByText(/only$/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Remove the/ })).not.toBeInTheDocument();
   });
 
   it("shows Inactive only for status=inactive, and writes a changed role to the URL", async () => {

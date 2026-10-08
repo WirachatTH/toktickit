@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import * as api from "../../src/api.js";
 import { AppRoutes } from "../../src/AppRoutes.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
+import { formatBangkok } from "../../src/components/ActionsTaken.js";
 import { ROUTER_FUTURE } from "../lab-03/routerFuture.js";
 import { emptyRequesterDashboard, REQUESTER, requesterDashboard } from "./dashboardFixtures.js";
 
@@ -70,6 +71,17 @@ describe("UI-18 the Requester's own summary (FR-12, AC-18)", () => {
       ["/tickets", "My TicketsTrack your requests"],
     ]);
   });
+
+  it("dates a resolved ticket by when it was resolved, and any other ticket by its last update", async () => {
+    vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(requesterDashboard());
+    renderDashboard();
+    const resolved = await screen.findByRole("region", { name: "Recently resolved (last 7 days)" });
+    const resolvedRow = within(resolved).getByRole("link", { name: /TCK-000062/ });
+    expect(resolvedRow).toHaveTextContent(formatBangkok("2026-10-06T02:00:00.000Z"));
+    expect(resolvedRow).not.toHaveTextContent(formatBangkok("2026-10-07T03:00:00.000Z"));
+    const recent = screen.getByRole("region", { name: "Recently updated" });
+    expect(within(recent).getByRole("link", { name: /TCK-000061/ })).toHaveTextContent(formatBangkok("2026-10-07T03:00:00.000Z"));
+  });
 });
 
 describe("UI-19 a brand-new Requester, and failure (FR-15, ui-spec §3.5)", () => {
@@ -83,6 +95,24 @@ describe("UI-19 a brand-new Requester, and failure (FR-15, ui-spec §3.5)", () =
     expect(within(card("Waiting for you")).queryByText("Needs your reply")).not.toBeInTheDocument();
     expect(screen.getByText("Nothing needs your reply right now.")).toBeInTheDocument();
     expect(screen.getByText("No tickets were resolved in the last 7 days.")).toBeInTheDocument();
+  });
+
+  it("does not call a Requester brand-new while a ticket is listed, even with every card at 0", async () => {
+    // Every ticket cancelled: no card counts it, but it was still updated recently.
+    const d = emptyRequesterDashboard();
+    d.lists.recentlyUpdated = [{ ...requesterDashboard().lists.recentlyUpdated[0], currentStatus: "CANCELLED" }];
+    vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(d);
+    renderDashboard();
+    await screen.findByRole("group", { name: "Open requests" });
+    expect(screen.queryByRole("region", { name: "Getting started" })).not.toBeInTheDocument();
+    expect(screen.queryByText("You haven't submitted any requests yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows a placeholder for each of the four Requester cards while loading", async () => {
+    vi.spyOn(api, "fetchRequesterDashboard").mockReturnValue(new Promise(() => undefined));
+    renderDashboard();
+    const busy = await screen.findByRole("status", { name: "Loading dashboard" });
+    expect(busy.querySelectorAll(".zg-metric-card--skeleton")).toHaveLength(4);
   });
 
   it("shows a safe failure with Retry", async () => {
