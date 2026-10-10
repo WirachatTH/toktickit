@@ -132,6 +132,37 @@ describe("UI-15 the My planned actions card jumps to its list (ui-spec §3.2)", 
     await waitFor(() => expect(scrolled).toContain(list));
     expect(list).toHaveFocus();
   });
+
+  // PR #80 review: the jump belongs to the navigation, not to each reload.
+  it("jumps once: Refresh with the hash still in the URL does not scroll again", async () => {
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
+    renderDashboard(STAFF);
+    await screen.findByRole("region", { name: "My planned actions" });
+    await userEvent.click(within(card("My planned actions")).getByRole("link", { name: "View My planned actions (9)" }));
+    await waitFor(() => expect(scrolled).toHaveLength(1));
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByRole("status", { name: "Dashboard updates" })).toHaveTextContent("Dashboard updated"));
+    expect(scrolled).toHaveLength(1);
+    // Using the link again is a new navigation, so it jumps again.
+    await userEvent.click(within(card("My planned actions")).getByRole("link", { name: "View My planned actions (9)" }));
+    await waitFor(() => expect(scrolled).toHaveLength(2));
+  });
+
+  // PR #80 review: a malformed percent-escape threw in the effect and blanked the app.
+  it.each(["#%", "#100%", "#%zz", "#%E0%A4%A", "#nope"])("renders the dashboard for the hash %s, without scrolling", async (hash) => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(STAFF);
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
+    render(
+      <AuthProvider>
+        <MemoryRouter future={ROUTER_FUTURE} initialEntries={[`/dashboard${hash}`]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole("group", { name: "Unassigned" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Welcome back, Pimchanok" })).toBeInTheDocument();
+    expect(scrolled).toEqual([]);
+  });
 });
 
 describe("UI-16 loading, empty lists, failure, and refresh (FR-15, ui-spec §3.5)", () => {

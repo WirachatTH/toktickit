@@ -188,6 +188,20 @@ describe("REG-07 a recoverable failure keeps what was typed (FR-18, BR-44)", () 
     expectTicketInputKept();
   });
 
+  // PR #80 review: with the API down, the proxy in front of it answers 5xx with
+  // a body that is not the API's JSON. That is an outage, not an API error.
+  it.each([
+    ["a proxy's plain-text 500", () => new Response("Error occurred while trying to proxy", { status: 500, headers: { "Content-Type": "text/plain" } }), /cannot reach the toktickit api/i],
+    ["a gateway's HTML 502", () => new Response("<html><body>Bad Gateway</body></html>", { status: 502, headers: { "Content-Type": "text/html" } }), /cannot reach the toktickit api/i],
+    ["the API's own JSON 500", () => new Response(JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } }), { status: 500, headers: { "Content-Type": "application/json" } }), /^Something went wrong\. Your ticket has not been created/],
+  ])("Create Ticket reads %s correctly, and keeps every value", async (_label, response, message) => {
+    await openCreateTicket();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => response());
+    await userEvent.click(screen.getByRole("button", { name: /submit ticket/i }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expectTicketInputKept();
+  });
+
   it.each([
     ["a 400", () => new ApiError(400, "VALIDATION_ERROR", "Some fields need attention.", { body: "Enter at most 2000 characters." }), "Enter at most 2000 characters."],
     ["a network error", NETWORK, "Something went wrong. Please try again."],
@@ -288,6 +302,18 @@ describe("UI-23 no dead ends and no console errors on a normal visit (FR-19, D-2
   it("sends a signed-out visitor at an unknown address to Login", async () => {
     renderAt("/no-such-page", null);
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/login"));
+  });
+
+  // PR #80 review: Login returned a visitor to the unknown address they had typed.
+  it("lands on the Dashboard after signing in from an unknown address", async () => {
+    vi.spyOn(api, "login").mockResolvedValue(STAFF);
+    vi.spyOn(api, "fetchStaffDashboard").mockImplementation(pending);
+    renderAt("/no-such-page?x=1", null);
+    await userEvent.type(await screen.findByLabelText(/^Email/), STAFF.email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Correct-horse-42");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
+    expect(screen.queryByRole("heading", { name: "Page not found" })).not.toBeInTheDocument();
   });
 
   it("asks who is signed in through /api/auth/session, which answers a visitor without 401", async () => {

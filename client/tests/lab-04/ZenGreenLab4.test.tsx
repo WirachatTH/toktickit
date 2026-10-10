@@ -130,6 +130,11 @@ describe("STYLE-02 the Lab 4 styles use the Zen Green tokens (ui-spec §1, §11)
     expect(at(992)).toBe("4");
   });
 
+  it("keeps the count-strip links at a 44px touch target (ui-spec §9)", () => {
+    expect(ruleOf(".zg-count-strip__link")).toMatch(/min-height: 44px/);
+    expect(ruleOf(".zg-count-strip__link")).toMatch(/display: inline-flex/);
+  });
+
   it("gives the filter chip's remove button a 44px touch target on mobile (ui-spec §9)", () => {
     // Inside a mobile media block: nothing between the block's start and the rule opens another one.
     const rule = css.match(/@media \(max-width: 767\.98px\) \{[^@]*?\.zg-filter-chip__remove\s*\{([^}]*)\}/)?.[1] ?? "";

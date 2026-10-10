@@ -107,6 +107,28 @@ describe("UI-21 My Tickets reads its status and sort from the URL (D-13)", () =>
     expect(screen.getByLabelText("Status", { selector: "#mt-status" })).toHaveValue("ALL");
   });
 
+  // PR #80 review: the same class as the sort: the page number outlived the filter it belonged to.
+  it("returns to page 1 when the My Tickets link leaves a filtered view on page 2", async () => {
+    const row = (id: number) => ({
+      id, ticketNumber: `TCK-${String(id).padStart(6, "0")}`, summary: `Ticket ${id}`, requestedPriority: "MEDIUM", currentStatus: "RESOLVED",
+      category: { id: 1, name: "Hardware" }, relatedSystem: { id: 1, name: "Corporate Laptop" }, createdAt: "2026-10-01T09:00:00.000Z", updatedAt: "2026-10-02T09:00:00.000Z",
+    });
+    const list = vi.spyOn(api, "fetchTickets").mockImplementation(async (params = {}) => ({
+      data: [row(params.page ?? 1)] as unknown as api.TicketListItem[],
+      pagination: { page: params.page ?? 1, pageSize: 10, totalItems: 16, totalPages: 2 },
+    }));
+    renderAt("/tickets?status=RESOLVED", REQUESTER);
+    await screen.findAllByText("Ticket 1");
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", page: 2 }));
+    await userEvent.click(screen.getAllByRole("link", { name: "My Tickets" })[0]);
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/tickets$/));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ page: 1 }));
+    expect(lastCall(list)).not.toHaveProperty("status");
+    // One request for the new view, not a stale page 2 first.
+    expect(list.mock.calls.filter(([p]) => p?.page === 2 && !p?.status)).toEqual([]);
+  });
+
   it("falls back to every ticket for an unknown status in the URL", async () => {
     const list = vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
     renderAt("/tickets?status=bogus", REQUESTER);
@@ -143,6 +165,18 @@ describe("UI-21 User Management reads role and activation from the URL (D-13)", 
     await waitFor(() => expect(location()).toHaveTextContent(/^\/admin\/users\?role=IT_STAFF$/));
     await waitFor(() => expect(lastCall(users)).toEqual({ role: "IT_STAFF" }));
     expect(chip).not.toBeInTheDocument();
+  });
+
+  // PR #80 review: nothing failed if the activation filter stopped counting as a filter.
+  it("says no users match, with Clear, when the activation filter alone finds nobody", async () => {
+    const users = vi.spyOn(api, "fetchAdminUsers").mockResolvedValue([]);
+    renderAt("/admin/users?status=inactive", ADMIN);
+    expect(await screen.findByText("No users match your search.")).toBeInTheDocument();
+    expect(screen.queryByText("No users yet.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/admin\/users$/));
+    await waitFor(() => expect(lastCall(users)).toEqual({}));
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
   });
 
   it("lists every user, with no chip, for an unknown status in the URL", async () => {

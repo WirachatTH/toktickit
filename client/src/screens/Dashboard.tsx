@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   AdminDashboard,
@@ -72,10 +72,17 @@ export function Dashboard() {
   // A link to a list on this screen (#my-planned-actions) only changes the hash;
   // the router does not scroll, and the list exists only once the data has come.
   // Scroll to it and move focus there then (ui-spec §3.2; PR #79 review).
+  // Once per navigation, not on every reload: Refresh leaves the page where the
+  // user has scrolled it. The hash is used as it is; the list ids need no
+  // decoding, and decoding a malformed escape (#%) would throw (PR #80 review).
   const { hash, key } = useLocation();
+  const jumpedFor = useRef<string | null>(null);
   useEffect(() => {
     if (state !== "loaded" || !hash) return;
-    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    const navigation = `${key}${hash}`;
+    if (jumpedFor.current === navigation) return;
+    jumpedFor.current = navigation;
+    const target = document.getElementById(hash.slice(1));
     if (!target) return;
     target.scrollIntoView?.({ block: "start" });
     target.focus({ preventScroll: true });

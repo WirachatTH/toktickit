@@ -92,7 +92,14 @@ export function MyTickets() {
   const [categoryId, setCategoryId] = useState("");
   const [relatedSystemId, setRelatedSystemId] = useState("");
   const [requestedPriority, setRequestedPriority] = useState("");
-  const [page, setPage] = useState(1);
+  // The page belongs to the status and sort it was reached under: when the URL
+  // changes them (the My Tickets link, Back), the list starts again at page 1
+  // in the same render, with no request for the stale page (PR #80 review).
+  const urlView = `${statusFilter}|${sortValue}`;
+  const [pageState, setPageState] = useState({ view: urlView, page: 1 });
+  const page = pageState.view === urlView ? pageState.page : 1;
+  const setPage = (next: number | ((current: number) => number)) =>
+    setPageState({ view: urlView, page: typeof next === "function" ? next(page) : next });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const [listState, setListState] = useState<ListState>("loading");
