@@ -138,6 +138,53 @@ describe("UI-21 My Tickets reads its status and sort from the URL (D-13)", () =>
   });
 });
 
+// Issue 8 (found by RESP-01 on mobile): below 768px the filters sit behind a
+// "Filters" toggle. A drill-down opened a filtered list with the toggle closed,
+// so nothing on the screen said the list was filtered.
+describe("UI-21 a filter from the URL is on show in the mobile filters too (ui-spec §7)", () => {
+  it("opens My Tickets' mobile filters when the URL carries a status", async () => {
+    vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
+    renderAt("/tickets?status=RESOLVED", REQUESTER);
+    const toggle = await screen.findByRole("button", { name: "Filters" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById("mt-mobile-status")).toHaveValue("RESOLVED");
+  });
+
+  it("opens My Tickets' mobile filters for a sort alone", async () => {
+    vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
+    renderAt("/tickets?sort=updatedAt&order=desc", REQUESTER);
+    expect(await screen.findByRole("button", { name: "Filters" })).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById("mt-mobile-sort")).toHaveValue("updatedAt:desc");
+  });
+
+  it("keeps My Tickets' mobile filters closed without a filter in the URL", async () => {
+    vi.spyOn(api, "fetchTickets").mockResolvedValue({ data: [], pagination: EMPTY_PAGE });
+    renderAt("/tickets", REQUESTER);
+    expect(await screen.findByRole("button", { name: "Filters" })).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById("mt-mobile-status")).toBeNull();
+  });
+
+  it("opens the queue's mobile filters when the URL carries a filter", async () => {
+    const page = (status: string) => ({
+      data: [], pagination: EMPTY_PAGE,
+      appliedQuery: { search: "", status, itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
+    });
+    vi.spyOn(api, "fetchStaffQueue").mockResolvedValue(page("UNRESOLVED") as unknown as api.QueueResponse);
+    renderAt("/staff/queue?status=UNRESOLVED&itPriority=HIGH", STAFF);
+    expect(await screen.findByRole("button", { name: "Filters" })).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById("queue-mobile-status")).toHaveValue("UNRESOLVED");
+  });
+
+  it("keeps the queue's mobile filters closed on a plain /staff/queue", async () => {
+    vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({
+      data: [], pagination: EMPTY_PAGE,
+      appliedQuery: { search: "", status: "ACTIVE", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
+    } as unknown as api.QueueResponse);
+    renderAt("/staff/queue", STAFF);
+    expect(await screen.findByRole("button", { name: "Filters" })).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
 describe("UI-21 the queue offers Unresolved (D-13)", () => {
   it("opens /staff/queue?status=UNRESOLVED with Unresolved chosen, and asks the API for it", async () => {
     const queue = vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({

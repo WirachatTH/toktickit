@@ -122,6 +122,17 @@ describe("UNIT-02 the Action Date/Time window (BR-07)", () => {
     expect(actionAtError(CREATED, "COMPLETED", opts)).toBeNull();
   });
 
+  // Issue 8 (found by E2E-01): the form's date has minute precision, so an action
+  // added in the minute the ticket was created is dated at that minute's start.
+  it("compares with the ticket's creation to the minute", () => {
+    const created = new Date("2026-10-05T03:00:30.500Z");
+    const opts = { now: new Date("2026-10-05T03:00:50.000Z"), ticketCreatedAt: created };
+    expect(actionAtError(new Date("2026-10-05T03:00:00.000Z"), "PLANNED", opts)).toBeNull();
+    expect(actionAtError(new Date("2026-10-05T03:00:00.000Z"), "COMPLETED", opts)).toBeNull();
+    expect(actionAtError(new Date("2026-10-05T02:59:59.999Z"), "PLANNED", opts)).toBeTruthy();
+    expect(actionAtError(new Date("2026-10-05T02:59:59.999Z"), "COMPLETED", opts)).toBeTruthy();
+  });
+
   it("lets a planned action be up to 365 days ahead, and a completed one at most 5 minutes ahead", () => {
     const opts = { now: NOW, ticketCreatedAt: CREATED };
     const at = (ms: number) => new Date(NOW.getTime() + ms);
