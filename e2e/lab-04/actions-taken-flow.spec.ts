@@ -31,6 +31,9 @@ const SEEDED = {
   closed: "New kiosk tablet cannot join staff Wi-Fi",
 };
 
+// These journeys are long: several sign-ins and many steps in one test.
+test.describe.configure({ timeout: 150_000 });
+
 test.afterAll(async ({}, info) => {
   await removeE2EData({ ticketPrefix: ticketPrefixFor(info) });
 });
@@ -60,6 +63,9 @@ async function seededTicketId(api: APIRequestContext, summary: string): Promise<
 async function expectPanelLayout(page: Page, info: TestInfo, panel: Locator) {
   const box = (await panel.boundingBox())!;
   const viewport = page.viewportSize()!;
+  expect(Math.round(box.y), "the panel starts at the top of the screen").toBe(0);
+  const footer = (await panel.locator(".zg-side-panel__footer").boundingBox())!;
+  expect(Math.round(footer.y + footer.height), "its buttons are fully on screen").toBeLessThanOrEqual(viewport.height);
   if (bp(info) === "desktop") {
     expect(Math.round(box.width), "side panel width").toBe(440);
     expect(Math.round(box.x + box.width), "side panel sits at the right edge").toBe(viewport.width);

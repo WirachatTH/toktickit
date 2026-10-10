@@ -97,10 +97,16 @@ export function MyTickets() {
   // in the same render, with no request for the stale page (PR #80 review).
   const urlView = `${statusFilter}|${sortValue}`;
   const [pageState, setPageState] = useState({ view: urlView, page: 1 });
+  // Forget the old view's page as soon as the view changes, so going Back to it
+  // starts at page 1 as well (PR #80 re-review). Resetting state while
+  // rendering is React's pattern for state that follows a changed input.
+  if (pageState.view !== urlView) setPageState({ view: urlView, page: 1 });
   const page = pageState.view === urlView ? pageState.page : 1;
   const setPage = (next: number | ((current: number) => number)) =>
     setPageState({ view: urlView, page: typeof next === "function" ? next(page) : next });
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Open from the start when the URL already filters or sorts the list, so a
+  // dashboard drill-down shows its filter on mobile too (Lab 4, Issue 8).
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(() => statusFilter !== "ALL" || sortValue !== DEFAULT_SORT);
 
   const [listState, setListState] = useState<ListState>("loading");
   const [tickets, setTickets] = useState<TicketListItem[]>([]);

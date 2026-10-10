@@ -31,8 +31,19 @@ export async function shot4(page: Page, info: TestInfo, folder: string, state: s
   const dir = path.join(LAB4_SCREENSHOTS, folder);
   fs.mkdirSync(dir, { recursive: true });
   const modal = (await page.getByRole("dialog").count()) > 0;
-  if (!modal) await page.evaluate(() => window.scrollTo(0, 0));
+  // A dialog or panel is fixed to the screen, so the capture is of the screen
+  // only. Headless Chromium draws a fixed overlay a few pixels low in such a
+  // capture while the page behind it is scrolled (its measured position is
+  // right; RESP-02 asserts it), so the page is put back to the top first and
+  // returned to where it was afterwards.
+  const scrolled = await page.evaluate(() => {
+    const y = window.scrollY;
+    // "instant": Bootstrap makes scrolling smooth, and a capture must not catch it half way.
+    window.scrollTo({ top: 0, behavior: "instant" });
+    return y;
+  });
   await page.screenshot({ path: path.join(dir, `${bp(info)}-${state}.png`), fullPage: !modal });
+  if (modal) await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), scrolled);
 }
 
 // ---------------------------------------------------------------- E2E-08

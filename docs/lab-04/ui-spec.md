@@ -345,7 +345,21 @@ What the sweep changed (Issue 7):
   front of an API that is down). An error from the API itself says "Something went
   wrong". Both keep the input.
 - **Filters:** on My Tickets, the page number belongs to the status and sort in the
-  URL. When the URL changes them, the list starts again at page 1.
+  URL. Whenever the URL changes them, the list starts again at page 1, including when
+  Back returns to an earlier view.
+
+What the end-to-end and responsive pass changed (Issue 8):
+- **Mobile filters:** below 768px the filters of My Tickets and the Ticket Queue sit
+  behind a "Filters" button. When the URL already filters or sorts the list (a
+  dashboard drill-down), that panel starts open, so the filter in force is on screen.
+- **Anchors:** `#action-<id>` moves focus to its card once. Later reloads of the list
+  leave focus where a save put it (§4.6).
+- **Sign-in after Log out:** Login returns a visitor to the screen they asked for
+  (Lab 3 §2), but not after an explicit Log out: the next person to sign in starts on
+  their own Dashboard, not on the last user's screen.
+- **Checkboxes and radios** use the theme: the checked fill is `--zg-primary` and the
+  focus ring `--zg-secondary`, in place of Bootstrap's blue.
+- **Date field:** its focus ring stays while focus is on the calendar button inside it.
 - **Console:** the page-load session check uses `GET /api/auth/session`
   (specification.md D-20), and the app has a favicon, so a normal visit logs no error.
 - **Touch target:** the filter chip's remove button is 44px on mobile (§9).

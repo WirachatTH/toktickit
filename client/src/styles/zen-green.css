@@ -66,9 +66,27 @@ textarea.zg-field {
   resize: vertical;
 }
 
-.zg-field:focus-visible {
+.zg-field:focus-visible,
+/* Lab 4, Issue 8 — a date field keeps its ring while focus is on the calendar
+   button inside it, which the field itself cannot see as :focus-visible. */
+.zg-field[type="datetime-local"]:focus-within {
   outline: 2px solid var(--zg-secondary);
   outline-offset: 1px;
+}
+
+/* Lab 4, Issue 8 — checkboxes and radios in the theme. Bootstrap's defaults
+   are blue: the checked fill and the focus ring (visual checklist, ui-spec §11). */
+.form-check-input:checked {
+  background-color: var(--zg-primary);
+  border-color: var(--zg-primary);
+}
+.form-check-input:focus {
+  border-color: var(--zg-secondary);
+  box-shadow: none;
+}
+.form-check-input:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
 }
 
 .zg-field--readonly,

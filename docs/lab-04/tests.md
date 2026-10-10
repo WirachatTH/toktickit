@@ -214,23 +214,23 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| RESP-01 | AC-35 | Responsive | Dashboards (three roles) at 1280, 834, 375px | 4/2/1 card columns; no horizontal overflow; strips wrap | `e2e/lab-04/dashboards.spec.ts` | Planned |
-| RESP-02 | AC-35 | Responsive | Actions Taken area, side panel, and dialogs at the three widths | No overflow or clipping; panel full-screen below desktop; buttons wrap on mobile | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
-| RESP-03 | AC-35 | Responsive | Keyboard pass: dashboard links, action cards, panel, dialogs, history disclosure | Visible focus everywhere; focus returns to openers; `#action-<id>` focuses the card | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
+| RESP-01 | AC-35 | Responsive | Each role's Dashboard at 1280, 834, and 375px, with its loading and failure states and one drill-down target per role | 4/2/1 card columns; lists beside Quick actions at desktop, above it otherwise; no horizontal overflow or clipped text; 44px targets on mobile; the mobile Filters panel open on a drill-down | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| RESP-02 | AC-35 | Responsive | Actions Taken area, side panel, and dialogs at the three widths, on the seeded tickets and through the E2E-01 journey | No overflow or clipping; panel 440px at the right edge at desktop, a full-screen sheet below it, starting at the top with its buttons on screen; action buttons full width on mobile; a validation message directly below its field | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| RESP-03 | AC-35 | Responsive | Keyboard only: dashboard links, `#action-<id>`, the History disclosure, the Edit panel, the Complete and Cancel dialogs, Add action | A visible focus indicator on every stop; Tab stays inside an open panel; Escape returns focus to the opener; the anchor focuses its card; a new action's card takes focus | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
 
 ### 2.12 End-to-end
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| E2E-01 | AC-01, AC-06, AC-07 | E2E | IT Staff plan three actions on one ticket, assign one to a colleague, edit one, complete one, cancel one, open history | List order and statuses correct after each step; history shows every change | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
-| E2E-02 | AC-29 | E2E | The Requester opens the same ticket | Every action and field visible read-only; no controls | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
-| E2E-03 | AC-08, AC-30 | E2E | Two browser contexts edit the same action | The second save shows the stale banner and keeps its text | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
-| E2E-04 | AC-14, AC-16 | E2E | Resolution gate in the UI: Resolved missing with a planned action, notice shown; complete it; Resolved offered; resolve | Status becomes Resolved; Add action replaced by the reopen message | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
-| E2E-05 | AC-17, AC-13 | E2E | Requester marks appears resolved, IT Staff reopen and close tickets through the full lifecycle | Advisory signal never changes status; every permitted transition works in the UI | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
-| E2E-06 | AC-26, AC-27 | E2E | Each role signs in and lands on its Dashboard; follow every metric link | Correct filtered list opens for each; back returns to the Dashboard | `e2e/lab-04/dashboards.spec.ts` | Planned |
-| E2E-07 | AC-19, AC-18 | E2E | Counts on the UI after creating known tickets and actions | Values change by exactly the created amounts; a second Requester's dashboard unchanged | `e2e/lab-04/dashboards.spec.ts` | Planned |
-| E2E-08 | AC-34, FR-19 | E2E | Console errors and broken links across all three specs | No `console.error` and no failed same-origin request during any journey | `e2e/lab-04/dashboards.spec.ts` | Planned |
-| E2E-09 | AC-33 | E2E | Lab 2 and Lab 3 Playwright suites in the same run | Pass, changed only per BR-46 | `e2e/lab-04/dashboards.spec.ts` | Planned |
+| E2E-01 | AC-01, AC-06, AC-07 | E2E | IT Staff plan three actions on one ticket, assign one to a colleague, edit one, complete one, cancel one, open history | List order and statuses correct after each step; history shows every change | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-02 | AC-29 | E2E | The Requester opens the same ticket | Every action and field visible read-only; no controls | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-03 | AC-08, AC-30 | E2E | Two browser contexts edit the same action | The second save shows the stale banner and keeps its text | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-04 | AC-14, AC-16 | E2E | Resolution gate in the UI: Resolved missing with a planned action, notice shown; complete it; Resolved offered; resolve | Status becomes Resolved; Add action replaced by the reopen message | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-05 | AC-17, AC-13 | E2E | The Requester marks appears resolved; IT Staff then take the ticket through Waiting, In progress, Resolved, Reopened, Resolved, and Closed in the UI; an unclaimed ticket is cancelled | The signal changes neither status nor the gate; every target status is reached through the control and its dialog; after a reopen the earlier completed work still counts (D-14) | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-06 | AC-26, AC-27 | E2E | Each role signs in and lands on its Dashboard; follow every card, status, priority, and user-count link | Each link opens its filtered URL; the list API returns exactly the counted number (at least it, for the two "today" cards); Back returns to the Dashboard | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-07 | AC-19, AC-18 | E2E | Dashboard values before and after creating three tickets, claiming one, and planning two actions; the author's and a second Requester's Dashboards | Each value moves by exactly the created amount; the author sees their three; the second Requester stays at zero with the first-ticket invitation | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-08 | AC-34, FR-19 | E2E | Every Lab 4 journey runs under a watch for console errors, page errors, and failed same-origin requests; one test provokes each to prove the watch reports them | No console error, page error, or response of 400 or above in any journey, except a response a step declares first (a stale `409`, a shown `500`); an unused declaration fails too | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-09 | AC-33 | E2E | The Lab 2, Lab 3, and Lab 4 Playwright suites in one `npx playwright test` run | All pass at desktop, tablet, and mobile; Lab 2–3 specs changed only per BR-46 | `e2e/lab-02/, lab-03/, lab-04/ (one run)` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -295,21 +295,37 @@ level of an acceptance criterion and are traced to that rule in §2.
 
 ## 4. Responsive and Visual Checklist
 
-Filled in by Issue 8 against `ui-spec.md` §11, with evidence under `artifacts/lab-04/screenshots/`
-(`ui-spec.md` §12).
+Filled in by Issue 8 against `ui-spec.md` §11. Evidence: the Playwright suites in `e2e/lab-04/`
+(each row names the test that checks it at desktop 1280px, tablet 834px, and mobile 375px) and the
+screenshots under `artifacts/lab-04/screenshots/` (`ui-spec.md` §12), every one of which was looked
+at after capture.
 
-| Check | Dashboards | Actions Taken (staff) | Requester view | Ticket controls / gate | Lab 1–3 screens |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Only `--zg-*` tokens and badge classes used | Planned | Planned | Planned | Planned | Planned |
-| Dashboard first in navigation, active page marked | Planned | Planned | Planned | Planned | Planned |
-| Metric cards: label, value, accessible drill-down | Planned | Planned | Planned | Planned | Planned |
-| Action badges and follow-up pills consistent | Planned | Planned | Planned | Planned | Planned |
-| Editable vs read-only distinct | Planned | Planned | Planned | Planned | Planned |
-| Validation below fields; conflicts beside their control | Planned | Planned | Planned | Planned | Planned |
-| Focus visible; focus returns to openers | Planned | Planned | Planned | Planned | Planned |
-| No clipping / overlap / horizontal overflow — desktop | Planned | Planned | Planned | Planned | Planned |
-| No clipping / overlap / horizontal overflow — tablet | Planned | Planned | Planned | Planned | Planned |
-| No clipping / overlap / horizontal overflow — mobile | Planned | Planned | Planned | Planned | Planned |
+| Check | Result | Checked by | Screenshots |
+| :--- | :--- | :--- | :--- |
+| Only `--zg-*` tokens and the badge classes; no ad hoc hex values | Pass | STYLE-01, STYLE-02 | all three folders |
+| Checkboxes, radios, and focus rings use the theme, not Bootstrap's blue | Pass (fixed in Issue 8) | STYLE-02, RESP-03 | `actions-taken/*-create-completed.png` |
+| Dashboard is the first navigation item for every role and is marked as the current page | Pass | UI-20, RESP-01 | `staff-dashboard/*-staff-default.png` |
+| Metric cards show label, value, and an accessible drill-down; counts match the API | Pass | UI-15, UI-18, E2E-06, E2E-07 | `staff-dashboard/`, `requester-dashboard/` |
+| Action status badges and follow-up pills render with their pairs and text everywhere | Pass | STYLE-01, RESP-02 | `actions-taken/*-list-several.png`, `*-requester-view.png` |
+| Editable (side panel, Ticket controls) and read-only (action cards, Requester view) are visibly distinct | Pass | RESP-02, E2E-02 | `actions-taken/*-edit.png`, `*-requester-view.png`, `*-admin-view.png` |
+| The Actions Taken caption says it is visible to the Requester; Internal Notes keep the Internal region | Pass | STYLE-03, RESP-02 | `actions-taken/*-list-several.png` |
+| Validation messages sit directly below their fields; conflict messages sit beside their control | Pass | RESP-02 (measured), E2E-03 | `actions-taken/*-create-validation.png`, `*-stale-conflict.png`, `*-gate-blocked.png` |
+| Focus is visible on every control, and returns to the opener after every panel and dialog | Pass (two fixes in Issue 8) | RESP-03 | not a still image; asserted step by step |
+| Dashboards: no clipping, overlap, or horizontal overflow at desktop, tablet, mobile | Pass | RESP-01 | `staff-dashboard/`, `requester-dashboard/` (33 images) |
+| Actions Taken (staff): no clipping, overlap, or horizontal overflow at desktop, tablet, mobile | Pass | RESP-02 | `actions-taken/` (42 images) |
+| Requester view (Work on your request): the same | Pass | RESP-02, E2E-02 | `actions-taken/*-requester-view.png` |
+| Ticket controls and the gate notice: the same | Pass | RESP-02, E2E-04 | `actions-taken/*-gate-blocked.png`, `*-gate-passed-resolved.png` |
+| Touch targets are at least 44px on mobile (card links, count strips, list rows, action buttons, the filter chip) | Pass | RESP-01, RESP-02 | `staff-dashboard/mobile-*.png` |
+| A filter applied by a drill-down is on screen at every width | Pass (fixed in Issue 8) | RESP-01, UI-21 | `*-drilldown-*.png` |
+| Every Lab 1–3 screen still renders correctly in the final shell | Pass | REG-18, E2E-09 (the Lab 2–3 journeys and their layout checks, unchanged) | `artifacts/lab-02/`, `artifacts/lab-03/` (not rewritten) |
+
+**Found by this pass and fixed in Issue 8** (each with a test that failed first):
+- an action added in the minute its ticket was created was refused as dated before the ticket (BR-07);
+- `#action-<id>` pulled focus back to its card on every reload of the list, away from a newly saved action;
+- on mobile, a drill-down opened a filtered list with the Filters panel closed, so the filter was not on screen;
+- after an explicit Log out, the next person to sign in was returned to the last user's screen;
+- checkboxes and radios used Bootstrap's blue for their checked fill and focus ring;
+- a date field lost its focus ring while focus was on its calendar button.
 
 ## 5. Test Commands
 
@@ -326,8 +342,17 @@ docker-compose exec client npx playwright test
 
 ## 6. Final Results
 
-Pending. A row is marked Pass only after its test passes in a full local run on the issue's
-branch, before its PR opens. The complete suite is re-run on `main` after the release PR, and
+Every one of the 126 rows above reads Pass. The numbers below are from the full local run on
+the Issue 8 branch, in the Docker environment:
+
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Server (Vitest + Supertest), `server/tests/lab-01..04` | `docker-compose exec server npm test` | 418 / 418 passed, 35 files |
+| Client (Vitest + Testing Library), `client/tests/lab-01..04` | `docker-compose exec client npm test` | 431 / 431 passed, 28 files |
+| End-to-end and responsive (Playwright), `e2e/lab-02..04`, three widths | `docker-compose exec client npx playwright test --workers=1` | 66 / 66 passed in one run (22 tests at each of desktop, tablet, mobile) |
+| Type checks | `npx tsc --noEmit` in `server` and `client` | clean |
+
+The complete suite is re-run on `lab4-staging` and again on `main` after the release PR (Issue 9);
 that output is the Part 3 evidence (labsheet §14).
 
 ## 7. Known Limitations or Deferred Tests
@@ -343,3 +368,17 @@ that output is the Part 3 evidence (labsheet §14).
   boundary function fixed instants, and DASH-08 places tickets one second either side of the
   Bangkok midnight that started the current day, so the server runs on its real clock.
 - **Cross-browser coverage** stays at Playwright's Chromium projects, as in Labs 2 and 3.
+- **The Lab 4 journeys read the seeded tickets.** RESP-01, RESP-02, and E2E-06 look at the seeded
+  data without changing it, so they need the seed as it was written (`prisma migrate reset` restores
+  it). Everything a journey changes is a ticket or user it created and removes.
+- **Expected errors are declared, not ignored.** A journey that tests a stale conflict or a failure
+  state causes a `409` or `500`, which the browser logs. E2E-08 allows exactly the response a step
+  declares and fails on any other, and on a declaration nothing used.
+- **Screenshots of panels are taken with the page behind scrolled to the top.** Headless Chromium
+  draws a fixed overlay a few pixels low in a capture while the page behind is scrolled. RESP-02
+  asserts the panel's real position (top of the screen, buttons on screen) instead of trusting the image.
+- **Times on Lab 2–3 screens use the browser's time zone; Lab 4's use Asia/Bangkok** (D-19). They
+  agree for users in Thailand, the application's audience. In the screenshots the test browser runs
+  in UTC, so the same ticket shows two clock times on different screens.
+- **Screen readers and real devices were not used.** Accessibility is checked through roles, names,
+  focus order, focus visibility, and target sizes in Chromium at three viewport widths.

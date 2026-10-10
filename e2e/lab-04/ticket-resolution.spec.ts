@@ -20,6 +20,9 @@ import { removeE2EData } from "../lab-03/cleanup.js";
 // (docs/lab-04/tests.md E2E-04, E2E-05; specification.md BR-05, BR-28 to BR-32).
 // Screenshot: artifacts/lab-04/screenshots/actions-taken/<breakpoint>-gate-passed-resolved.png.
 
+// These journeys are long: several sign-ins and many steps in one test.
+test.describe.configure({ timeout: 150_000 });
+
 test.afterAll(async ({}, info) => {
   await removeE2EData({ ticketPrefix: ticketPrefixFor(info) });
 });

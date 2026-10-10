@@ -28,6 +28,9 @@ import { removeE2EData } from "../lab-03/cleanup.js";
 // (docs/lab-04/tests.md E2E-06 to E2E-09, RESP-01).
 // Screenshots: artifacts/lab-04/screenshots/{staff-dashboard,requester-dashboard}/.
 
+// These journeys are long: several sign-ins and many steps in one test.
+test.describe.configure({ timeout: 150_000 });
+
 test.afterAll(async ({}, info) => {
   // Tickets first: a user who still owns or requested one cannot be removed.
   await removeE2EData({ ticketPrefix: ticketPrefixFor(info), emailPrefix: emailPrefix4For(info) });

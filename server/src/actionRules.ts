@@ -92,7 +92,10 @@ export function parseActionAt(raw: unknown): Date | null {
 
 // BR-07 — the window, against the server's clock and the ticket's creation.
 export function actionAtError(at: Date, status: "PLANNED" | "COMPLETED", opts: { now: Date; ticketCreatedAt: Date }): string | null {
-  if (at.getTime() < opts.ticketCreatedAt.getTime()) return "The action can't be dated before the ticket was created.";
+  // To the minute: the form's date has minute precision, so work added in the
+  // minute the ticket was created is dated at that minute's start (Issue 8).
+  const createdMinute = Math.floor(opts.ticketCreatedAt.getTime() / MINUTE) * MINUTE;
+  if (at.getTime() < createdMinute) return "The action can't be dated before the ticket was created.";
   if (status === "COMPLETED" && at.getTime() > opts.now.getTime() + COMPLETED_GRACE) return "Completed work can't be dated in the future.";
   if (status === "PLANNED" && at.getTime() > opts.now.getTime() + PLANNED_HORIZON) return "Plan the action within the next 365 days.";
   return null;

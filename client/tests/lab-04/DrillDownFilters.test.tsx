@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import * as api from "../../src/api.js";
 import { AppRoutes } from "../../src/AppRoutes.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
@@ -21,6 +21,17 @@ function UrlProbe() {
   return <output data-testid="location">{pathname + search}</output>;
 }
 
+// Stands in for the browser's Back button and for a link from another screen.
+function History() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button type="button" onClick={() => navigate(-1)}>test: back</button>
+      <button type="button" onClick={() => navigate("/tickets?status=RESOLVED&sort=updatedAt&order=desc")}>test: resolved, by update</button>
+    </>
+  );
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(api, "fetchCategories").mockResolvedValue([]);
@@ -35,6 +46,7 @@ function renderAt(path: string, user: api.AuthUser) {
       <MemoryRouter future={ROUTER_FUTURE} initialEntries={[path]}>
         <AppRoutes />
         <UrlProbe />
+        <History />
       </MemoryRouter>
     </AuthProvider>,
   );
@@ -127,6 +139,32 @@ describe("UI-21 My Tickets reads its status and sort from the URL (D-13)", () =>
     expect(lastCall(list)).not.toHaveProperty("status");
     // One request for the new view, not a stale page 2 first.
     expect(list.mock.calls.filter(([p]) => p?.page === 2 && !p?.status)).toEqual([]);
+  });
+
+  // PR #80 re-review: the page was remembered per view, so going Back to a view
+  // restored its page, although the ui-spec says a changed view starts at page 1.
+  it("starts at page 1 whenever the URL changes the view: a sort alone, and Back to an earlier view", async () => {
+    const list = vi.spyOn(api, "fetchTickets").mockImplementation(async (params = {}) => ({
+      data: [{
+        id: 1, ticketNumber: "TCK-000001", summary: "Ticket 1", requestedPriority: "MEDIUM", currentStatus: "RESOLVED",
+        category: { id: 1, name: "Hardware" }, relatedSystem: { id: 1, name: "Corporate Laptop" }, createdAt: "2026-10-01T09:00:00.000Z", updatedAt: "2026-10-02T09:00:00.000Z",
+      }] as unknown as api.TicketListItem[],
+      pagination: { page: params.page ?? 1, pageSize: 10, totalItems: 16, totalPages: 2 },
+    }));
+    renderAt("/tickets?status=RESOLVED", REQUESTER);
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", page: 1 }));
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", page: 2 }));
+
+    // The same status with another sort: a new view, so page 1.
+    await userEvent.click(screen.getByRole("button", { name: "test: resolved, by update" }));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", sort: "updatedAt", order: "desc", page: 1 }));
+
+    // Back to the first view: page 1 again, not the page 2 it was left on.
+    await userEvent.click(screen.getByRole("button", { name: "test: back" }));
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/tickets\?status=RESOLVED$/));
+    await waitFor(() => expect(lastCall(list)).toMatchObject({ status: "RESOLVED", sort: "createdAt", page: 1 }));
+    expect(list.mock.calls.filter(([p]) => p?.page === 2)).toHaveLength(1);
   });
 
   it("falls back to every ticket for an unknown status in the URL", async () => {

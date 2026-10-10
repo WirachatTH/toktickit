@@ -36,7 +36,8 @@ async function makeTicket(requester: number, status: TicketStatus, over: { updat
     },
   });
   // updatedAt is set by Prisma on write; set it explicitly where a test needs an order.
-  if (over.updatedAt) await prisma.$executeRaw`UPDATE "Ticket" SET "updatedAt" = ${over.updatedAt} WHERE id = ${t.id}`;
+  // Sent as UTC text and cast, so the stored value is the same whatever time zone the database runs in.
+  if (over.updatedAt) await prisma.$executeRaw`UPDATE "Ticket" SET "updatedAt" = ${over.updatedAt.toISOString()}::timestamp WHERE id = ${t.id}`;
   ticketIds.push(t.id);
   return t.id;
 }
