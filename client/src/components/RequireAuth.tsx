@@ -24,7 +24,7 @@ export interface FromState {
 }
 
 export function RequireAuth({ roles, children }: { roles: readonly Role[]; children: ReactNode }) {
-  const { user, status, sessionEnded } = useAuth();
+  const { user, status, sessionEnded, signedOut } = useAuth();
   const location = useLocation();
 
   if (status === "loading") {
@@ -35,7 +35,10 @@ export function RequireAuth({ roles, children }: { roles: readonly Role[]; child
     );
   }
   if (!user) {
-    const state: FromState = { from: { pathname: location.pathname, search: location.search }, sessionEnded };
+    // After an explicit Log out there is nowhere to return to: the next person
+    // to sign in starts at their own home, not on the last user's screen
+    // (Lab 4, Issue 8). An expired session still returns to where it was.
+    const state: FromState = signedOut ? {} : { from: { pathname: location.pathname, search: location.search }, sessionEnded };
     return <Navigate to={ROUTES.login} replace state={state} />;
   }
   if (!roles.includes(user.role)) {

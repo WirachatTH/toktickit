@@ -14,6 +14,8 @@ interface AuthContextValue {
   status: AuthStatus;
   /** True once the server has ended a session this browser was using (Issue 4, AC-08). */
   sessionEnded: boolean;
+  /** True from an explicit Log out until the next sign-in (Lab 4, Issue 8). */
+  signedOut: boolean;
   setUser: (user: AuthUser | null) => void;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -25,6 +27,7 @@ const SIGNED_OUT: AuthContextValue = {
   user: null,
   status: "ready",
   sessionEnded: false,
+  signedOut: false,
   setUser: () => {},
   refresh: async () => {},
   signOut: async () => {},
@@ -36,13 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const userRef = useRef<AuthUser | null>(null);
   userRef.current = user;
 
   // Signing in (a user arrives) clears any earlier "session ended" notice.
   const setUser = useCallback((next: AuthUser | null) => {
     setUserState(next);
-    if (next) setSessionEnded(false);
+    if (next) {
+      setSessionEnded(false);
+      setSignedOut(false);
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -81,12 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // HttpOnly and the server deletes the session on the next successful call.
       setUserState(null);
       setSessionEnded(false);
+      setSignedOut(true);
     }
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, sessionEnded, setUser, refresh, signOut }),
-    [user, status, sessionEnded, setUser, refresh, signOut],
+    () => ({ user, status, sessionEnded, signedOut, setUser, refresh, signOut }),
+    [user, status, sessionEnded, signedOut, setUser, refresh, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
