@@ -20,7 +20,7 @@ Coverage spans every type labsheet §10 names:
 - end-to-end.
 
 Three techniques carry the riskiest rules:
-- **Matrix sweep** (SEC-01): drives all 37 routes with no session, each denied role, and each
+- **Matrix sweep** (SEC-01): drives all 38 routes with no session, each denied role, and each
   granted role.
 - **Independent counts** (DASH-02, DASH-04, DASH-07): every dashboard value is compared with a
   separate SQL count written in the test. This is the evidence that the counts match the database.
@@ -84,6 +84,7 @@ Planned until the issue that owns the row runs it green.
 | API-20 | BR-14 | API | Create with `followUpOfId` pointing to: an eligible action, a planned action, a completed action without follow-up, another ticket's action | Only the eligible one accepted; others `400` on `followUpOfId`; once the follow-up completes, `followUpHandled` is true on the original | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
 | API-21 | AC-09, BR-19 | API | Requester lists Actions Taken on their own ticket | `200` with every §1.1 field, including assignee, follow-up note, attachment notes | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
 | API-22 | BR-21 | API | Each Action Taken write, then read the ticket | Ticket `updatedAt` advanced by every create, effective edit, complete, and cancel | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-23 | AC-34, FR-19, D-20 | API | `GET /api/auth/session` with no session, a made-up, expired, or deactivated session, a signed-in user, and a must-change user; `GET /api/auth/me` with no session | `200` with `user: null` and `no-store` when nobody is signed in; otherwise exactly the `/me` user; `/me` still answers `401` | `server/tests/lab-04/session.api.test.ts` | Pass |
 
 ### 2.3 Workflow
 
@@ -122,7 +123,7 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | AC-36, BR-15 | Security | Matrix sweep over all 37 routes (api-spec §5): no session; each denied role; each granted role | `401`; `403` with no resource data; granted roles never `401`/`403` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-01 | AC-36, BR-15 | Security | Matrix sweep over all 38 routes (api-spec §5): no session; each denied role; each granted role | `401`; `403` with no resource data; granted roles never `401`/`403` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-02 | AC-09, BR-18 | Security | Requester calls every Action Taken write and history route on an own ticket, another's ticket, and a missing id | All `403` with identical bodies, before any lookup | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-03 | AC-09, BR-18 | Security | Requester lists Actions Taken on another Requester's ticket | `404`, identical to a missing ticket | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-04 | AC-36 | Security | Each new state-changing route with a foreign `Origin` and with `Origin: null` | `403 FORBIDDEN_ORIGIN`; nothing changed | `server/tests/lab-04/authorization.api.test.ts` | Pass |
@@ -146,24 +147,24 @@ Planned until the issue that owns the row runs it green.
 
 | Test ID | Requirement/AC | Type | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| REG-01 | AC-33, BR-46 | Regression | Lab 1, Lab 2, and Lab 3 server suites on the Lab 4 build | Pass; only the BR-46 tests changed, each named in its PR | `server/tests/lab-04/regression.api.test.ts` | Planned |
+| REG-01 | AC-33, BR-46 | Regression | Lab 1, Lab 2, and Lab 3 server suites on the Lab 4 build | Pass; only the BR-46 tests changed, each named in its PR | `server/tests/lab-01/, lab-02/, lab-03/ (whole suites)` | Pass |
 | REG-02 | AC-33, BR-46 | Regression | Lab 1–3 client suites and the Lab 2–3 Playwright suites on the Lab 4 build | Pass; home-route and navigation expectations updated to `/dashboard` (named in the Issue 6 PR) | `client/tests/lab-04/Navigation.test.tsx` | Pass |
 | REG-03 | BR-45, D-13 | Regression | `GET /api/tickets`, the queue, and `GET /api/admin/users`, each without `status` | Byte-identical to Lab 3 responses for the same data (defaults `ALL`, `ACTIVE`, and every user) | `server/tests/lab-04/regression.api.test.ts` | Pass |
 | REG-04 | AC-23, D-13 | Regression | `GET /api/tickets?status=UNRESOLVED` and `?status=WAITING_FOR_REQUESTER`; the queue with `status=UNRESOLVED`; `GET /api/admin/users` with `status=active`, `status=inactive`, combined with `role`, and with an unknown value | Only matching own tickets, matching tickets, or matching users; pagination metadata correct; an unknown user `status` returns every user, as in Lab 3 | `server/tests/lab-04/regression.api.test.ts` | Pass |
 | REG-05 | FR-20 | Regression | `apiCredentials.test.ts` coverage check with the new API functions | Every new client API function is listed and sends credentials | `client/tests/lab-04/apiCredentials.lab4.test.ts` | Pass |
-| REG-06 | AC-34, FR-17 | Regression | Double submit on Create Ticket, Post comment, Add internal note, Create user (UI busy state) | One request per click burst; one row created | `client/tests/lab-04/Hardening.test.tsx` | Planned |
-| REG-07 | AC-34, FR-18 | Regression | Recoverable failure on Create Ticket, comment, note, user panels, and Actions Taken | Typed input kept after `400`, `409`, network error, and `500` | `client/tests/lab-04/Hardening.test.tsx` | Planned |
-| REG-08 | AC-33 | Regression | Lab 1 feature: health check, the public Categories list, and the System Status page | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-01/health.test.ts` | Planned |
-| REG-09 | AC-33 | Regression | Lab 2 feature: Create Ticket (validation, numbering, attachments on create) | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
-| REG-10 | AC-33 | Regression | Lab 2 feature: My Tickets search, filters, sort, and pagination | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
-| REG-11 | AC-33 | Regression | Lab 2 feature: Requester Ticket Detail and the attachment lifecycle | Pass on the Lab 4 build, changed only as BR-46 allows (Lab 2 REG-14 rewritten, BR-46) | `server/tests/lab-02/attachments.api.test.ts` | Planned |
-| REG-12 | AC-33 | Regression | Lab 3 feature: sign-in, sessions, password change, and the login throttle | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| REG-13 | AC-33 | Regression | Lab 3 feature: the authorization matrix, Origin guard, and safe errors | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| REG-14 | AC-33 | Regression | Lab 3 feature: Public Comments, Internal Notes, and "appears resolved" | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| REG-15 | AC-33 | Regression | Lab 3 feature: the IT Staff Ticket Queue | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| REG-16 | AC-33 | Regression | Lab 3 feature: IT Staff Ticket Detail, ownership, IT Priority, and the status workflow | Pass on the Lab 4 build, changed only as BR-46 allows (Lab 3 API-42 and gate setup, BR-46) | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
-| REG-17 | AC-33 | Regression | Lab 3 feature: Administrator User Management and its safety rules | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
-| REG-18 | AC-33 | Regression | Lab 2 and Lab 3 browser journeys: Requester ticket flow, authentication, IT Staff ticket flow, user administration | Pass at desktop, tablet, and mobile, changed only as BR-46 allows | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
+| REG-06 | AC-34, FR-17 | Regression | A burst of clicks and form submits on Create Ticket, Post comment, Add internal note, Create user (Actions Taken: UI-08) | One request per burst | `client/tests/lab-04/Hardening.test.tsx` | Pass |
+| REG-07 | AC-34, FR-18 | Regression | Recoverable failure on Create Ticket, comment, note, and the Create user panel (Actions Taken: UI-07, UI-08) | Typed input kept after `400`, `409`, network error, and `500`; Create Ticket blames the network only when no answer came back | `client/tests/lab-04/Hardening.test.tsx` | Pass |
+| REG-08 | AC-33 | Regression | Lab 1 feature: health check, the public Categories list, and the System Status page | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-01/health.test.ts` | Pass |
+| REG-09 | AC-33 | Regression | Lab 2 feature: Create Ticket (validation, numbering, attachments on create) | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
+| REG-10 | AC-33 | Regression | Lab 2 feature: My Tickets search, filters, sort, and pagination | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| REG-11 | AC-33 | Regression | Lab 2 feature: Requester Ticket Detail and the attachment lifecycle | Pass on the Lab 4 build, changed only as BR-46 allows (Lab 2 REG-14 rewritten, BR-46) | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| REG-12 | AC-33 | Regression | Lab 3 feature: sign-in, sessions, password change, and the login throttle | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| REG-13 | AC-33 | Regression | Lab 3 feature: the authorization matrix, Origin guard, and safe errors | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/authorization.api.test.ts` | Pass |
+| REG-14 | AC-33 | Regression | Lab 3 feature: Public Comments, Internal Notes, and "appears resolved" | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| REG-15 | AC-33 | Regression | Lab 3 feature: the IT Staff Ticket Queue | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| REG-16 | AC-33 | Regression | Lab 3 feature: IT Staff Ticket Detail, ownership, IT Priority, and the status workflow | Pass on the Lab 4 build, changed only as BR-46 allows (Lab 3 API-42 and gate setup, BR-46) | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Pass |
+| REG-17 | AC-33 | Regression | Lab 3 feature: Administrator User Management and its safety rules | Pass on the Lab 4 build, changed only as BR-46 allows | `server/tests/lab-03/users-admin.api.test.ts` | Pass |
+| REG-18 | AC-33 | Regression | Lab 2 and Lab 3 browser journeys: Requester ticket flow, authentication, IT Staff ticket flow, user administration | Pass at desktop, tablet, and mobile, changed only as BR-46 allows | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
 
 ### 2.8 Performance smoke
 
@@ -198,7 +199,8 @@ Planned until the issue that owns the row runs it green.
 | UI-19 | AC-27, FR-15 | UI | Requester Dashboard empty (brand-new Requester), failure, Retry | Zeros plus the Create Ticket empty state; error banner; Retry refetches | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
 | UI-20 | AC-26, FR-10 | UI | Navigation for each role and the post-login landing | Dashboard first with `aria-current` on `/dashboard`; landing `/dashboard`; forbidden callout shown there | `client/tests/lab-04/Navigation.test.tsx` | Pass |
 | UI-21 | AC-23, D-13 | UI | Drill-down targets: My Tickets `?status=`, queue `status=UNRESOLVED`, User Management `?role=` with `?status=active` and `?status=inactive` | Each screen opens with the filter applied and requests it from the API; User Management shows the removable activation chip, and removing it drops the parameter | `client/tests/lab-04/DrillDownFilters.test.tsx` | Pass |
-| UI-22 | AC-34, FR-16 | UI | Feedback consistency sweep: each screen's not-found, forbidden, and failure states use the shared components | Shared `EmptyState`/`ErrorState`/callout rendered with the screen's message | `client/tests/lab-04/Hardening.test.tsx` | Planned |
+| UI-22 | AC-34, FR-16 | UI | Feedback consistency sweep: each screen's not-found and load-failure states use the shared components (forbidden: UI-20) | Shared `ErrorState` with the screen's message and a way back; Retry shows loading and loads again | `client/tests/lab-04/Hardening.test.tsx` | Pass |
+| UI-23 | AC-34, FR-19, D-20 | UI | An unknown address as each role and signed out; the page-load session check; the favicon | "Page not found" inside the shell with a link to the Dashboard, Login when signed out; the check calls `/api/auth/session`; `index.html` links an icon file that exists | `client/tests/lab-04/Hardening.test.tsx` | Pass |
 
 ### 2.10 UI style
 
@@ -267,7 +269,7 @@ Planned until the issue that owns the row runs it green.
 | AC-31 | MIG-01, MIG-02, MIG-03, MIG-04 |
 | AC-32 | MIG-06, MIG-07 |
 | AC-33 | REG-01, REG-02, REG-08, REG-09, REG-10, REG-11, REG-12, REG-13, REG-14, REG-15, REG-16, REG-17, REG-18, E2E-09 |
-| AC-34 | REG-06, REG-07, UI-22, E2E-08 |
+| AC-34 | API-23, REG-06, REG-07, UI-22, UI-23, E2E-08 |
 | AC-35 | STYLE-01, STYLE-02, STYLE-03, RESP-01, RESP-02, RESP-03 |
 | AC-36 | SEC-01, SEC-04, SEC-05, SEC-07 |
 
@@ -285,11 +287,11 @@ level of an acceptance criterion and are traced to that rule in §2.
 | 4 — Ticket Workflow & Resolution Gate | UNIT-05, WF-01, WF-02, WF-03, WF-04, WF-05, WF-06, WF-07, WF-08, WF-09, WF-10, WF-11, UI-12, UI-13, UI-14 | 15 |
 | 5 — Dashboard APIs | UNIT-06, UNIT-07, DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DASH-07, DASH-08, DASH-09, DASH-10, DASH-11, DASH-12, SEC-07, REG-03, REG-04, PERF-01, PERF-02 | 19 |
 | 6 — Dashboard UI & Navigation | REG-02, UI-15, UI-16, UI-17, UI-18, UI-19, UI-20, UI-21, STYLE-02 | 9 |
-| 7 — Final Hardening & Full Regression | REG-01, REG-06, REG-07, REG-08, REG-09, REG-10, REG-11, REG-12, REG-13, REG-14, REG-15, REG-16, REG-17, REG-18, UI-22 | 15 |
+| 7 — Final Hardening & Full Regression | API-23, REG-01, REG-06, REG-07, REG-08, REG-09, REG-10, REG-11, REG-12, REG-13, REG-14, REG-15, REG-16, REG-17, REG-18, UI-22, UI-23 | 17 |
 | 8 — Responsive & Accessibility QA, Visual Checklist & E2E | RESP-01, RESP-02, RESP-03, E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06, E2E-07, E2E-08, E2E-09 | 12 |
 | 9 — Integration & Release to Main | full regression of every row above on `lab4-staging`, then on `main` | — |
 
-**Totals:** UNIT 7, API 22, WF 11, DASH 12, SEC 7, MIG 7, REG 18, PERF 3, UI 22, STYLE 3, RESP 3, E2E 9: **124 planned tests**.
+**Totals:** UNIT 7, API 23, WF 11, DASH 12, SEC 7, MIG 7, REG 18, PERF 3, UI 23, STYLE 3, RESP 3, E2E 9: **126 planned tests**.
 
 ## 4. Responsive and Visual Checklist
 

@@ -157,9 +157,12 @@ export function CreateTicket() {
       } else {
         // Safe message only (BR-28). Every value the Requester typed and every
         // still-valid attachment selection stays in state — nothing is cleared
-        // on failure (BR-27).
+        // on failure (BR-27). Lab 4, Issue 7: only a request that never got an
+        // answer says the API could not be reached; a server error does not.
         setFormError(
-          "Cannot reach the TokTickIT API. Your ticket has not been created, and nothing you entered has been lost — try again."
+          error instanceof ApiError
+            ? "Something went wrong. Your ticket has not been created, and nothing you entered has been lost — try again."
+            : "Cannot reach the TokTickIT API. Your ticket has not been created, and nothing you entered has been lost — try again."
         );
       }
     } finally {

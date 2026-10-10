@@ -444,6 +444,7 @@ contract, except the additive changes in BR-45.
 | Requester Dashboard | `GET /api/dashboard/requester` | Requester |
 | IT Staff Dashboard | `GET /api/dashboard/staff` | IT Staff |
 | Administrator Dashboard | `GET /api/dashboard/admin` | Administrator |
+| Who is signed in (page-load check) | `GET /api/auth/session` | anyone; `user: null` without a session (D-20) |
 | *Changed:* status change | `PATCH /api/staff/tickets/:id/status` | IT Staff: adds `409 RESOLUTION_BLOCKED` and sets `resolvedAt` |
 | *Changed:* IT Staff Ticket Detail | `GET /api/staff/tickets/:id` | adds `resolutionGate` and `capabilities.canWriteActions`; gated `permittedTransitions` |
 | *Changed:* My Tickets | `GET /api/tickets` | adds optional `status` filter |
@@ -569,3 +570,4 @@ Origin guard, and route-policy table are unchanged.
 | D-17 | Performance-smoke budget: on the seeded data, each dashboard endpoint's 95th-percentile time over 20 sequential calls is under 500 ms in the Docker test environment. Its query count stays the same when 50 more tickets are added. | The labsheet asks for a performance smoke test, not load testing. A fixed query count catches the real risk, an N+1 query, independent of machine speed. The time budget is generous enough not to flake on a laptop. |
 | D-18 | Cancelling or closing a ticket leaves its planned actions as they are, and dashboards skip actions on `CLOSED` or `CANCELLED` tickets. | Changing actions automatically on a ticket transition would rewrite history the user did not touch. The actions stay visible and read-only (BR-20), and the dashboards do not report work nobody can do. |
 | D-19 | The time zone is fixed to Asia/Bangkok on the server, not per user. | All users are in one organisation in Thailand, and the labsheet names no per-user setting. One fixed boundary makes counts identical for everyone and testable. |
+| D-20 | The client asks who is signed in through a new `GET /api/auth/session`, which answers `200` with `user: null` when there is no session. Lab 3's `GET /api/auth/me` keeps its `401`. | The app asks on every page load, and a browser logs every `401` response as a console error, so each signed-out visit broke FR-19. Changing `/me` would rewrite Lab 3's contract and its tests (API-17, the authorization matrix), which BR-46 does not allow. An additive route changes no earlier rule. |

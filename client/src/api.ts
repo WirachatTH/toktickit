@@ -395,10 +395,11 @@ export async function logout(): Promise<void> {
   if (!res.ok) throw await toApiError(res);
 }
 
-/** The signed-in user, or null when there is no session (401). */
+/** The signed-in user, or null when there is no session.
+ *  Lab 4, Issue 7 (D-20): asked through /api/auth/session, which answers a
+ *  visitor with `user: null` and 200, so a signed-out page load logs no 401. */
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
-  const res = await apiFetch("/api/auth/me");
-  if (res.status === 401) return null;
+  const res = await apiFetch("/api/auth/session");
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).user;
 }

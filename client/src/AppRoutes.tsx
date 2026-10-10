@@ -7,6 +7,7 @@ import { ChangePassword } from "./screens/ChangePassword.js";
 import { RequireAuth } from "./components/RequireAuth.js";
 import { AppShell } from "./components/AppShell.js";
 import SystemStatus from "./screens/SystemStatus.js";
+import { NotFound } from "./screens/NotFound.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
@@ -114,6 +115,16 @@ function AppRouteTable() {
         element={
           <Protected roles={SCREEN_ROLES.adminUsers}>
             <UserManagement />
+          </Protected>
+        }
+      />
+      {/* Lab 4, Issue 7 — any other address: a not-found page in the shell for
+          every role, Login for a visitor (FR-19). */}
+      <Route
+        path="*"
+        element={
+          <Protected roles={SCREEN_ROLES.dashboard}>
+            <NotFound />
           </Protected>
         }
       />

@@ -79,7 +79,10 @@ function formatDateTime(iso: string): string {
 export function MyTickets() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Both are read from the URL on every render, so leaving a filtered URL (the
+  // My Tickets link, Back) resets them together (PR #79 review).
   const statusFilter = statusFrom(searchParams.get("status"));
+  const sortValue = sortFrom(searchParams.get("sort"), searchParams.get("order"));
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [systems, setSystems] = useState<RelatedSystem[]>([]);
@@ -89,7 +92,6 @@ export function MyTickets() {
   const [categoryId, setCategoryId] = useState("");
   const [relatedSystemId, setRelatedSystemId] = useState("");
   const [requestedPriority, setRequestedPriority] = useState("");
-  const [sortValue, setSortValueState] = useState<SortValue>(() => sortFrom(searchParams.get("sort"), searchParams.get("order")));
   const [page, setPage] = useState(1);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -114,7 +116,6 @@ export function MyTickets() {
     writeUrl(status, sortValue);
   }
   function setSortValue(sort: SortValue) {
-    setSortValueState(sort);
     writeUrl(statusFilter, sort);
   }
 
@@ -184,7 +185,6 @@ export function MyTickets() {
     setCategoryId("");
     setRelatedSystemId("");
     setRequestedPriority("");
-    setSortValueState(DEFAULT_SORT);
     writeUrl("ALL", DEFAULT_SORT);
     setPage(1);
   }

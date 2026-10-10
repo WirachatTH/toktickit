@@ -168,7 +168,8 @@ missing from some system fonts, and the text carries the meaning:
   - "Created today" and "Resolved today" carry the helper text "Bangkok day; the queue
     opens newest first" (BR-38, a superset drill-down).
   - The My planned actions card's View link jumps to the list below
-    (`#my-planned-actions`).
+    (`#my-planned-actions`): the list scrolls into view and takes focus. Opening
+    `/dashboard#my-planned-actions` directly does the same once the data has loaded.
 - **Count strips:** "By status" (8 status badges) and "Unresolved by IT Priority"
   (3 priority badges).
 - **Lists:**
@@ -324,12 +325,24 @@ missing from some system fonts, and the text carries the meaning:
 | Requester Ticket Detail — Work on your request | read-only list | loading, empty |
 | Ticket controls | permitted transitions, gate notice | blocked-resolution message, stale reload, success |
 | My Tickets / Queue / User Management | URL-driven filters | unchanged Lab 2/3 states |
+| Any other address | view | signed in: "Page not found" inside the shell, with "Go to your Dashboard"; signed out: Login |
 
 **Hardening (FR-16 to FR-19):** every screen from Labs 1–4 is checked against the same
 set of states, using the shared Lab 2/3 components (`LoadingSpinner`, `EmptyState`,
 `ErrorState`, toasts, field errors). Each create or submit button gets a busy state.
 Forms keep their input after failures. Leftovers found by the hardening sweep are
 removed and listed in the Issue 7 PR.
+
+What the sweep changed (Issue 7):
+- **Not found:** an address no screen answers shows the row above. It was an empty page.
+- **Loading:** Retry on IT Staff Ticket Detail shows the loading state while it
+  retries, as Requester Ticket Detail does. The Dashboard's loading placeholder shows
+  one card per card the role will see (4 for a Requester, 6 otherwise).
+- **Failure:** Create Ticket says "Cannot reach the TokTickIT API" only when no answer
+  came back. A server error says "Something went wrong". Both keep the input.
+- **Console:** the page-load session check uses `GET /api/auth/session`
+  (specification.md D-20), and the app has a favicon, so a normal visit logs no error.
+- **Touch target:** the filter chip's remove button is 44px on mobile (§9).
 
 ## 9. Accessibility
 Labs 2 and 3 apply unchanged. In addition:

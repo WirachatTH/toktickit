@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   AdminDashboard,
   DashboardMetric,
@@ -69,6 +69,18 @@ export function Dashboard() {
     void fetchData(false);
   }, [fetchData]);
 
+  // A link to a list on this screen (#my-planned-actions) only changes the hash;
+  // the router does not scroll, and the list exists only once the data has come.
+  // Scroll to it and move focus there then (ui-spec §3.2; PR #79 review).
+  const { hash, key } = useLocation();
+  useEffect(() => {
+    if (state !== "loaded" || !hash) return;
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (!target) return;
+    target.scrollIntoView?.({ block: "start" });
+    target.focus({ preventScroll: true });
+  }, [state, hash, key]);
+
   if (!user) return null;
   const firstName = user.name.split(" ")[0];
   const greeting = user.role === "REQUESTER" ? `Welcome, ${firstName}` : `Welcome back, ${firstName}`;
@@ -88,7 +100,7 @@ export function Dashboard() {
       </div>
       <div className="zg-visually-hidden" role="status" aria-live="polite" aria-label="Dashboard updates">{announce}</div>
 
-      {state === "loading" && <Skeleton />}
+      {state === "loading" && <Skeleton cards={role === "REQUESTER" ? 4 : 6} />}
       {state === "failure" && (
         <ErrorState message="We couldn't load your dashboard." action={<Button variant="secondary" onClick={() => void fetchData(false)}>Retry</Button>} />
       )}
@@ -99,11 +111,12 @@ export function Dashboard() {
   );
 }
 
-function Skeleton() {
+// One placeholder per card the role will see: 4 for a Requester, 6 otherwise.
+function Skeleton({ cards }: { cards: number }) {
   return (
     <div role="status" aria-busy="true" aria-label="Loading dashboard">
       <div className="zg-dashboard-cards mb-4">
-        {[0, 1, 2, 3].map((i) => (
+        {Array.from({ length: cards }, (_, i) => (
           <div key={i} className="zg-metric-card zg-metric-card--skeleton" />
         ))}
       </div>
@@ -151,7 +164,7 @@ function CountStrip({ label, metrics, badge }: { label: string; metrics: Dashboa
 function ListCard({ id, title, empty, viewAll, children, count }: { id: string; title: string; empty: string; viewAll?: { label: string; to: string }; children: ReactNode; count: number }) {
   const headingId = `${id}-heading`;
   return (
-    <section id={id} className="zg-card mb-3" aria-labelledby={headingId}>
+    <section id={id} className="zg-card mb-3" aria-labelledby={headingId} tabIndex={-1}>
       <div className="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
         <h2 id={headingId} className="h6 mb-0">{title}</h2>
         {viewAll && (

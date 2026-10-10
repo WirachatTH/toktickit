@@ -121,6 +121,13 @@ export function StaffTicketDetail() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Retry shows the loading state, not the failure it is retrying (Lab 4, Issue 7).
+  // The other reloads (after a conflict or an action change) stay silent.
+  function retry() {
+    setState("loading");
+    setReloadToken((t) => t + 1);
+  }
+
   if (state === "loading") {
     return (
       <div aria-busy="true" role="status" aria-label="Loading ticket">
@@ -133,7 +140,7 @@ export function StaffTicketDetail() {
     return <ErrorState message="This ticket doesn't exist." action={<Link to={ROUTES.staffQueue}>Back to queue</Link>} />;
   }
   if (state === "failure" || !ticket || !user) {
-    return <ErrorState message="Unable to load this ticket. Please try again." action={<Button variant="secondary" onClick={() => setReloadToken((t) => t + 1)}>Retry</Button>} />;
+    return <ErrorState message="Unable to load this ticket. Please try again." action={<Button variant="secondary" onClick={retry}>Retry</Button>} />;
   }
 
   const t = ticket;

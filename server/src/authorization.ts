@@ -45,6 +45,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { method: "POST", path: "/api/auth/login", access: PUBLIC },
   { method: "POST", path: "/api/auth/logout", access: { kind: "optional" } },
   { method: "GET", path: "/api/auth/me", access: { kind: "any", duringPasswordChange: true } },
+  // Lab 4, Issue 7 (D-20) — the page-load session check, with or without a session.
+  { method: "GET", path: "/api/auth/session", access: { kind: "optional" } },
   { method: "POST", path: "/api/auth/change-password", access: { kind: "any", duringPasswordChange: true } },
   { method: "GET", path: "/api/categories", access: PUBLIC },
   { method: "GET", path: "/api/systems", access: PUBLIC },
