@@ -136,7 +136,9 @@ function UserPanel({ me, editing, onClose, onSaved }: PanelProps) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (unsentPassword) return;
+    // Lab 4, Issue 7 (BR-43): one request at a time, even for a submit that
+    // does not come through the (disabled) button.
+    if (busy || unsentPassword) return;
     const e = validate();
     setErrors(e);
     if (Object.keys(e).length > 0) return;

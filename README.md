@@ -232,7 +232,8 @@ docker-compose up -d client
 ```
 
 ### Signing in
-- Each role lands on its own home and sees only the screens it may open:
+- Each role lands on its *Dashboard* (since Lab 4; in Lab 3 it was the first screen
+  listed here) and sees only the screens it may open:
   Requester → *My Tickets* and *Create Ticket*; IT Staff → *Ticket Queue*;
   Administrator → *User Management* and *Ticket Queue*. The Ticket Queue is live
   (Administrators see it read-only), and each row opens IT Staff Ticket Detail, where
@@ -278,11 +279,10 @@ role gets a Dashboard as its home screen, and the whole application is hardened.
 engineering contract lives in `docs/lab-04/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–6 are in: the contract; the Actions Taken model, migration,
-> seed, API, and screens; the resolution gate; and the dashboards, which are now every
-> role's home after sign-in (`/dashboard`). Final hardening and the Lab 4 end-to-end
-> suites follow in Issues 7–8. This section gains the remaining test and demonstration
-> steps as each issue lands.
+> **Status:** Issues 1–7 are in: the contract; the Actions Taken model, migration,
+> seed, API, and screens; the resolution gate; the dashboards, which are every role's
+> home after sign-in (`/dashboard`); and the final hardening pass. The Lab 4
+> end-to-end suites and screenshots follow in Issue 8.
 
 ### Applying the Lab 4 migration and seed
 Back up first, as for Lab 3. The migration only adds, but a backup is what makes the
@@ -317,3 +317,52 @@ This drops every Action Taken and its history; every Lab 1–3 row stays. Check 
 Lab 3 commit before restarting the server, because the Lab 4 code expects the new
 tables. MIG-04 in `server/tests/lab-04/migration-seed.test.ts` applies, rolls back,
 and re-applies the migration on a throwaway schema to prove it.
+
+### Running Lab 4 tests
+```bash
+docker-compose exec server npm test               # server/tests/lab-01..04
+docker-compose exec client npm test               # client/tests/lab-01..04
+docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..03, three viewports
+```
+- The server suites create their own users and tickets and remove them. The tests
+  that need an exact database (migration, seed, dashboard counts) create and drop
+  their own PostgreSQL schema, so the development data is left as it was.
+- `docker-compose exec server npx vitest run tests/lab-04` and
+  `docker-compose exec client npx vitest run tests/lab-04` run only the Lab 4 suites.
+- The Playwright notes under "Running Lab 3 tests" still apply. The Lab 2–3 journeys
+  run against the Lab 4 build; the Lab 4 journeys arrive with Issue 8.
+- `docs/lab-04/tests.md` lists every test row, the requirement it proves, and its
+  result.
+
+### Demonstrating Lab 4
+Use the local development accounts above (password `TokTickIT-dev-2026`) on a
+freshly seeded database.
+
+1. **IT Staff Dashboard.** Sign in as `chanon.rattanakorn@kmutt.ac.th`. You land on
+   `/dashboard`: six metric cards, tickets by status and by IT Priority, and the
+   lists *My planned actions*, *Urgent tickets*, and *Recently updated*. Every card,
+   count, and *View all* opens the list it counted, already filtered.
+2. **Actions Taken.** Open "VPN disconnects while uploading large files" from the
+   queue. It has four actions: two completed (one a follow-up of the other), one
+   cancelled, and one planned. *Add action* plans work or records work already done;
+   a planned action offers *Edit*, *Complete*, and *Cancel action*; *History* shows
+   every change.
+3. **Resolution gate.** On that ticket the status select does not offer *Resolved*,
+   and a notice under it says why: an action is still planned. Complete or cancel that
+   action and *Resolved* appears. "LEB2 shows the wrong timetable for semester 1" is
+   ready to resolve as seeded. "Request read access to the grade submission app" is
+   blocked by a follow-up that nobody has handled yet.
+4. **Requester view.** Sign in as `somchai.prasert@kmutt.ac.th`: the Dashboard shows
+   only their own tickets and never IT Priority. Their VPN ticket shows the same
+   actions under *Work on your request*, read-only.
+5. **Administrator.** Sign in as `siriporn.boonmee@kmutt.ac.th`: the same ticket
+   metrics, marked read-only, plus user counts that open User Management filtered by
+   role and by active or inactive. Administrators may write Actions Taken but cannot
+   change a ticket's owner, IT Priority, or status.
+6. **Hardening.** An address that does not exist (`/nope`) shows *Page not found*
+   with a link back to the Dashboard. Submit buttons take one click at a time, and a
+   form keeps what you typed when a request fails.
+
+The seed never edits a ticket you have changed, so run
+`docker-compose exec server npx prisma migrate reset` to return to this starting
+state after a demonstration.

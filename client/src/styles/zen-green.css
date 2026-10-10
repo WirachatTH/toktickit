@@ -933,3 +933,5 @@ textarea.zg-field {
 }
 .zg-filter-chip__remove { border: 0; background: transparent; color: inherit; min-width: 32px; min-height: 32px; border-radius: 999px; }
 .zg-filter-chip__remove:focus-visible { outline: 2px solid var(--zg-secondary); outline-offset: 1px; }
+/* Lab 4, Issue 7 — a 44px touch target on mobile (ui-spec §9; PR #79 review). */
+@media (max-width: 767.98px) { .zg-filter-chip__remove { min-width: 44px; min-height: 44px; } }

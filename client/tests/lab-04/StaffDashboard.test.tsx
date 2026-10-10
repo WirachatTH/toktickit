@@ -77,10 +77,12 @@ describe("UI-15 the IT Staff Dashboard shows the API's values (FR-11, BR-34)", (
     expect(plannedLinks[0]).toHaveAccessibleName(expect.stringContaining("TCK-000042"));
 
     const urgent = screen.getByRole("region", { name: "Urgent tickets" });
+    expect(urgent).toHaveAttribute("id", "urgent-tickets");
     expect(within(urgent).getByRole("link", { name: /TCK-000050: Payroll server unreachable/ })).toHaveAttribute("href", "/staff/tickets/50");
     expect(within(urgent).getByRole("link", { name: "View all urgent tickets" })).toHaveAttribute("href", "/staff/queue?status=UNRESOLVED&itPriority=HIGH&sort=createdAt&order=asc");
 
     const recent = screen.getByRole("region", { name: "Recently updated" });
+    expect(recent).toHaveAttribute("id", "recently-updated");
     expect(within(recent).getAllByRole("listitem")).toHaveLength(2);
     expect(within(recent).getByRole("link", { name: "View all recently updated tickets" })).toHaveAttribute("href", "/staff/queue?sort=updatedAt&order=desc");
     expect(within(recent).getByTitle("Laptop battery drains quickly")).toBeInTheDocument();
@@ -94,12 +96,82 @@ describe("UI-15 the IT Staff Dashboard shows the API's values (FR-11, BR-34)", (
   });
 });
 
+// PR #79 review: the card's link only changed the URL's hash; nothing scrolled,
+// because a single-page app has to scroll to a hash that renders after its data.
+describe("UI-15 the My planned actions card jumps to its list (ui-spec §3.2)", () => {
+  let scrolled: Element[];
+  beforeEach(() => {
+    scrolled = [];
+    // jsdom has no layout, so scrolling is recorded rather than performed.
+    Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+      scrolled.push(this);
+    });
+  });
+
+  it("scrolls to the list and focuses it when the card's View link is used", async () => {
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
+    renderDashboard(STAFF);
+    const list = await screen.findByRole("region", { name: "My planned actions" });
+    expect(scrolled).toEqual([]);
+    await userEvent.click(within(card("My planned actions")).getByRole("link", { name: "View My planned actions (9)" }));
+    await waitFor(() => expect(scrolled).toContain(list));
+    expect(list).toHaveFocus();
+  });
+
+  it("scrolls to the list on a direct load of /dashboard#my-planned-actions, once the data has arrived", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(STAFF);
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
+    render(
+      <AuthProvider>
+        <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/dashboard#my-planned-actions"]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    const list = await screen.findByRole("region", { name: "My planned actions" });
+    await waitFor(() => expect(scrolled).toContain(list));
+    expect(list).toHaveFocus();
+  });
+
+  // PR #80 review: the jump belongs to the navigation, not to each reload.
+  it("jumps once: Refresh with the hash still in the URL does not scroll again", async () => {
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
+    renderDashboard(STAFF);
+    await screen.findByRole("region", { name: "My planned actions" });
+    await userEvent.click(within(card("My planned actions")).getByRole("link", { name: "View My planned actions (9)" }));
+    await waitFor(() => expect(scrolled).toHaveLength(1));
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByRole("status", { name: "Dashboard updates" })).toHaveTextContent("Dashboard updated"));
+    expect(scrolled).toHaveLength(1);
+    // Using the link again is a new navigation, so it jumps again.
+    await userEvent.click(within(card("My planned actions")).getByRole("link", { name: "View My planned actions (9)" }));
+    await waitFor(() => expect(scrolled).toHaveLength(2));
+  });
+
+  // PR #80 review: a malformed percent-escape threw in the effect and blanked the app.
+  it.each(["#%", "#100%", "#%zz", "#%E0%A4%A", "#nope"])("renders the dashboard for the hash %s, without scrolling", async (hash) => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(STAFF);
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(staffDashboard());
+    render(
+      <AuthProvider>
+        <MemoryRouter future={ROUTER_FUTURE} initialEntries={[`/dashboard${hash}`]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole("group", { name: "Unassigned" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Welcome back, Pimchanok" })).toBeInTheDocument();
+    expect(scrolled).toEqual([]);
+  });
+});
+
 describe("UI-16 loading, empty lists, failure, and refresh (FR-15, ui-spec §3.5)", () => {
-  it("shows a busy skeleton while loading", async () => {
+  it("shows a busy skeleton while loading, with a placeholder for each of the six IT Staff cards", async () => {
     vi.spyOn(api, "fetchStaffDashboard").mockReturnValue(new Promise(() => undefined));
     renderDashboard(STAFF);
     const busy = await screen.findByRole("status", { name: "Loading dashboard" });
     expect(busy).toHaveAttribute("aria-busy", "true");
+    expect(busy.querySelectorAll(".zg-metric-card--skeleton")).toHaveLength(6);
   });
 
   it("says why each list is empty while the cards still show 0", async () => {

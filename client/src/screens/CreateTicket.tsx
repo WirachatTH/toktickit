@@ -4,6 +4,7 @@ import {
   fetchCategories,
   fetchRelatedSystems,
   createTicket,
+  API_UNREACHABLE,
   ApiError,
   Category,
   RelatedSystem,
@@ -157,9 +158,13 @@ export function CreateTicket() {
       } else {
         // Safe message only (BR-28). Every value the Requester typed and every
         // still-valid attachment selection stays in state — nothing is cleared
-        // on failure (BR-27).
+        // on failure (BR-27). Lab 4, Issue 7: only a request the API never
+        // answered (no reply, or a proxy's reply) says it could not be reached;
+        // an error from the API itself does not.
         setFormError(
-          "Cannot reach the TokTickIT API. Your ticket has not been created, and nothing you entered has been lost — try again."
+          error instanceof ApiError && error.code !== API_UNREACHABLE
+            ? "Something went wrong. Your ticket has not been created, and nothing you entered has been lost — try again."
+            : "Cannot reach the TokTickIT API. Your ticket has not been created, and nothing you entered has been lost — try again."
         );
       }
     } finally {

@@ -83,6 +83,12 @@ const PROTECTED_SCREENS: { pattern: string; roles: readonly Role[] }[] = [
   { pattern: ROUTES.dashboard, roles: SCREEN_ROLES.dashboard },
 ];
 
+/** Whether `pathname` is a screen behind sign-in. Login returns a visitor only to
+ *  one of these: an unknown address would only show "Page not found" (Lab 4, Issue 7). */
+export function isProtectedScreen(pathname: string): boolean {
+  return PROTECTED_SCREENS.some(({ pattern }) => matchPath(pattern, pathname));
+}
+
 /** Whether `role` may open `pathname`; screens without a role list (e.g. `/`) are open to all. */
 export function canOpen(role: Role, pathname: string): boolean {
   const screen = PROTECTED_SCREENS.find(({ pattern }) => matchPath(pattern, pathname));

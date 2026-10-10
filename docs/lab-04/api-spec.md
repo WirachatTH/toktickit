@@ -398,10 +398,25 @@ The 29 Lab 3 routes (Lab 3 api-spec §7) stay, with the changes in §2 and §4. 
 | `GET` | `/api/dashboard/requester` | yes | Requester |
 | `GET` | `/api/dashboard/staff` | yes | IT Staff |
 | `GET` | `/api/dashboard/admin` | yes | Administrator |
+| `GET` | `/api/auth/session` | optional | anyone (§5.1) |
 
-37 routes in total. Each one has a row in the route-policy table, and the
+38 routes in total. Each one has a row in the route-policy table, and the
 authorization sweep (SEC rows in `tests.md`) drives every route with no session, with
 each denied role, and with each granted role.
+
+### 5.1 `GET /api/auth/session` (Issue 7, specification.md D-20)
+
+The page-load session check. It answers what `GET /api/auth/me` answers for a
+signed-in user, a must-change one included, and `200 { "user": null }` with no
+session, an unknown or expired token, or a deactivated user. It never answers `401`,
+so a signed-out visit logs no console error (FR-19). Like every auth response it
+carries `Cache-Control: no-store`. `GET /api/auth/me` is unchanged (Lab 3 api-spec
+§1.2), and the client no longer calls it.
+
+```json
+{ "user": { "id": 8, "name": "Pimchanok Srisuk", "email": "pimchanok.srisuk@kmutt.ac.th",
+            "role": "IT_STAFF", "isActive": true, "mustChangePassword": false } }
+```
 
 ## 6. Status code summary
 

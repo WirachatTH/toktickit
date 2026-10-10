@@ -108,6 +108,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Set by the client, never sent by the API: a 5xx whose body is not the API's JSON. */
+export const API_UNREACHABLE = "API_UNREACHABLE";
+
 function retryAfterOf(res: Response): number | undefined {
   const raw = res.headers?.get?.("Retry-After");
   const seconds = raw === null || raw === undefined ? NaN : Number(raw);
@@ -145,8 +148,10 @@ async function toApiError(res: Response): Promise<ApiError> {
     return error;
   } catch {
     // Response body wasn't JSON at all (e.g. a proxy/network-level failure) —
-    // never surface that raw detail to the user (BR-28).
-    return new ApiError(res.status, "INTERNAL_ERROR", "Something went wrong. Please try again.");
+    // never surface that raw detail to the user (BR-28). The API always answers
+    // JSON, so a 5xx without it came from whatever sits in front of an API that
+    // is down: API_UNREACHABLE, a client-side code (Lab 4, Issue 7).
+    return new ApiError(res.status, res.status >= 500 ? API_UNREACHABLE : "INTERNAL_ERROR", "Something went wrong. Please try again.");
   }
 }
 
@@ -395,10 +400,11 @@ export async function logout(): Promise<void> {
   if (!res.ok) throw await toApiError(res);
 }
 
-/** The signed-in user, or null when there is no session (401). */
+/** The signed-in user, or null when there is no session.
+ *  Lab 4, Issue 7 (D-20): asked through /api/auth/session, which answers a
+ *  visitor with `user: null` and 200, so a signed-out page load logs no 401. */
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
-  const res = await apiFetch("/api/auth/me");
-  if (res.status === 401) return null;
+  const res = await apiFetch("/api/auth/session");
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).user;
 }

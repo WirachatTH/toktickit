@@ -66,6 +66,8 @@ const LAB4: Row[] = [
   { method: "GET", path: "/api/dashboard/requester", who: [R] },
   { method: "GET", path: "/api/dashboard/staff", who: [S] },
   { method: "GET", path: "/api/dashboard/admin", who: [A] },
+  // Issue 7 (D-20): who is signed in, answered with 200 and `user: null` instead of 401.
+  { method: "GET", path: "/api/auth/session", who: "optional" },
 ];
 const MATRIX = [...LAB3, ...LAB4];
 const ROLES: Role[] = [R, S, A];
@@ -137,9 +139,9 @@ afterAll(async () => {
 
 const cookieFor: Record<Role, keyof typeof users> = { REQUESTER: "requester", IT_STAFF: "staff", ADMINISTRATOR: "admin" };
 
-describe("SEC-01 the matrix over all 37 routes (BR-15)", () => {
-  it("has 37 rows", () => {
-    expect(MATRIX).toHaveLength(37);
+describe("SEC-01 the matrix over all 38 routes (BR-15)", () => {
+  it("has 38 rows", () => {
+    expect(MATRIX).toHaveLength(38);
   });
 
   it("answers 401 without a session, 403 to every denied role, and never 401/403 to a granted role", async () => {
@@ -207,7 +209,7 @@ describe("SEC-05 the route-policy table is the contract (api-spec §5)", () => {
   }
   const normalise = (path: string) => path.replace(/:[A-Za-z]+/g, ":p");
 
-  it("classifies every registered route, and the table equals the 37-row matrix", () => {
+  it("classifies every registered route, and the table equals the 38-row matrix", () => {
     const policies = ROUTE_POLICIES.map((p) => `${p.method} ${normalise(p.path)}`);
     expect(new Set(policies).size).toBe(policies.length);
     for (const route of registeredRoutes()) {
