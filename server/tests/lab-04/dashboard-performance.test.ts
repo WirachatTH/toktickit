@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+
+// The loops below make dozens of requests; on a loaded machine that passed the 5 s
+// default (PR #81 review). The 500 ms budgets they assert are unchanged.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 60_000 });
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";

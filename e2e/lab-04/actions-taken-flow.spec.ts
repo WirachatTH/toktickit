@@ -196,6 +196,8 @@ test.describe("Actions Taken", () => {
     await panel.getByRole("checkbox", { name: "Follow-up required?" }).check();
     await panel.getByLabel(/^Follow-up note/).fill("Recheck the drain after the new battery arrives.");
     await expectNoHorizontalOverflow(page, "Add action, recorded work");
+    // Clear of the sticky footer for the capture (PR #81 review): the note just filled is the point of it.
+    await panel.getByLabel(/^Follow-up note/).evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
     await shot4(page, info, "actions-taken", "create-completed");
     await panel.getByRole("button", { name: "Save action" }).click();
     await expect(panel).toBeHidden();

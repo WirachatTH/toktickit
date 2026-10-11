@@ -213,6 +213,22 @@ describe("UI-21 a filter from the URL is on show in the mobile filters too (ui-s
     expect(document.getElementById("queue-mobile-status")).toHaveValue("UNRESOLVED");
   });
 
+  // PR #81 review: nothing pinned that a search or a page number alone leaves the panel closed.
+  it.each([
+    ["/staff/queue?search=printer", "false"],
+    ["/staff/queue?page=2", "false"],
+    ["/staff/queue?sort=updatedAt&order=desc", "true"],
+    // A filter named in the URL opens the panel even at its default value: the URL asked for it.
+    ["/staff/queue?status=ACTIVE", "true"],
+  ])("the queue's mobile filters at %s: expanded=%s", async (path, expanded) => {
+    vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({
+      data: [], pagination: EMPTY_PAGE,
+      appliedQuery: { search: "", status: "ACTIVE", itPriority: null, categoryId: null, owner: "any", appearsResolved: false, sort: "itPriority", order: "desc", page: 1, pageSize: 10 },
+    } as unknown as api.QueueResponse);
+    renderAt(path, STAFF);
+    expect(await screen.findByRole("button", { name: "Filters" })).toHaveAttribute("aria-expanded", expanded);
+  });
+
   it("keeps the queue's mobile filters closed on a plain /staff/queue", async () => {
     vi.spyOn(api, "fetchStaffQueue").mockResolvedValue({
       data: [], pagination: EMPTY_PAGE,
