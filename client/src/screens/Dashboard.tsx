@@ -188,7 +188,8 @@ function ListCard({ id, title, empty, viewAll, children, count }: { id: string; 
 function TicketRow({ ticket }: { ticket: DashboardTicket }) {
   return (
     <li>
-      <Link to={ticket.href} className="zg-dashboard-row" aria-label={`${ticket.ticketNumber}: ${ticket.summary}`}>
+      {/* No aria-label: the name is everything the row shows (WCAG 2.5.3; PR #81 review). */}
+      <Link to={ticket.href} className="zg-dashboard-row">
         <span className="zg-dashboard-row__number">{ticket.ticketNumber}</span>
         <span className="zg-dashboard-row__summary" title={ticket.summary}>{ticket.summary}</span>
         <Badge kind="status" value={ticket.currentStatus as TicketStatus} />

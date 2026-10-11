@@ -316,10 +316,13 @@ at after capture.
 | Requester view (Work on your request): the same | Pass | RESP-02, E2E-02 | `actions-taken/*-requester-view.png` |
 | Ticket controls and the gate notice: the same | Pass | RESP-02, E2E-04 | `actions-taken/*-gate-blocked.png`, `*-gate-passed-resolved.png` |
 | Touch targets are at least 44px on mobile (card links, count strips, list rows, action buttons, the filter chip) | Pass | RESP-01, RESP-02 | `staff-dashboard/mobile-*.png` |
+| Pager buttons are at least 40px wide; a dashboard row's accessible name is its visible text (WCAG 2.5.8, 2.5.3) | Pass (fixed before release, from the PR #81 review) | STYLE-02, UI-15, UI-18 | `requester-dashboard/*-drilldown-my-tickets.png` |
 | A filter applied by a drill-down is on screen at every width | Pass (fixed in Issue 8) | RESP-01, UI-21 | `*-drilldown-*.png` |
 | Every Lab 1–3 screen still renders correctly in the final shell | Pass | REG-18, E2E-09 (the Lab 2–3 journeys and their layout checks, unchanged) | `artifacts/lab-02/`, `artifacts/lab-03/` (not rewritten) |
 
-**Found by this pass and fixed in Issue 8** (each with a test that failed first):
+**Found by this pass and fixed in Issue 8.** Each is covered by a test. For the first four the test was
+committed before the fix (the end-to-end journeys cover the Log out case); the styling tests for the
+last two were committed with their fix, and fail when it is removed:
 - an action added in the minute its ticket was created was refused as dated before the ticket (BR-07);
 - `#action-<id>` pulled focus back to its card on every reload of the list, away from a newly saved action;
 - on mobile, a drill-down opened a filtered list with the Filters panel closed, so the filter was not on screen;
@@ -343,12 +346,12 @@ docker-compose exec client npx playwright test
 ## 6. Final Results
 
 Every one of the 126 rows above reads Pass. The numbers below are from the full local run on
-the Issue 8 branch, in the Docker environment:
+the pre-release branch (every Lab 4 issue merged, plus the last review's fixes), in the Docker environment:
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
 | Server (Vitest + Supertest), `server/tests/lab-01..04` | `docker-compose exec server npm test` | 418 / 418 passed, 35 files |
-| Client (Vitest + Testing Library), `client/tests/lab-01..04` | `docker-compose exec client npm test` | 431 / 431 passed, 28 files |
+| Client (Vitest + Testing Library), `client/tests/lab-01..04` | `docker-compose exec client npm test` | 436 / 436 passed, 28 files |
 | End-to-end and responsive (Playwright), `e2e/lab-02..04`, three widths | `docker-compose exec client npx playwright test --workers=1` | 66 / 66 passed in one run (22 tests at each of desktop, tablet, mobile) |
 | Type checks | `npx tsc --noEmit` in `server` and `client` | clean |
 
@@ -380,5 +383,9 @@ that output is the Part 3 evidence (labsheet §14).
 - **Times on Lab 2–3 screens use the browser's time zone; Lab 4's use Asia/Bangkok** (D-19). They
   agree for users in Thailand, the application's audience. In the screenshots the test browser runs
   in UTC, so the same ticket shows two clock times on different screens.
+- **Tests must not date their data with the calendar.** API-01 created its ticket ten days before "now" but
+  dated two actions at a fixed day. Once the calendar passed that day the actions fell before the
+  ticket's creation and the test began to fail with no code change (found on 11 Oct 2026 in the
+  pre-release run). Its dates are relative now, and the other Lab 4 suites were checked for the same pattern.
 - **Screen readers and real devices were not used.** Accessibility is checked through roles, names,
   focus order, focus visibility, and target sizes in Chromium at three viewport widths.

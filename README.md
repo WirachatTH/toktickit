@@ -279,10 +279,10 @@ role gets a Dashboard as its home screen, and the whole application is hardened.
 engineering contract lives in `docs/lab-04/` (`specification.md`, `api-spec.md`,
 `ui-spec.md`, `tests.md`).
 
-> **Status:** Issues 1–8 are in: the contract; the Actions Taken model, migration,
-> seed, API, and screens; the resolution gate; the dashboards, which are every role's
-> home after sign-in (`/dashboard`); the final hardening pass; and the Lab 4
-> end-to-end suites with their screenshots. The release to `main` is Issue 9.
+> **Status:** complete. All of Lab 4 is in: the contract; the Actions Taken model,
+> migration, seed, API, and screens; the resolution gate; the dashboards, which are
+> every role's home after sign-in (`/dashboard`); the final hardening pass; and the
+> end-to-end suites with their screenshots. `docs/lab-04/tests.md` has the results.
 
 ### Applying the Lab 4 migration and seed
 Back up first, as for Lab 3. The migration only adds, but a backup is what makes the
@@ -331,8 +331,8 @@ docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..04, 
   `docker-compose exec client npx vitest run tests/lab-04` run only the Lab 4 suites.
 - The Playwright notes under "Running Lab 3 tests" still apply. One run covers the
   Lab 2–3 journeys and the Lab 4 ones in `e2e/lab-04/` (Actions Taken, the resolution
-  gate, and the dashboards) at desktop, tablet, and mobile: 66 tests, about 20
-  minutes with one worker. `npx playwright test lab-04/` runs only the Lab 4 suites.
+  gate, and the dashboards) at desktop, tablet, and mobile: 66 tests, roughly
+  7 to 17 minutes with one worker, depending on the machine. `npx playwright test lab-04/` runs only the Lab 4 suites.
 - The Lab 4 journeys use the seeded tickets for what they only read (run the seed
   first; `prisma migrate reset` restores it) and create their own tickets and users,
   prefixed `E2E lab4` and `e2e4.`, for everything they change. Each spec file removes
