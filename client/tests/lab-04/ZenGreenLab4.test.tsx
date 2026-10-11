@@ -139,6 +139,11 @@ describe("STYLE-02 the Lab 4 styles use the Zen Green tokens (ui-spec §1, §11)
     expect(css).toMatch(/\.zg-field:focus-visible,[^{]*\.zg-field\[type="datetime-local"\]:focus-within \{\s*outline: 2px solid var\(--zg-secondary\)/);
   });
 
+  // PR #81 review (WCAG 2.5.8 Target Size): the numbered page buttons were about 9px wide.
+  it("gives every pager button a width of at least 40px", () => {
+    expect(ruleOf(".zg-pagination .btn")).toMatch(/min-width: 2\.5rem/);
+  });
+
   it("keeps the count-strip links at a 44px touch target (ui-spec §9)", () => {
     expect(ruleOf(".zg-count-strip__link")).toMatch(/min-height: 44px/);
     expect(ruleOf(".zg-count-strip__link")).toMatch(/display: inline-flex/);

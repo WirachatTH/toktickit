@@ -181,6 +181,7 @@ test.describe("dashboards", () => {
     // The filter is on show at every width: on mobile the Filters panel is already open.
     await expect(page.locator(bp(info) === "mobile" ? "#mt-mobile-status" : "#mt-status")).toBeVisible();
     await expect(page.locator(bp(info) === "mobile" ? "#mt-mobile-status" : "#mt-status")).toHaveValue("UNRESOLVED");
+    await expect(page.getByTestId(bp(info) === "mobile" ? "my-tickets-cards" : "my-tickets-table")).toBeVisible();
     await expectNoHorizontalOverflow(page, "My Tickets from a drill-down");
     await shot4(page, info, "requester-dashboard", "requester-drilldown-my-tickets");
 

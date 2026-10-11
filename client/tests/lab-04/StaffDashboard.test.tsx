@@ -78,7 +78,12 @@ describe("UI-15 the IT Staff Dashboard shows the API's values (FR-11, BR-34)", (
 
     const urgent = screen.getByRole("region", { name: "Urgent tickets" });
     expect(urgent).toHaveAttribute("id", "urgent-tickets");
-    expect(within(urgent).getByRole("link", { name: /TCK-000050: Payroll server unreachable/ })).toHaveAttribute("href", "/staff/tickets/50");
+    const urgentRow = within(urgent).getByRole("link", { name: /TCK-000050/ });
+    expect(urgentRow).toHaveAttribute("href", "/staff/tickets/50");
+    // The row's name is everything it shows: number, summary, status, and time
+    // (WCAG 2.5.3 Label in Name; PR #81 review). No aria-label replaces part of it.
+    expect(urgentRow).not.toHaveAttribute("aria-label");
+    expect(urgentRow).toHaveAccessibleName(/^TCK-000050\s*Payroll server unreachable\s*\S.*\d{2}:\d{2}$/);
     expect(within(urgent).getByRole("link", { name: "View all urgent tickets" })).toHaveAttribute("href", "/staff/queue?status=UNRESOLVED&itPriority=HIGH&sort=createdAt&order=asc");
 
     const recent = screen.getByRole("region", { name: "Recently updated" });

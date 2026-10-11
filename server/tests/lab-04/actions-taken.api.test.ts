@@ -92,8 +92,12 @@ describe("listing and order (BR-24)", () => {
   it("API-01 lists every field in actionAt-then-id order, the same on every read", async () => {
     const t = await makeTicket();
     const later = (await create(t, "staff", planned({ actionAt: iso(1) }))).body.id;
-    const first = (await create(t, "staff", completed({ actionAt: "2026-10-01T10:00:00.000Z" }))).body.id;
-    const sameTime = (await create(t, "staff", completed({ actionAt: "2026-10-01T10:00:00.000Z" }))).body.id;
+    // Relative to now, like the ticket's creation (10 days ago). A fixed date
+    // here fell before that creation once the calendar passed it, and the test
+    // began to fail on 11 Oct 2026 without any code change (pre-release check).
+    const earlier = iso(-72);
+    const first = (await create(t, "staff", completed({ actionAt: earlier }))).body.id;
+    const sameTime = (await create(t, "staff", completed({ actionAt: earlier }))).body.id;
     const reads = [];
     for (let i = 0; i < 3; i += 1) {
       const res = await list(t, "staff");

@@ -2,13 +2,22 @@ import { test as base, expect, type APIRequestContext, type Page, type TestInfo 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ACCOUNTS, CAPTURE, DEV_PASSWORD, INITIAL_PASSWORD, ORIGIN, apiAs, bp, createUser } from "../lab-03/helpers.js";
+import { ACCOUNTS, CAPTURE, DEV_PASSWORD, INITIAL_PASSWORD, ORIGIN, apiAs, bp, createUser, logOut as logOutNow } from "../lab-03/helpers.js";
 
 // Shared by the Lab 4 specs (docs/lab-04/tests.md §2.11, §2.12). Everything the
 // Lab 3 helpers already do (sign-in, the navigation toggle, overflow and focus
 // checks) is imported from there by each spec; this file adds what is new.
 
 export * from "../lab-03/helpers.js";
+
+// Logging out while a request is still in flight makes that request answer 401,
+// which the E2E-08 watch rightly reports as a failure. On a slow machine a
+// screen's own request could still be out when a journey logs out, so the Lab 4
+// journeys let the page settle first. (This named export replaces Lab 3's.)
+export async function logOut(page: Page): Promise<void> {
+  await page.waitForLoadState("networkidle");
+  await logOutNow(page);
+}
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const LAB4_SCREENSHOTS = path.join(HERE, "../../artifacts/lab-04/screenshots");
@@ -193,7 +202,7 @@ export async function columnsOf(page: Page, selector: string): Promise<number> {
 export async function expectNothingClipped(page: Page, rootSelector: string, where: string): Promise<void> {
   const clipped = await page.locator(rootSelector).first().evaluate((root) => {
     const out: string[] = [];
-    for (const el of root.querySelectorAll<HTMLElement>("*")) {
+    for (const el of Array.from(root.querySelectorAll<HTMLElement>("*"))) {
       if (el.offsetParent === null) continue;
       const style = getComputedStyle(el);
       if (style.textOverflow === "ellipsis" || el.classList.contains("zg-visually-hidden")) continue;

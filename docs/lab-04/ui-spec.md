@@ -347,11 +347,16 @@ What the sweep changed (Issue 7):
 - **Filters:** on My Tickets, the page number belongs to the status and sort in the
   URL. Whenever the URL changes them, the list starts again at page 1, including when
   Back returns to an earlier view.
+- **Console:** the page-load session check uses `GET /api/auth/session`
+  (specification.md D-20), and the app has a favicon, so a normal visit logs no error.
+- **Touch target:** the filter chip's remove button is 44px on mobile (§9).
 
 What the end-to-end and responsive pass changed (Issue 8):
 - **Mobile filters:** below 768px the filters of My Tickets and the Ticket Queue sit
   behind a "Filters" button. When the URL already filters or sorts the list (a
   dashboard drill-down), that panel starts open, so the filter in force is on screen.
+  A filter named in the URL opens it even at its default value (`?status=ACTIVE`); a
+  search or a page number alone does not.
 - **Anchors:** `#action-<id>` moves focus to its card once. Later reloads of the list
   leave focus where a save put it (§4.6).
 - **Sign-in after Log out:** Login returns a visitor to the screen they asked for
@@ -360,9 +365,12 @@ What the end-to-end and responsive pass changed (Issue 8):
 - **Checkboxes and radios** use the theme: the checked fill is `--zg-primary` and the
   focus ring `--zg-secondary`, in place of Bootstrap's blue.
 - **Date field:** its focus ring stays while focus is on the calendar button inside it.
-- **Console:** the page-load session check uses `GET /api/auth/session`
-  (specification.md D-20), and the app has a favicon, so a normal visit logs no error.
-- **Touch target:** the filter chip's remove button is 44px on mobile (§9).
+
+What the pre-release check changed (from the PR #81 review):
+- **Dashboard rows:** a ticket row's accessible name is everything it shows (number,
+  summary, status, and time), with no `aria-label` replacing part of it (WCAG 2.5.3).
+- **Page numbers:** every pager button on My Tickets and the Ticket Queue is at least
+  40px wide (WCAG 2.5.8). A one-digit page number was about 9px wide.
 
 ## 9. Accessibility
 Labs 2 and 3 apply unchanged. In addition:

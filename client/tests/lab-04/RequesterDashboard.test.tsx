@@ -58,7 +58,10 @@ describe("UI-18 the Requester's own summary (FR-12, AC-18)", () => {
     vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(requesterDashboard());
     renderDashboard();
     const attention = await screen.findByRole("region", { name: "Needs your attention" });
-    expect(within(attention).getByRole("link", { name: /TCK-000061: Docking station no longer charges/ })).toHaveAttribute("href", "/tickets/61");
+    const waitingRow = within(attention).getByRole("link", { name: /TCK-000061/ });
+    expect(waitingRow).toHaveAttribute("href", "/tickets/61");
+    expect(waitingRow).not.toHaveAttribute("aria-label");
+    expect(waitingRow).toHaveAccessibleName(/^TCK-000061\s*Docking station no longer charges\s*WAITING FOR REQUESTER/);
     expect(within(attention).getByRole("link", { name: "View all tickets waiting for you" })).toHaveAttribute("href", "/tickets?status=WAITING_FOR_REQUESTER");
     const recent = screen.getByRole("region", { name: "Recently updated" });
     expect(within(recent).getByRole("link", { name: "View all recently updated tickets" })).toHaveAttribute("href", "/tickets?sort=updatedAt&order=desc");
