@@ -129,7 +129,9 @@ export function StaffTicketQueue() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [people, setPeople] = useState<PersonRef[]>([]);
   const [searchInput, setSearchInput] = useState(params.search ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Open from the start when the URL already filters or sorts the queue, so a
+  // dashboard drill-down shows its filter on mobile too (Lab 4, Issue 8).
+  const [filtersOpen, setFiltersOpen] = useState(() => [...FILTER_KEYS, "sort"].some((key) => key !== "search" && searchParams.has(key)));
 
   // Reference data for the filters; a failure only leaves those lists short.
   useEffect(() => {

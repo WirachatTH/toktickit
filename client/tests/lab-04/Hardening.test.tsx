@@ -193,6 +193,9 @@ describe("REG-07 a recoverable failure keeps what was typed (FR-18, BR-44)", () 
   it.each([
     ["a proxy's plain-text 500", () => new Response("Error occurred while trying to proxy", { status: 500, headers: { "Content-Type": "text/plain" } }), /cannot reach the toktickit api/i],
     ["a gateway's HTML 502", () => new Response("<html><body>Bad Gateway</body></html>", { status: 502, headers: { "Content-Type": "text/html" } }), /cannot reach the toktickit api/i],
+    // PR #80 re-review: a 4xx that is not JSON (a proxy's 413 or 404) is not an outage.
+    ["a proxy's plain-text 413", () => new Response("Payload Too Large", { status: 413, headers: { "Content-Type": "text/plain" } }), /^Something went wrong\. Your ticket has not been created/],
+    ["a proxy's HTML 404", () => new Response("<html><body>Not Found</body></html>", { status: 404, headers: { "Content-Type": "text/html" } }), /^Something went wrong\. Your ticket has not been created/],
     ["the API's own JSON 500", () => new Response(JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } }), { status: 500, headers: { "Content-Type": "application/json" } }), /^Something went wrong\. Your ticket has not been created/],
   ])("Create Ticket reads %s correctly, and keeps every value", async (_label, response, message) => {
     await openCreateTicket();
@@ -314,6 +317,36 @@ describe("UI-23 no dead ends and no console errors on a normal visit (FR-19, D-2
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
     expect(screen.queryByRole("heading", { name: "Page not found" })).not.toBeInTheDocument();
+  });
+
+  // PR #80 re-review: nothing in the client tests failed if Login stopped returning anywhere.
+  it("returns to the screen a visitor asked for, with its filters, after signing in", async () => {
+    vi.spyOn(api, "login").mockResolvedValue(STAFF);
+    vi.spyOn(api, "fetchStaffQueue").mockImplementation(pending);
+    renderAt("/staff/queue?owner=me&status=UNRESOLVED", null);
+    await userEvent.type(await screen.findByLabelText(/^Email/), STAFF.email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Correct-horse-42");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/staff/queue"));
+    expect(await screen.findByRole("heading", { level: 1, name: "Ticket Queue" })).toBeInTheDocument();
+    expect(vi.mocked(api.fetchStaffQueue).mock.calls.at(-1)![0]).toMatchObject({ owner: "me", status: "UNRESOLVED" });
+  });
+
+  // Issue 8 (found by RESP-01): after Log out, Login still remembered the last
+  // user's screen, so the next person to sign in landed there, not on their Dashboard.
+  it("opens the Dashboard for whoever signs in after a Log out, not the last user's screen", async () => {
+    vi.spyOn(api, "fetchAdminUsers").mockResolvedValue(ADMIN_USERS);
+    vi.spyOn(api, "fetchAdminDashboard").mockImplementation(pending);
+    vi.spyOn(api, "logout").mockResolvedValue(undefined);
+    renderAt("/admin/users?status=inactive", { ...ADMIN, id: 1 });
+    await screen.findByText("Inactive only");
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/login"));
+    vi.spyOn(api, "login").mockResolvedValue({ ...ADMIN, id: 2, name: "Krit Wattana", email: "krit.wattana@kmutt.ac.th" });
+    await userEvent.type(await screen.findByLabelText(/^Email/), "krit.wattana@kmutt.ac.th");
+    await userEvent.type(screen.getByLabelText(/^Password/), "Correct-horse-42");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
   });
 
   it("asks who is signed in through /api/auth/session, which answers a visitor without 401", async () => {

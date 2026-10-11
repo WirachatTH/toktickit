@@ -184,9 +184,15 @@ export function ActionsTaken({ ticketId, mode, canWrite, ticketStatus, people, c
   }, [focusId, actions, editor, confirm]);
 
   // #action-<id> from the Dashboard scrolls to the card and focuses it (ui-spec §7).
+  // Once per anchor: the list reloads after every save, and honouring the anchor
+  // again would pull focus back from the card the save moved it to (Issue 8).
+  const anchorDone = useRef<string | null>(null);
   useEffect(() => {
     if (!actions) return;
-    const match = window.location.hash.match(/^#action-(\d+)$/);
+    const hash = window.location.hash;
+    if (anchorDone.current === hash) return;
+    anchorDone.current = hash;
+    const match = hash.match(/^#action-(\d+)$/);
     if (match) document.getElementById(`action-${match[1]}`)?.focus();
   }, [actions]);
 

@@ -130,6 +130,15 @@ describe("STYLE-02 the Lab 4 styles use the Zen Green tokens (ui-spec §1, §11)
     expect(at(992)).toBe("4");
   });
 
+  // Issue 8 (visual checklist): Bootstrap's defaults for these are blue.
+  it("themes checkboxes, radios, and the date field's focus ring with tokens (ui-spec §11)", () => {
+    expect(ruleOf(".form-check-input:checked")).toMatch(/background-color: var\(--zg-primary\)/);
+    expect(ruleOf(".form-check-input:checked")).toMatch(/border-color: var\(--zg-primary\)/);
+    expect(ruleOf(".form-check-input:focus")).toMatch(/box-shadow: none/);
+    expect(ruleOf(".form-check-input:focus-visible")).toMatch(/outline: 2px solid var\(--zg-secondary\)/);
+    expect(css).toMatch(/\.zg-field:focus-visible,[^{]*\.zg-field\[type="datetime-local"\]:focus-within \{\s*outline: 2px solid var\(--zg-secondary\)/);
+  });
+
   it("keeps the count-strip links at a 44px touch target (ui-spec §9)", () => {
     expect(ruleOf(".zg-count-strip__link")).toMatch(/min-height: 44px/);
     expect(ruleOf(".zg-count-strip__link")).toMatch(/display: inline-flex/);

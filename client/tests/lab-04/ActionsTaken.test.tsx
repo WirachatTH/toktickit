@@ -232,6 +232,29 @@ describe("UI-02 create mode (FR-02, BR-04, BR-11, ui-spec §4.3)", () => {
     await waitFor(() => expect(document.activeElement?.id).toBe("action-118"));
   });
 
+  // Issue 8 (found by RESP-03): the anchor was honoured again on every reload of
+  // the list, so it pulled focus back from the card a save had just moved it to.
+  it("focuses the card named by #action-<id> once, then leaves focus where a save puts it", async () => {
+    window.location.hash = "#action-101";
+    try {
+      const { loadActions } = renderStaff(staffTicket(), [COMPLETED]);
+      await waitFor(() => expect(document.activeElement?.id).toBe("action-101"));
+      await userEvent.click(screen.getByRole("button", { name: "Add action" }));
+      const panel = await screen.findByRole("dialog", { name: "Add action" });
+      await userEvent.type(within(panel).getByLabelText(/Action description/), "Replace the laptop battery.");
+      vi.spyOn(api, "createActionTaken").mockResolvedValue(PLANNED);
+      loadActions.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve([COMPLETED, PLANNED]), 50)));
+      await userEvent.click(within(panel).getByRole("button", { name: "Save action" }));
+      await screen.findByRole("heading", { name: "Actions taken (2)" });
+      await waitFor(() => expect(document.activeElement?.id).toBe("action-118"));
+      // Still there after the screen has settled.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(document.activeElement?.id).toBe("action-118");
+    } finally {
+      window.location.hash = "";
+    }
+  });
+
   it("offers a follow-up link only to completed actions still needing one", async () => {
     renderStaff(staffTicket(), [COMPLETED, PLANNED]);
     await userEvent.click(await screen.findByRole("button", { name: "Add action" }));

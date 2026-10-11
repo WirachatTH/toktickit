@@ -283,7 +283,9 @@ test.describe("user administration", () => {
       await page.keyboard.press("Tab");
       toolbar.push(await focused(page));
       await expectFocusVisible(page, "Filters button");
-      await page.keyboard.press("Enter");
+      // Lab 4 BR-45 (5), BR-46: this URL carries a filter, so the panel already
+      // starts open; Enter is pressed only when it is closed. The assertion is unchanged.
+      if ((await page.getByRole("button", { name: "Filters", exact: true }).getAttribute("aria-expanded")) !== "true") await page.keyboard.press("Enter");
       await expect(page.locator("#queue-mobile-filters")).toBeVisible();
     }
     for (let i = 0; i < 7; i++) {

@@ -43,7 +43,7 @@ async function ticket(data: { status: TicketStatus; owner?: number | null; it?: 
       requesterResolvedAt: data.appearsResolved ? new Date() : null,
     },
   });
-  if (data.updatedAt) await prisma.$executeRaw`UPDATE "Ticket" SET "updatedAt" = ${data.updatedAt} WHERE id = ${t.id}`;
+  if (data.updatedAt) await prisma.$executeRaw`UPDATE "Ticket" SET "updatedAt" = ${data.updatedAt.toISOString()}::timestamp WHERE id = ${t.id}`;
   return t.id;
 }
 
@@ -61,12 +61,28 @@ async function action(ticketId: number, status: "PLANNED" | "COMPLETED" | "CANCE
 const get = (path: string, who: Who) => request(app).get(path).set("Cookie", cookies[who]);
 type Metric = { key: string; label: string; value: number; href: string };
 const byKey = (list: Metric[], key: string) => list.find((m) => m.key === key)!;
+// The columns are `timestamp` (no zone) holding UTC, as Prisma writes them. A
+// JavaScript Date bound to raw SQL arrives as a `timestamptz`, and PostgreSQL
+// then reads the column in the session's time zone, so these checks were right
+// only on a database running in UTC (PR #80 review). Each Date is sent as its
+// UTC text and cast to `timestamp`, which means the same on any database.
+function zoneFree(sql: string, params: unknown[]): [string, unknown[]] {
+  let out = sql;
+  const values = params.map((value, i) => {
+    if (!(value instanceof Date)) return value;
+    out = out.replace(new RegExp(`\\$${i + 1}(?!\\d)`, "g"), `$${i + 1}::timestamp`);
+    return value.toISOString();
+  });
+  return [out, values];
+}
 async function count(sql: string, ...params: unknown[]) {
-  const [{ n: c }] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(*) AS n FROM ${sql}`, ...params);
+  const [text, values] = zoneFree(sql, params);
+  const [{ n: c }] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(*) AS n FROM ${text}`, ...values);
   return Number(c);
 }
 async function ids(sql: string, ...params: unknown[]) {
-  return (await prisma.$queryRawUnsafe<{ id: number }[]>(`SELECT id FROM ${sql}`, ...params)).map((r) => r.id).sort((a, b) => a - b);
+  const [text, values] = zoneFree(sql, params);
+  return (await prisma.$queryRawUnsafe<{ id: number }[]>(`SELECT id FROM ${text}`, ...values)).map((r) => r.id).sort((a, b) => a - b);
 }
 
 // The BR-39 definitions, written as SQL from the spec.
