@@ -232,7 +232,8 @@ docker-compose up -d client
 ```
 
 ### Signing in
-- Each role lands on its own home and sees only the screens it may open:
+- Each role lands on its *Dashboard* (since Lab 4; in Lab 3 it was the first screen
+  listed here) and sees only the screens it may open:
   Requester → *My Tickets* and *Create Ticket*; IT Staff → *Ticket Queue*;
   Administrator → *User Management* and *Ticket Queue*. The Ticket Queue is live
   (Administrators see it read-only), and each row opens IT Staff Ticket Detail, where
@@ -269,3 +270,111 @@ docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..03, 
   the Lab 2 journey's `artifacts/lab-02/screenshots/`; restore the Lab 2 ones with
   `git checkout artifacts/lab-02` if you only meant to refresh Lab 3. Each spec file
   removes its own test data when it ends, so the screenshots show the seeded data.
+
+## Lab 4 — Actions Taken, Resolution Gate, Dashboards & Final Hardening
+
+Lab 4 lets IT Staff and Administrators plan and record the work on a ticket as
+Actions Taken. The backend refuses to resolve a ticket until that work is done, each
+role gets a Dashboard as its home screen, and the whole application is hardened. The
+engineering contract lives in `docs/lab-04/` (`specification.md`, `api-spec.md`,
+`ui-spec.md`, `tests.md`).
+
+> **Status:** complete. All of Lab 4 is in: the contract; the Actions Taken model,
+> migration, seed, API, and screens; the resolution gate; the dashboards, which are
+> every role's home after sign-in (`/dashboard`); the final hardening pass; and the
+> end-to-end suites with their screenshots. `docs/lab-04/tests.md` has the results.
+
+### Applying the Lab 4 migration and seed
+Back up first, as for Lab 3. The migration only adds, but a backup is what makes the
+rollback below a choice:
+```bash
+docker exec toktickit-db pg_dump -U toktickit -d toktickit -Fc > pre-lab4.dump
+docker-compose exec server npx prisma migrate deploy
+docker-compose exec server npm run prisma:seed
+docker-compose restart server        # regenerates the Prisma client for the Lab 4 schema
+```
+*Expected result:* `migrate deploy` applies `…_lab4_actions_taken_dashboards`, which
+adds the `ActionTaken` and `ActionTakenEvent` tables and `Ticket.resolvedAt`, and
+fills `resolvedAt` for tickets that are already resolved or closed (from their last
+update, the closest time Lab 3 recorded; `specification.md` D-04). No other Lab 1–3
+value changes. The seed prints `Actions Taken created: 15` on a database seeded in
+Lab 3 whose seed tickets are untouched, and `0` on every later run. It adds a seed
+ticket's actions only while that ticket has none and still has its seeded status, so
+tickets you changed in a demo are left alone.
+
+### Rolling back the Lab 4 migration
+Either restore the backup, streaming the dump from the host into the database
+container as the `toktickit` user:
+```bash
+docker exec -i toktickit-db pg_restore -U toktickit --clean --if-exists -d toktickit < pre-lab4.dump
+```
+or apply the reviewed down-script, which removes exactly what the migration added and
+returns the schema to Lab 3:
+```bash
+docker-compose exec server npx prisma db execute --file prisma/rollback/lab4_down.sql --schema prisma/schema.prisma
+```
+This drops every Action Taken and its history; every Lab 1–3 row stays. Check out a
+Lab 3 commit before restarting the server, because the Lab 4 code expects the new
+tables. MIG-04 in `server/tests/lab-04/migration-seed.test.ts` applies, rolls back,
+and re-applies the migration on a throwaway schema to prove it.
+
+### Running Lab 4 tests
+```bash
+docker-compose exec server npm test               # server/tests/lab-01..04
+docker-compose exec client npm test               # client/tests/lab-01..04
+docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..04, three viewports
+```
+- The server suites create their own users and tickets and remove them. The tests
+  that need an exact database (migration, seed, dashboard counts) create and drop
+  their own PostgreSQL schema, so the development data is left as it was.
+- `docker-compose exec server npx vitest run tests/lab-04` and
+  `docker-compose exec client npx vitest run tests/lab-04` run only the Lab 4 suites.
+- The Playwright notes under "Running Lab 3 tests" still apply. One run covers the
+  Lab 2–3 journeys and the Lab 4 ones in `e2e/lab-04/` (Actions Taken, the resolution
+  gate, and the dashboards) at desktop, tablet, and mobile: 69 tests, roughly
+  7 to 17 minutes with one worker, depending on the machine. `npx playwright test lab-04/` runs only the Lab 4 suites.
+- The Lab 4 journeys use the seeded tickets for what they only read (run the seed
+  first; `prisma migrate reset` restores it) and create their own tickets and users,
+  prefixed `E2E lab4` and `e2e4.`, for everything they change. Each spec file removes
+  what it created.
+- Every Lab 4 journey fails on a console error, an uncaught page error, or a failed
+  request to the app, unless the step that causes it says so first (a stale `409`,
+  for example).
+- To recapture the Lab 4 screenshots in `artifacts/lab-04/screenshots/`:
+  `docker-compose exec -e CAPTURE_SCREENSHOTS=1 client npx playwright test lab-04/ --workers=1`.
+  Naming the folder keeps the Lab 2–3 screenshots untouched.
+- `docs/lab-04/tests.md` lists every test row, the requirement it proves, and its
+  result.
+
+### Demonstrating Lab 4
+Use the local development accounts above (password `TokTickIT-dev-2026`) on a
+freshly seeded database.
+
+1. **IT Staff Dashboard.** Sign in as `chanon.rattanakorn@kmutt.ac.th`. You land on
+   `/dashboard`: six metric cards, tickets by status and by IT Priority, and the
+   lists *My planned actions*, *Urgent tickets*, and *Recently updated*. Every card,
+   count, and *View all* opens the list it counted, already filtered.
+2. **Actions Taken.** Open "VPN disconnects while uploading large files" from the
+   queue. It has four actions: two completed (one a follow-up of the other), one
+   cancelled, and one planned. *Add action* plans work or records work already done;
+   a planned action offers *Edit*, *Complete*, and *Cancel action*; *History* shows
+   every change.
+3. **Resolution gate.** On that ticket the status select does not offer *Resolved*,
+   and a notice under it says why: an action is still planned. Complete or cancel that
+   action and *Resolved* appears. "LEB2 shows the wrong timetable for semester 1" is
+   ready to resolve as seeded. "Request read access to the grade submission app" is
+   blocked by a follow-up that nobody has handled yet.
+4. **Requester view.** Sign in as `somchai.prasert@kmutt.ac.th`: the Dashboard shows
+   only their own tickets and never IT Priority. Their VPN ticket shows the same
+   actions under *Work on your request*, read-only.
+5. **Administrator.** Sign in as `siriporn.boonmee@kmutt.ac.th`: the same ticket
+   metrics, marked read-only, plus user counts that open User Management filtered by
+   role and by active or inactive. Administrators may write Actions Taken but cannot
+   change a ticket's owner, IT Priority, or status.
+6. **Hardening.** An address that does not exist (`/nope`) shows *Page not found*
+   with a link back to the Dashboard. Submit buttons take one click at a time, and a
+   form keeps what you typed when a request fails.
+
+The seed never edits a ticket you have changed, so run
+`docker-compose exec server npx prisma migrate reset` to return to this starting
+state after a demonstration.

@@ -13,8 +13,10 @@ export default defineConfig({
   // and e2e/lab-03 (authentication, the staff ticket flow, user
   // administration). A path filter on the command line is matched against
   // paths relative to this folder, e.g. `npx playwright test lab-03/`.
+  // Lab 4, Issue 8: plus e2e/lab-04 (Actions Taken, the resolution gate, and
+  // the dashboards), so one run covers every lab's journeys (tests.md E2E-09).
   testDir: "../e2e",
-  testMatch: /lab-0[23]\/.*\.spec\.ts$/,
+  testMatch: /lab-0[234]\/.*\.spec\.ts$/,
   // Real tickets, attachments, and (Lab 3) users the suites create through
   // the actual app (no delete routes exist to clean up through) — swept
   // once, after every project finishes, so repeated local runs don't pile

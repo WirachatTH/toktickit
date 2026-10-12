@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchCategories,
   fetchRelatedSystems,
@@ -8,6 +8,7 @@ import {
   RelatedSystem,
   RequestedPriority,
   SortOrder,
+  TicketStatus,
   TicketListItem,
   TicketSortField,
 } from "../api.js";
@@ -45,6 +46,24 @@ const SORT_OPTIONS: { value: SortValue; label: string }[] = [
 ];
 const DEFAULT_SORT: SortValue = "createdAt:desc";
 
+// Lab 4, Issue 6 — the status filter a dashboard drills down with (docs/lab-04/
+// ui-spec.md §7, D-13). It and the sort live in the URL, so /tickets?status=…
+// opens already filtered; anything unknown in the URL falls back to the default.
+type StatusFilter = "ALL" | "UNRESOLVED" | TicketStatus;
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "UNRESOLVED", label: "Open requests" },
+  ...(["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"] as const).map((s) => ({
+    value: s,
+    label: s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " "),
+  })),
+];
+const statusFrom = (raw: string | null): StatusFilter => (STATUS_OPTIONS.some((o) => o.value === raw) ? (raw as StatusFilter) : "ALL");
+const sortFrom = (sort: string | null, order: string | null): SortValue => {
+  const value = `${sort}:${order}`;
+  return SORT_OPTIONS.some((o) => o.value === value) ? (value as SortValue) : DEFAULT_SORT;
+};
+
 type ListState = "loading" | "loaded" | "failure";
 
 function formatDateTime(iso: string): string {
@@ -59,6 +78,11 @@ function formatDateTime(iso: string): string {
 
 export function MyTickets() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Both are read from the URL on every render, so leaving a filtered URL (the
+  // My Tickets link, Back) resets them together (PR #79 review).
+  const statusFilter = statusFrom(searchParams.get("status"));
+  const sortValue = sortFrom(searchParams.get("sort"), searchParams.get("order"));
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [systems, setSystems] = useState<RelatedSystem[]>([]);
@@ -68,14 +92,45 @@ export function MyTickets() {
   const [categoryId, setCategoryId] = useState("");
   const [relatedSystemId, setRelatedSystemId] = useState("");
   const [requestedPriority, setRequestedPriority] = useState("");
-  const [sortValue, setSortValue] = useState<SortValue>(DEFAULT_SORT);
-  const [page, setPage] = useState(1);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // The page belongs to the status and sort it was reached under: when the URL
+  // changes them (the My Tickets link, Back), the list starts again at page 1
+  // in the same render, with no request for the stale page (PR #80 review).
+  const urlView = `${statusFilter}|${sortValue}`;
+  const [pageState, setPageState] = useState({ view: urlView, page: 1 });
+  // Forget the old view's page as soon as the view changes, so going Back to it
+  // starts at page 1 as well (PR #80 re-review). Resetting state while
+  // rendering is React's pattern for state that follows a changed input.
+  if (pageState.view !== urlView) setPageState({ view: urlView, page: 1 });
+  const page = pageState.view === urlView ? pageState.page : 1;
+  const setPage = (next: number | ((current: number) => number)) =>
+    setPageState({ view: urlView, page: typeof next === "function" ? next(page) : next });
+  // Open from the start when the URL already filters or sorts the list, so a
+  // dashboard drill-down shows its filter on mobile too (Lab 4, Issue 8).
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(() => statusFilter !== "ALL" || sortValue !== DEFAULT_SORT);
 
   const [listState, setListState] = useState<ListState>("loading");
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, totalItems: 0, totalPages: 0 });
   const [retryToken, setRetryToken] = useState(0);
+
+  // The status filter and the sort are written to the URL (replace, so Back
+  // leaves the screen instead of stepping through filter changes).
+  function writeUrl(status: StatusFilter, sort: SortValue) {
+    const next = new URLSearchParams();
+    if (status !== "ALL") next.set("status", status);
+    if (sort !== DEFAULT_SORT) {
+      const [s, o] = sort.split(":");
+      next.set("sort", s);
+      next.set("order", o);
+    }
+    setSearchParams(next, { replace: true });
+  }
+  function setStatusFilter(status: StatusFilter) {
+    writeUrl(status, sortValue);
+  }
+  function setSortValue(sort: SortValue) {
+    writeUrl(statusFilter, sort);
+  }
 
   // Reference data for the filter dropdowns — failure here isn't fatal to
   // the screen (the list itself can still load), so it's tracked separately
@@ -110,6 +165,7 @@ export function MyTickets() {
       sort,
       order,
       page,
+      ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
     })
       .then((res) => {
         if (cancelled) return;
@@ -125,7 +181,7 @@ export function MyTickets() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, categoryId, relatedSystemId, requestedPriority, sortValue, page, retryToken]);
+  }, [debouncedSearch, categoryId, relatedSystemId, requestedPriority, sortValue, statusFilter, page, retryToken]);
 
   function resetToFirstPage() {
     setPage(1);
@@ -142,12 +198,12 @@ export function MyTickets() {
     setCategoryId("");
     setRelatedSystemId("");
     setRequestedPriority("");
-    setSortValue(DEFAULT_SORT);
+    writeUrl("ALL", DEFAULT_SORT);
     setPage(1);
   }
 
   const hasActiveFilters = Boolean(
-    debouncedSearch || categoryId || relatedSystemId || requestedPriority || sortValue !== DEFAULT_SORT
+    debouncedSearch || categoryId || relatedSystemId || requestedPriority || sortValue !== DEFAULT_SORT || statusFilter !== "ALL"
   );
 
   // A plain function, not a component — it's invoked inline as
@@ -162,6 +218,22 @@ export function MyTickets() {
   function renderFilterControls(idPrefix: string) {
     return (
       <>
+        <div className="mb-3 mb-md-0">
+          <label htmlFor={`${idPrefix}-status`} className="zg-label">
+            Status
+          </label>
+          <Select
+            id={`${idPrefix}-status`}
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); resetToFirstPage(); }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
+        </div>
         <div className="mb-3 mb-md-0">
           <label htmlFor={`${idPrefix}-category`} className="zg-label">
             Category

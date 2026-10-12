@@ -65,6 +65,8 @@ beforeEach(() => {
   window.localStorage.clear();
   // Lab 3, Issue 6 — the screen now loads its Public Comments too (setup only).
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
+  // Lab 4, Issue 3 — the screen now also loads its Actions Taken (setup only, BR-46).
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
 });
 
 describe("rendering an owned ticket (UI-10, BR-46)", () => {
@@ -86,7 +88,18 @@ describe("rendering an owned ticket (UI-10, BR-46)", () => {
   // REG-14 — Lab 2 BR-46 ("no comment box") is superseded by Lab 3 FR-14/FR-15
   // (BR-68), so this test is rewritten to the Lab 3 rule (BR-69): the Requester
   // now has a comment box, and everything else BR-46 kept out stays out.
-  it("REG-14 has a comment box, but never internal notes, IT Priority, Actions Taken, or a status control, regardless of the ticket's data", async () => {
+  // Lab 4 BR-46 rewrites it once more: Actions Taken now appear, read-only
+  // (Lab 4 FR-06, BR-19); Internal Notes, IT Priority, and status controls stay out.
+  it("REG-14 has a comment box and read-only Actions Taken, but never internal notes, IT Priority, or a status control, regardless of the ticket's data", async () => {
+    vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([
+      {
+        id: 5, ticketId: 42, actionAt: "2026-08-28T03:00:00.000Z", description: "Replaced the battery.", result: "Holds charge.", status: "COMPLETED",
+        assignee: { id: 8, name: "Pimchanok Srisuk", role: "IT_STAFF", isActive: true }, createdBy: { id: 8, name: "Pimchanok Srisuk", role: "IT_STAFF", isActive: true },
+        performedBy: { id: 8, name: "Pimchanok Srisuk", role: "IT_STAFF", isActive: true }, followUpRequired: false, followUpNote: null, followUpHandled: null,
+        followUpOfId: null, attachmentNotes: null, cancelReason: null, cancelledBy: null, completedAt: "2026-08-28T04:00:00.000Z", cancelledAt: null, version: 1,
+        createdAt: "2026-08-28T04:00:00.000Z", updatedAt: "2026-08-28T04:00:00.000Z",
+      },
+    ]);
     vi.spyOn(api, "fetchTicket").mockResolvedValue({ ...TICKET, itPriority: "HIGH", internalNotes: [{ body: "secret" }] } as TicketDetail);
     renderScreen();
     await screen.findByText("TCK-000042");
@@ -97,7 +110,9 @@ describe("rendering an owned ticket (UI-10, BR-46)", () => {
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
     expect(screen.queryByText(/IT Priority/i)).not.toBeInTheDocument();
     expect(screen.queryByText("HIGH")).not.toBeInTheDocument();
-    expect(screen.queryByText(/action(s)? taken/i)).not.toBeInTheDocument();
+    const work = await screen.findByRole("region", { name: "Work on your request (1)" });
+    expect(screen.getByText("Replaced the battery.")).toBeInTheDocument();
+    expect(work.querySelectorAll("button")).toHaveLength(0);
     expect(screen.queryByRole("combobox", { name: /status/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /change status/i })).not.toBeInTheDocument();
   });

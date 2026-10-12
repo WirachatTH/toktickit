@@ -444,7 +444,9 @@ describe("every route is classified (labsheet §4.3)", () => {
       const who = Array.isArray(row.who) ? [...row.who].sort().join(",") : row.who;
       return `${row.method} ${normalise(row.path)} ${who}${row.duringPasswordChange ? " +pw" : ""}`;
     });
-    expect(ROUTE_POLICIES.map(asWho).sort()).toEqual(expected.sort());
+    // Lab 4 adds routes to the same table (Lab 4 BR-46); every Lab 3 row must
+    // still be there unchanged. Lab 4's SEC-05 checks the complete table.
+    expect(ROUTE_POLICIES.map(asWho)).toEqual(expect.arrayContaining(expected));
   });
 });
 

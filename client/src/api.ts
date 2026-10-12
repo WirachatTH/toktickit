@@ -108,6 +108,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Set by the client, never sent by the API: a 5xx whose body is not the API's JSON. */
+export const API_UNREACHABLE = "API_UNREACHABLE";
+
 function retryAfterOf(res: Response): number | undefined {
   const raw = res.headers?.get?.("Retry-After");
   const seconds = raw === null || raw === undefined ? NaN : Number(raw);
@@ -145,8 +148,10 @@ async function toApiError(res: Response): Promise<ApiError> {
     return error;
   } catch {
     // Response body wasn't JSON at all (e.g. a proxy/network-level failure) —
-    // never surface that raw detail to the user (BR-28).
-    return new ApiError(res.status, "INTERNAL_ERROR", "Something went wrong. Please try again.");
+    // never surface that raw detail to the user (BR-28). The API always answers
+    // JSON, so a 5xx without it came from whatever sits in front of an API that
+    // is down: API_UNREACHABLE, a client-side code (Lab 4, Issue 7).
+    return new ApiError(res.status, res.status >= 500 ? API_UNREACHABLE : "INTERNAL_ERROR", "Something went wrong. Please try again.");
   }
 }
 
@@ -230,6 +235,8 @@ export interface TicketListParams {
   sort?: TicketSortField;
   order?: SortOrder;
   page?: number;
+  /** Lab 4 D-13 — "UNRESOLVED" or one status; omit for every ticket. */
+  status?: "UNRESOLVED" | TicketStatus;
 }
 
 export async function fetchTickets(params: TicketListParams = {}): Promise<TicketListResponse> {
@@ -241,6 +248,7 @@ export async function fetchTickets(params: TicketListParams = {}): Promise<Ticke
   if (params.sort) query.set("sort", params.sort);
   if (params.order) query.set("order", params.order);
   if (params.page) query.set("page", String(params.page));
+  if (params.status) query.set("status", params.status);
 
   const res = await apiFetch(`/api/tickets?${query.toString()}`);
   if (!res.ok) throw await toApiError(res);
@@ -288,6 +296,8 @@ export interface TicketDetail {
   requesterResolvedAt: string | null;
   /** Lab 3, Issue 6 — false on a CLOSED or CANCELLED ticket (BR-52). */
   canComment: boolean;
+  /** Lab 4 BR-31 (api-spec §2.3) — when IT Staff resolved it. */
+  resolvedAt?: string | null;
   /** Lab 3, Issue 8 — whether "Problem appears resolved" is offered (BR-47). */
   canMarkAppearsResolved: boolean;
   createdAt: string;
@@ -390,10 +400,11 @@ export async function logout(): Promise<void> {
   if (!res.ok) throw await toApiError(res);
 }
 
-/** The signed-in user, or null when there is no session (401). */
+/** The signed-in user, or null when there is no session.
+ *  Lab 4, Issue 7 (D-20): asked through /api/auth/session, which answers a
+ *  visitor with `user: null` and 200, so a signed-out page load logs no 401. */
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
-  const res = await apiFetch("/api/auth/me");
-  if (res.status === 401) return null;
+  const res = await apiFetch("/api/auth/session");
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).user;
 }
@@ -459,7 +470,7 @@ export type Priority = RequestedPriority;
 
 export interface QueueQuery {
   search: string;
-  status: "ACTIVE" | "ALL" | TicketStatus;
+  status: "ACTIVE" | "ALL" | "UNRESOLVED" | TicketStatus; // Lab 4 D-13 adds UNRESOLVED
   itPriority: Priority | null;
   categoryId: number | null;
   owner: "any" | "unassigned" | "me" | number;
@@ -528,8 +539,20 @@ export interface StaffTicketDetail {
   createdAt: string;
   updatedAt: string;
   attachments: TicketDetailAttachment[];
+  /** Lab 4 BR-31 — when the ticket was last resolved; null unless RESOLVED or CLOSED. */
+  resolvedAt: string | null;
+  /** Lab 4 BR-30 — the resolution gate; `permittedTransitions` leaves out RESOLVED while it fails. */
+  resolutionGate: { passes: boolean; completedCount: number; plannedCount: number; openFollowUpCount: number };
   permittedTransitions: TicketStatus[];
-  capabilities: { canAssign: boolean; canChangePriority: boolean; canChangeStatus: boolean; canPostComment: boolean; canPostNote: boolean };
+  capabilities: {
+    canAssign: boolean;
+    canChangePriority: boolean;
+    canChangeStatus: boolean;
+    canPostComment: boolean;
+    canPostNote: boolean;
+    /** Lab 4 BR-17, BR-20 — IT Staff and Administrators, while the ticket is being worked. */
+    canWriteActions: boolean;
+  };
 }
 
 async function patchStaffTicket(ticketId: number, what: string, body: object): Promise<StaffTicketDetail> {
@@ -586,7 +609,8 @@ export interface NewUserInput {
   initialPassword: string;
 }
 
-export async function fetchAdminUsers(params: { search?: string; role?: Role } = {}): Promise<AdminUser[]> {
+// Lab 4 D-13 adds the optional activation filter.
+export async function fetchAdminUsers(params: { search?: string; role?: Role; status?: "active" | "inactive" } = {}): Promise<AdminUser[]> {
   const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
   const res = await apiFetch(query ? `/api/admin/users?${query}` : "/api/admin/users");
   if (!res.ok) throw await toApiError(res);
@@ -609,4 +633,179 @@ export async function setInitialPassword(id: number, initialPassword: string): P
   const res = await apiFetch(`/api/admin/users/${id}/initial-password`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ initialPassword }) });
   if (!res.ok) throw await toApiError(res);
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 3 — Actions Taken (docs/lab-04/api-spec.md §1). Every edit and
+// status change states the version the screen showed, so a change made
+// meanwhile by someone else is refused (409 STALE_STATE), not overwritten. A
+// create carries the form's clientRequestId, so a retry never makes a second action.
+// ---------------------------------------------------------------------------
+
+export type ActionTakenStatus = "PLANNED" | "COMPLETED" | "CANCELLED";
+
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  actionAt: string;
+  description: string;
+  result: string | null;
+  status: ActionTakenStatus;
+  assignee: PersonRef;
+  createdBy: PersonRef;
+  performedBy: PersonRef | null;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  /** Whether a completed follow-up links to this action; null without the flag (BR-14). */
+  followUpHandled: boolean | null;
+  followUpOfId: number | null;
+  attachmentNotes: string | null;
+  cancelReason: string | null;
+  cancelledBy: PersonRef | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActionTakenEvent {
+  id: number;
+  type: "CREATED" | "UPDATED" | "COMPLETED" | "CANCELLED";
+  actor: PersonRef;
+  createdAt: string;
+  changes: Record<string, { from: unknown; to: unknown }>;
+}
+
+export interface NewActionTaken {
+  status: "PLANNED" | "COMPLETED";
+  actionAt: string;
+  description: string;
+  assigneeId: number;
+  result?: string | null;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+  followUpOfId?: number | null;
+  clientRequestId?: string;
+}
+
+export interface ActionTakenChanges {
+  expectedVersion: number;
+  actionAt?: string;
+  description?: string;
+  assigneeId?: number;
+  result?: string | null;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+}
+
+export type ActionTakenStatusChange =
+  | { status: "COMPLETED"; expectedVersion: number; result?: string; followUpRequired?: boolean; followUpNote?: string | null; actionAt?: string }
+  | { status: "CANCELLED"; expectedVersion: number; reason: string };
+
+const actionsPath = (ticketId: number) => `/api/tickets/${ticketId}/actions-taken`;
+
+async function sendAction(path: string, method: "POST" | "PATCH", body: object): Promise<ActionTaken> {
+  const res = await apiFetch(path, { method, headers: JSON_HEADERS, body: JSON.stringify(body) });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function fetchActionsTaken(ticketId: number): Promise<ActionTaken[]> {
+  const res = await apiFetch(actionsPath(ticketId));
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+export function createActionTaken(ticketId: number, body: NewActionTaken): Promise<ActionTaken> {
+  return sendAction(actionsPath(ticketId), "POST", body);
+}
+
+export function updateActionTaken(ticketId: number, actionId: number, body: ActionTakenChanges): Promise<ActionTaken> {
+  return sendAction(`${actionsPath(ticketId)}/${actionId}`, "PATCH", body);
+}
+
+export function changeActionStatus(ticketId: number, actionId: number, body: ActionTakenStatusChange): Promise<ActionTaken> {
+  return sendAction(`${actionsPath(ticketId)}/${actionId}/status`, "PATCH", body);
+}
+
+export async function fetchActionHistory(ticketId: number, actionId: number): Promise<ActionTakenEvent[]> {
+  const res = await apiFetch(`${actionsPath(ticketId)}/${actionId}/history`);
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).data;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 6 — the dashboards (docs/lab-04/api-spec.md §3). Every value is
+// counted by the server (BR-34); the screen only shows what arrives.
+// ---------------------------------------------------------------------------
+
+export interface DashboardMetric {
+  key: string;
+  label: string;
+  value: number;
+  /** A client route that lists what the metric counts (BR-38). */
+  href: string;
+}
+
+export interface DashboardTicket {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: TicketStatus;
+  updatedAt: string;
+  href: string;
+  /** IT Staff and Administrator lists only; never in a Requester's (BR-36). */
+  itPriority?: Priority;
+  owner?: PersonRef | null;
+  resolvedAt?: string | null;
+}
+
+export interface DashboardPlannedAction {
+  actionId: number;
+  actionAt: string;
+  description: string;
+  ticket: { id: number; ticketNumber: string; summary: string; currentStatus: TicketStatus };
+  href: string;
+}
+
+interface DashboardEnvelope {
+  generatedAt: string;
+  timeZone: string;
+  today: { start: string; end: string };
+  metrics: DashboardMetric[];
+}
+
+export interface RequesterDashboard extends DashboardEnvelope {
+  lists: { needsAttention: DashboardTicket[]; recentlyUpdated: DashboardTicket[]; recentlyResolved: DashboardTicket[] };
+}
+
+export interface StaffDashboard extends DashboardEnvelope {
+  byStatus: DashboardMetric[];
+  byItPriority: DashboardMetric[];
+  lists: { myPlannedActions: DashboardPlannedAction[]; urgent: DashboardTicket[]; recentlyUpdated: DashboardTicket[] };
+}
+
+export interface AdminDashboard extends StaffDashboard {
+  users: DashboardMetric[];
+}
+
+async function getDashboard<T>(which: "requester" | "staff" | "admin"): Promise<T> {
+  const res = await apiFetch(`/api/dashboard/${which}`);
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export function fetchRequesterDashboard(): Promise<RequesterDashboard> {
+  return getDashboard("requester");
+}
+
+export function fetchStaffDashboard(): Promise<StaffDashboard> {
+  return getDashboard("staff");
+}
+
+export function fetchAdminDashboard(): Promise<AdminDashboard> {
+  return getDashboard("admin");
 }

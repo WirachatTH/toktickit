@@ -2,7 +2,7 @@ import { FormEvent, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, login } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
-import { canOpen, homeFor, ROUTES } from "../routes.js";
+import { canOpen, homeFor, isProtectedScreen, ROUTES } from "../routes.js";
 import type { FromState } from "../components/RequireAuth.js";
 import { Button } from "../components/Button.js";
 import { FormField } from "../components/FormField.js";
@@ -54,7 +54,7 @@ export function Login() {
       // otherwise their home. A pending password change comes first (BR-02).
       const destination = user.mustChangePassword
         ? ROUTES.changePassword
-        : from && canOpen(user.role, from.pathname)
+        : from && isProtectedScreen(from.pathname) && canOpen(user.role, from.pathname)
           ? from.pathname + from.search
           : homeFor(user.role);
       navigate(destination, { replace: true });

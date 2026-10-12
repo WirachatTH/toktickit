@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { parseUserStatus } from "./ticketFilters.js";
 import type { Prisma, Role } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { isValidId, sessionUser } from "./authorization.js";
@@ -110,9 +111,13 @@ function targetId(req: Request): number {
 const listUsers = handle(async (req, res) => {
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   const role = ROLES.includes(req.query.role as Role) ? (req.query.role as Role) : undefined;
+  // Lab 4 D-13 — an optional activation filter, so a dashboard user count
+  // drills down to exactly the users it counts; absent means every user.
+  const status = parseUserStatus(req.query.status);
   const data = await getPrisma().user.findMany({
     where: {
       ...(role ? { role } : {}),
+      ...(status ? { isActive: status === "active" } : {}),
       ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] } : {}),
     },
     select: LIST_SELECT,

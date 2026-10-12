@@ -11,8 +11,10 @@ import { seed, ACCOUNTS, TICKETS, SEED_PASSWORD, FIRST_LOGIN_EMAIL } from "../..
 
 const SLOW = 180_000;
 const files = migrationFiles();
-const LAB2_FILES = files.filter((f) => !path.basename(path.dirname(f)).includes("lab3"));
 const LAB3_FILE = files.find((f) => path.basename(path.dirname(f)).includes("lab3"))!;
+// Every migration before Lab 3's, not "every one that isn't Lab 3's": later labs
+// add migrations after it (Lab 4 BR-46).
+const LAB2_FILES = files.slice(0, files.indexOf(LAB3_FILE));
 
 describe("Lab 3 migration on Lab 2-shaped data (MIG-01 to MIG-04)", () => {
   const schema = new ThrowawaySchema();

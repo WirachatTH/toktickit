@@ -105,12 +105,14 @@ describe("AppShell", () => {
 
     const brand = screen.getByRole("link", { name: "TokTickIT" });
     const toggle = screen.getByRole("button", { name: /toggle navigation menu/i });
+    // Lab 4 BR-46 (1): Dashboard is now the first destination (D-08).
+    const dashboard = screen.getByRole("link", { name: "Dashboard" });
     const myTickets = screen.getByRole("link", { name: /my tickets/i });
     const createTicket = screen.getByRole("link", { name: /create ticket/i });
     const changePassword = screen.getByRole("link", { name: /change password/i });
     const logOut = screen.getByRole("button", { name: /log out/i });
 
-    const focusOrder = [brand, toggle, myTickets, createTicket, changePassword, logOut];
+    const focusOrder = [brand, toggle, dashboard, myTickets, createTicket, changePassword, logOut];
     for (const element of focusOrder) {
       await user.tab();
       expect(element).toHaveFocus();

@@ -77,7 +77,9 @@ test.describe("the staff ticket flow", () => {
   // First, while the queue holds only seeded tickets (this file's flow adds one).
   test("RESP-01 the queue's states at each width: default, filtered, sorted, page 2, unassigned, no results, empty, failure", async ({ page }, info) => {
     await signIn(page, ACCOUNTS.staff.email);
-    await expect(page).toHaveURL(/\/staff\/queue$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens the queue.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/staff/queue");
     await expect(queueRows(page, info)).toBeVisible();
     await expectQueueLayout(page, info);
     await shot(page, info, "staff-queue", "default");
@@ -139,7 +141,8 @@ test.describe("the staff ticket flow", () => {
 
     // --- E2E-04: the Requester creates a ticket with an attachment, finds it, comments, marks it appears resolved.
     await signIn(page, ACCOUNTS.requester.email);
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08).
+    await expect(page).toHaveURL(/\/dashboard$/);
     await clickNav(page, "Create Ticket");
     for (const label of ["Category", "Related System"]) {
       const select = page.getByLabel(label);
@@ -178,7 +181,9 @@ test.describe("the staff ticket flow", () => {
 
     // --- E2E-05: IT Staff filter the queue to unassigned and claim the NEW ticket.
     await signIn(page, ACCOUNTS.staff.email);
-    await expect(page).toHaveURL(/\/staff\/queue$/);
+    // Lab 4 BR-46 (1): sign-in lands on the Dashboard (D-08), then the journey opens the queue.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/staff/queue");
     await expect(queueRows(page, info)).toBeVisible();
     await expectQueueLayout(page, info);
     await queueFilter(page, info, "owner", "unassigned");
@@ -230,6 +235,13 @@ test.describe("the staff ticket flow", () => {
     // the ticket reloads (BR-31).
     const staffApi = await apiAs(ACCOUNTS.staff.email);
     const me = (await (await staffApi.get("/api/auth/me")).json()).user;
+    // Lab 4 BR-46 (setup only): the work is on record before the ticket is
+    // resolved below, as the resolution gate requires (Lab 4 BR-28). The stale
+    // reload that follows brings it onto this screen.
+    const work = await staffApi.post(`/api/tickets/${ticketId}/actions-taken`, {
+      data: { status: "COMPLETED", actionAt: new Date().toISOString(), description: "Reseated the laptop battery connector.", result: "The battery charges normally.", assigneeId: me.id },
+    });
+    expect(work.status()).toBe(201);
     const moved = await staffApi.patch(`/api/staff/tickets/${ticketId}/status`, { data: { status: "WAITING_FOR_REQUESTER", expectedStatus: "IN_PROGRESS", expectedOwnerId: me.id } });
     expect(moved.status()).toBe(200);
     await controls.getByLabel("IT Priority").selectOption("MEDIUM");
@@ -269,7 +281,9 @@ test.describe("the staff ticket flow", () => {
     await expectQueueLayout(page, info);
     await shot(page, info, "staff-queue", "admin-read-only");
     await page.goto(`/staff/tickets/${ticketId}`);
-    await expect(page.getByText("Administrators can view tickets but not change them.")).toBeVisible();
+    // Lab 4 BR-17 (BR-46): the note now says Administrators manage Actions Taken;
+    // every Lab 3 ticket control below stays absent.
+    await expect(page.getByText("Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.")).toBeVisible();
     await expect(controls.getByRole("combobox")).toHaveCount(0);
     await expect(controls.getByRole("button")).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: /Add a public comment|Add an internal note/ })).toHaveCount(0);

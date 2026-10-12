@@ -25,6 +25,17 @@
   --zg-internal-bg: #EEF1F6;
   --zg-internal-border: #7C8BA3;
   --zg-internal-text: #3D4A5C;
+  /* Lab 4 (docs/lab-04/ui-spec.md §1.1 to §1.3) — action badges, follow-up pills,
+     metric values. Every pair ≥ 4.5:1 (STYLE-01 computes it from this file). */
+  --zg-action-planned-bg: #FFF4DC;
+  --zg-action-planned-text: #7A4A00;
+  --zg-action-completed-bg: #E8F5EC;
+  --zg-action-completed-text: #0E5A2C;
+  --zg-action-cancelled-bg: #F1F1F1;
+  --zg-action-cancelled-text: #5B5B5B;
+  --zg-followup-bg: #FDEDEA;
+  --zg-followup-text: #8C2A14;
+  --zg-metric-value: #006B3C;
 }
 
 body {
@@ -55,9 +66,27 @@ textarea.zg-field {
   resize: vertical;
 }
 
-.zg-field:focus-visible {
+.zg-field:focus-visible,
+/* Lab 4, Issue 8 — a date field keeps its ring while focus is on the calendar
+   button inside it, which the field itself cannot see as :focus-visible. */
+.zg-field[type="datetime-local"]:focus-within {
   outline: 2px solid var(--zg-secondary);
   outline-offset: 1px;
+}
+
+/* Lab 4, Issue 8 — checkboxes and radios in the theme. Bootstrap's defaults
+   are blue: the checked fill and the focus ring (visual checklist, ui-spec §11). */
+.form-check-input:checked {
+  background-color: var(--zg-primary);
+  border-color: var(--zg-primary);
+}
+.form-check-input:focus {
+  border-color: var(--zg-secondary);
+  box-shadow: none;
+}
+.form-check-input:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
 }
 
 .zg-field--readonly,
@@ -436,6 +465,12 @@ textarea.zg-field {
   margin-top: 1rem;
 }
 
+/* Lab 4 pre-release (WCAG 2.5.8; PR #81 review): the numbered page buttons
+   have no side padding, so a one-digit number was about 9px wide. */
+.zg-pagination .btn {
+  min-width: 2.5rem;
+}
+
 .zg-pagination__count {
   color: var(--zg-text-muted);
   margin-left: auto;
@@ -678,7 +713,11 @@ textarea.zg-field {
 }
 .zg-side-panel__footer {
   position: sticky;
-  bottom: 0;
+  /* Lab 4, Issue 3: stick to the panel's real bottom edge, not 1.5rem above
+     it (the panel's padding), so scrolled fields never show beneath the
+     buttons. The padding below keeps the buttons where they were. */
+  bottom: -1.5rem;
+  padding-bottom: 1.5rem;
   background: var(--zg-surface);
   border-top: 1px solid var(--zg-border);
   padding-top: 0.75rem;
@@ -782,3 +821,141 @@ textarea.zg-field {
 @media (min-width: 768px) {
   .zg-shell-nav { flex-wrap: wrap; justify-content: flex-end; row-gap: 0.25rem; }
 }
+
+/* ---------------------------------------------------------------------
+   Lab 4, Issue 3 — Actions Taken (docs/lab-04/ui-spec.md §1.1, §1.2, §1.5, §4).
+   Action badges never reuse a ticket status's words; the follow-up pills say
+   their state in text. A cancelled action is struck through *and* badged.
+   --------------------------------------------------------------------- */
+
+.zg-badge--action-planned { background: var(--zg-action-planned-bg); color: var(--zg-action-planned-text); }
+.zg-badge--action-completed { background: var(--zg-action-completed-bg); color: var(--zg-action-completed-text); }
+.zg-badge--action-cancelled { background: var(--zg-action-cancelled-bg); color: var(--zg-action-cancelled-text); }
+.zg-badge-group { display: inline-flex; align-items: center; gap: 0.25rem; }
+.zg-badge-icon { color: var(--zg-text-muted); }
+
+.zg-pill--followup-needed { background: var(--zg-followup-bg); color: var(--zg-followup-text); }
+.zg-pill--followup-handled { background: #fff; border: 1px solid #0B7A46; color: #0B7A46; }
+
+.zg-action-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.zg-action-card {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+.zg-action-card:focus { outline: 2px solid var(--zg-secondary); outline-offset: 2px; }
+.zg-action-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.5rem; }
+.zg-action-card__desc { white-space: pre-wrap; margin-bottom: 0.5rem; }
+.zg-action-card--cancelled .zg-action-card__desc { text-decoration: line-through; color: var(--zg-text-muted); }
+.zg-action-card__fields { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.75rem; margin: 0 0 0.5rem; }
+.zg-action-card__fields dt { font-weight: 600; font-size: 0.875rem; color: var(--zg-text-muted); }
+.zg-action-card__fields dd { margin: 0; white-space: pre-wrap; }
+.zg-action-card__meta { font-size: 0.875rem; color: var(--zg-text-muted); margin-bottom: 0.5rem; }
+.zg-action-card__buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.zg-action-history { list-style: none; padding: 0.5rem 0 0; margin: 0.5rem 0 0; border-top: 1px dashed var(--zg-border); font-size: 0.875rem; }
+.zg-action-history li { margin-bottom: 0.25rem; }
+.zg-unsaved { background: var(--zg-warning-bg); color: var(--zg-text); border-radius: 0.375rem; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; }
+.zg-unsaved pre { white-space: pre-wrap; font-family: inherit; margin: 0; }
+
+@media (max-width: 767.98px) {
+  .zg-action-card__fields { grid-template-columns: 1fr; }
+  .zg-action-card__buttons .btn { flex: 1 1 100%; }
+}
+
+/* Lab 4, Issue 4 — the gate notice under the status select (docs/lab-04/ui-spec.md §1.6),
+   styled like Lab 2's warning; its text, not its colour, says what is missing. */
+.zg-gate-notice {
+  background: var(--zg-warning-bg);
+  color: var(--zg-warning-text);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+.zg-gate-notice ul { padding-left: 1.25rem; }
+
+/* ---------------------------------------------------------------------
+   Lab 4, Issue 6 — the Dashboard (docs/lab-04/ui-spec.md §1.3, §1.4, §3, §10).
+   Cards: 4 columns at desktop, 2 at tablet, 1 at mobile. Lists in a main
+   column beside Quick actions at desktop; everything stacks below it.
+   --------------------------------------------------------------------- */
+
+.zg-dashboard-cards { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+@media (min-width: 768px) { .zg-dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 992px) { .zg-dashboard-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.zg-metric-card {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.zg-metric-card--attention { background: var(--zg-warning-bg); border-color: var(--zg-warning-text); }
+.zg-metric-card--skeleton { min-height: 7.5rem; background: var(--zg-border); opacity: 0.6; }
+.zg-metric-card__label { font-size: 0.875rem; color: var(--zg-text-muted); }
+.zg-metric-card__value { font-size: 2rem; font-weight: 600; line-height: 1.1; color: var(--zg-metric-value); }
+.zg-metric-card__note { font-size: 0.875rem; font-weight: 600; color: var(--zg-warning-text); }
+.zg-metric-card__helper { font-size: 0.75rem; color: var(--zg-text-muted); }
+.zg-metric-card .btn { align-self: flex-start; } /* the View link lines up with the label and value */
+
+.zg-count-strip { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+.zg-count-strip__link { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px; color: var(--zg-text); text-decoration: none; }
+.zg-count-strip__link:hover .zg-count-strip__value { text-decoration: underline; }
+.zg-count-strip__value { font-weight: 600; }
+
+.zg-dashboard-layout { display: flex; flex-direction: column; gap: 0 1.5rem; }
+.zg-dashboard-main, .zg-dashboard-side { min-width: 0; }
+@media (min-width: 992px) {
+  .zg-dashboard-layout { flex-direction: row; align-items: flex-start; }
+  .zg-dashboard-main { flex: 2 1 0; }
+  .zg-dashboard-side { flex: 1 1 0; }
+}
+
+.zg-dashboard-list { list-style: none; padding: 0; margin: 0; }
+.zg-dashboard-list li + li { border-top: 1px solid var(--zg-border); }
+.zg-dashboard-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 0;
+  min-height: 44px;
+  color: var(--zg-text);
+  text-decoration: none;
+}
+.zg-dashboard-row:hover .zg-dashboard-row__summary { text-decoration: underline; }
+.zg-dashboard-row__number { font-weight: 600; white-space: nowrap; }
+.zg-dashboard-row__summary { flex: 1 1 12rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zg-dashboard-row__time { font-size: 0.875rem; color: var(--zg-text-muted); white-space: nowrap; }
+
+.zg-quick-action { display: flex; flex-direction: column; padding: 0.5rem 0; min-height: 44px; color: var(--zg-secondary); text-decoration: none; }
+.zg-quick-action__label { font-weight: 600; }
+.zg-quick-action__note { font-size: 0.875rem; color: var(--zg-text-muted); }
+
+.zg-user-counts { margin: 0 0 0.5rem; }
+.zg-user-counts__row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.zg-user-counts__row dt { font-weight: 400; }
+.zg-user-counts__row dd { margin: 0; }
+.zg-user-counts__value { font-weight: 600; }
+
+/* The removable drill-down filter on User Management (ui-spec §7). */
+.zg-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--zg-pale);
+  color: var(--zg-secondary);
+  border-radius: 999px;
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.zg-filter-chip__remove { border: 0; background: transparent; color: inherit; min-width: 32px; min-height: 32px; border-radius: 999px; }
+.zg-filter-chip__remove:focus-visible { outline: 2px solid var(--zg-secondary); outline-offset: 1px; }
+/* Lab 4, Issue 7 — a 44px touch target on mobile (ui-spec §9; PR #79 review). */
+@media (max-width: 767.98px) { .zg-filter-chip__remove { min-width: 44px; min-height: 44px; } }

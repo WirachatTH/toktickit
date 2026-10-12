@@ -58,6 +58,8 @@ function renderDetail(ticket: TicketDetail | Record<string, unknown>) {
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
+  // Lab 4, Issue 3 — the screen now also loads its Actions Taken (setup only, BR-46).
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
 });
 
 describe("UI-16 what the Requester detail never shows (BR-71)", () => {

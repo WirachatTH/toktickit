@@ -23,5 +23,10 @@ export default defineConfig({
     // (e.g. testing a pure function) would otherwise be silently skipped
     // rather than failed (review finding, message.txt).
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Lab 4, Issue 7 — the tests that render the whole app and type into it
+    // take 2 to 5 s when every file runs at once on a many-core machine, which
+    // left no margin under the 5 s default (PR #80 review). No assertion waits
+    // this long: a missing element still fails at its own 1 to 5 s wait.
+    testTimeout: 15000,
   },
 });

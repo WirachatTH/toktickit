@@ -23,6 +23,8 @@ import { Modal } from "../components/Modal.js";
 import { ErrorState } from "../components/ErrorState.js";
 import { AttachmentSection } from "../components/AttachmentSection.js";
 import { DiscussionPanel } from "../components/DiscussionPanel.js";
+import { ActionsTaken } from "../components/ActionsTaken.js";
+import { GateNotice } from "../components/GateNotice.js";
 import { ROUTES } from "../routes.js";
 
 // Lab 3, Issue 8 — IT Staff Ticket Detail (docs/lab-03/ui-spec.md §7, FR-25 to
@@ -72,6 +74,9 @@ export function StaffTicketDetail() {
   // Bumped when a status change posts a reason as a Public Comment, so the
   // conversation shows it (BR-45); otherwise the panel keeps its drafts.
   const [threadVersion, setThreadVersion] = useState(0);
+  // Lab 4 — bumped to reload the Actions Taken list when the ticket learns it
+  // changed underneath (a 409 RESOLUTION_BLOCKED).
+  const [actionsVersion, setActionsVersion] = useState(0);
 
   const [ownerChoice, setOwnerChoice] = useState("");
   const [priorityChoice, setPriorityChoice] = useState<Priority>("MEDIUM");
@@ -96,9 +101,11 @@ export function StaffTicketDetail() {
     };
   }, [ticketId, reloadToken]);
 
+  // The owner select (IT Staff) and the Actions Taken assignee select (IT Staff
+  // and Administrators, Lab 4 BR-08) both choose from the assignable users.
   useEffect(() => {
-    if (isStaff) fetchAssignableUsers().then(setPeople).catch(() => setPeople([]));
-  }, [isStaff]);
+    fetchAssignableUsers().then(setPeople).catch(() => setPeople([]));
+  }, []);
 
   // The controls start from the ticket as shown.
   useEffect(() => {
@@ -114,6 +121,13 @@ export function StaffTicketDetail() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Retry shows the loading state, not the failure it is retrying (Lab 4, Issue 7).
+  // The other reloads (after a conflict or an action change) stay silent.
+  function retry() {
+    setState("loading");
+    setReloadToken((t) => t + 1);
+  }
+
   if (state === "loading") {
     return (
       <div aria-busy="true" role="status" aria-label="Loading ticket">
@@ -126,7 +140,7 @@ export function StaffTicketDetail() {
     return <ErrorState message="This ticket doesn't exist." action={<Link to={ROUTES.staffQueue}>Back to queue</Link>} />;
   }
   if (state === "failure" || !ticket || !user) {
-    return <ErrorState message="Unable to load this ticket. Please try again." action={<Button variant="secondary" onClick={() => setReloadToken((t) => t + 1)}>Retry</Button>} />;
+    return <ErrorState message="Unable to load this ticket. Please try again." action={<Button variant="secondary" onClick={retry}>Retry</Button>} />;
   }
 
   const t = ticket;
@@ -151,6 +165,13 @@ export function StaffTicketDetail() {
         setBanner(STALE_MESSAGE);
         setConfirming(null);
         setReloadToken((n) => n + 1);
+      } else if (err?.code === "RESOLUTION_BLOCKED") {
+        // Lab 4 BR-28 — an action changed after this screen loaded: say why under
+        // the status select, and reload the ticket and its actions (ui-spec §5).
+        setConfirming(null);
+        setControlError({ control: "status", message: err.message });
+        setReloadToken((n) => n + 1);
+        setActionsVersion((n) => n + 1);
       } else if (err && err.status === 400 && err.fields) {
         const message = Object.values(err.fields)[0];
         if (control === "status" && confirming) setConfirmError(message);
@@ -219,7 +240,7 @@ export function StaffTicketDetail() {
           <h2 className="h5 mb-3">Ticket controls</h2>
           {!isStaff ? (
             <>
-              <p className="small" style={{ color: "var(--zg-text-muted)" }}>Administrators can view tickets but not change them.</p>
+              <p className="small" style={{ color: "var(--zg-text-muted)" }}>Administrators can view this ticket and manage its actions, but not change its owner, priority, or status.</p>
               <dl className="mb-0">
                 <dt className="zg-label">Owner</dt>
                 <dd>{t.owner ? t.owner.name : <em style={{ color: "var(--zg-text-muted)" }}>Unassigned</em>}</dd>
@@ -296,6 +317,7 @@ export function StaffTicketDetail() {
                   ))}
                 </Select>
                 {!t.owner && <div className="small mt-1" style={{ color: "var(--zg-text-muted)" }}>Assign an owner to move this ticket forward.</div>}
+                <GateNotice status={t.currentStatus} gate={t.resolutionGate} />
                 <Button className="mt-2" disabled={busy || !statusChoice} onClick={startStatusChange}>Update status</Button>
                 {controlError?.control === "status" && <span className="zg-field-error d-block" role="alert">{controlError.message}</span>}
               </div>
@@ -337,6 +359,19 @@ export function StaffTicketDetail() {
               onAttachmentsChange={(attachments: TicketDetailAttachment[]) => setTicket({ ...t, attachments })}
             />
           </section>
+
+          {/* Lab 4, Issue 3 — between Attachments and the conversation (ui-spec §4.1). */}
+          <ActionsTaken
+            key={t.id}
+            ticketId={t.id}
+            mode="staff"
+            canWrite={caps.canWriteActions}
+            ticketStatus={t.currentStatus}
+            people={people}
+            currentUserId={user.id}
+            onChanged={() => setReloadToken((n) => n + 1)}
+            reloadSignal={actionsVersion}
+          />
 
           <DiscussionPanel key={`${t.id}-${threadVersion}`} ticketId={t.id} canComment={caps.canPostComment} canPost={isStaff} />
         </div>

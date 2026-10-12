@@ -165,6 +165,15 @@ authRouter.get("/me", (req: Request, res: Response) => {
   return res.status(200).json({ user: sessionUser(req) });
 });
 
+// Lab 4, Issue 7 — GET /api/auth/session (docs/lab-04/api-spec.md §5, D-20).
+// The same answer as /me, except that no session is `user: null` with 200, not
+// 401: the app asks on every page load, and a browser logs every 401 as a
+// console error. A must-change session reads itself here too (BR-02), because
+// "optional" routes pass the password-change gate, as logout does.
+authRouter.get("/session", (req: Request, res: Response) => {
+  return res.status(200).json({ user: req.auth ? sessionUser(req) : null });
+});
+
 // §1.4 — POST /api/auth/change-password
 authRouter.post("/change-password", async (req: Request, res: Response) => {
   const user = sessionUser(req);
