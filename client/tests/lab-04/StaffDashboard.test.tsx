@@ -75,6 +75,10 @@ describe("UI-15 the IT Staff Dashboard shows the API's values (FR-11, BR-34)", (
     expect(plannedLinks[0]).toHaveAttribute("href", "/staff/tickets/42#action-118");
     expect(plannedLinks[0]).toHaveAccessibleName(expect.stringContaining("Replace the laptop battery."));
     expect(plannedLinks[0]).toHaveAccessibleName(expect.stringContaining("TCK-000042"));
+    // PR #82 review: this row kept an aria-label after the ticket rows lost theirs.
+    // Its name is what it shows, in order: the time, the description, the ticket number.
+    expect(plannedLinks[0]).not.toHaveAttribute("aria-label");
+    expect(plannedLinks[0]).toHaveAccessibleName(/\d{2}:\d{2}\s*Replace the laptop battery\.\s*TCK-000042$/);
 
     const urgent = screen.getByRole("region", { name: "Urgent tickets" });
     expect(urgent).toHaveAttribute("id", "urgent-tickets");
@@ -83,7 +87,8 @@ describe("UI-15 the IT Staff Dashboard shows the API's values (FR-11, BR-34)", (
     // The row's name is everything it shows: number, summary, status, and time
     // (WCAG 2.5.3 Label in Name; PR #81 review). No aria-label replaces part of it.
     expect(urgentRow).not.toHaveAttribute("aria-label");
-    expect(urgentRow).toHaveAccessibleName(/^TCK-000050\s*Payroll server unreachable\s*\S.*\d{2}:\d{2}$/);
+    // The status is named in the pattern: without it, the time alone satisfied the old one (PR #82 review).
+    expect(urgentRow).toHaveAccessibleName(/^TCK-000050\s*Payroll server unreachable\s*OPEN\s*\S.*\d{2}:\d{2}$/);
     expect(within(urgent).getByRole("link", { name: "View all urgent tickets" })).toHaveAttribute("href", "/staff/queue?status=UNRESOLVED&itPriority=HIGH&sort=createdAt&order=asc");
 
     const recent = screen.getByRole("region", { name: "Recently updated" });

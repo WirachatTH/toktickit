@@ -355,8 +355,10 @@ What the end-to-end and responsive pass changed (Issue 8):
 - **Mobile filters:** below 768px the filters of My Tickets and the Ticket Queue sit
   behind a "Filters" button. When the URL already filters or sorts the list (a
   dashboard drill-down), that panel starts open, so the filter in force is on screen.
-  A filter named in the URL opens it even at its default value (`?status=ACTIVE`); a
-  search or a page number alone does not.
+  The two screens decide this differently. On the Ticket Queue, any filter or sort
+  named in the URL opens the panel, even at its default value (`?status=ACTIVE`); a
+  search or a page number alone does not. On My Tickets, the panel opens only when the
+  status or sort differs from the default, so `/tickets?status=ALL` stays closed.
 - **Anchors:** `#action-<id>` moves focus to its card once. Later reloads of the list
   leave focus where a save put it (§4.6).
 - **Sign-in after Log out:** Login returns a visitor to the screen they asked for
@@ -367,8 +369,9 @@ What the end-to-end and responsive pass changed (Issue 8):
 - **Date field:** its focus ring stays while focus is on the calendar button inside it.
 
 What the pre-release check changed (from the PR #81 review):
-- **Dashboard rows:** a ticket row's accessible name is everything it shows (number,
-  summary, status, and time), with no `aria-label` replacing part of it (WCAG 2.5.3).
+- **Dashboard rows:** a row's accessible name is everything it shows, with no
+  `aria-label` replacing part of it (WCAG 2.5.3): number, summary, status, and time for
+  a ticket row; time, description, and ticket number for a planned-action row.
 - **Page numbers:** every pager button on My Tickets and the Ticket Queue is at least
   40px wide (WCAG 2.5.8). A one-digit page number was about 9px wide.
 

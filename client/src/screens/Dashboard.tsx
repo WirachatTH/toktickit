@@ -203,7 +203,8 @@ function PlannedRow({ action }: { action: DashboardPlannedAction }) {
   const when = formatBangkok(action.actionAt);
   return (
     <li>
-      <Link to={action.href} className="zg-dashboard-row" aria-label={`${when}: ${action.description} (${action.ticket.ticketNumber})`}>
+      {/* No aria-label here either: the name is the time, description, and ticket number it shows (PR #82 review). */}
+      <Link to={action.href} className="zg-dashboard-row">
         <span className="zg-dashboard-row__time">{when}</span>
         <span className="zg-dashboard-row__summary" title={action.description}>{action.description}</span>
         <span className="zg-dashboard-row__number">{action.ticket.ticketNumber}</span>

@@ -346,13 +346,13 @@ docker-compose exec client npx playwright test
 ## 6. Final Results
 
 Every one of the 126 rows above reads Pass. The numbers below are from the full local run on
-the pre-release branch (every Lab 4 issue merged, plus the last review's fixes), in the Docker environment:
+the last branch before the release (every Lab 4 issue merged, plus the last reviews' fixes), in the Docker environment:
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
 | Server (Vitest + Supertest), `server/tests/lab-01..04` | `docker-compose exec server npm test` | 418 / 418 passed, 35 files |
 | Client (Vitest + Testing Library), `client/tests/lab-01..04` | `docker-compose exec client npm test` | 436 / 436 passed, 28 files |
-| End-to-end and responsive (Playwright), `e2e/lab-02..04`, three widths | `docker-compose exec client npx playwright test --workers=1` | 66 / 66 passed in one run (22 tests at each of desktop, tablet, mobile) |
+| End-to-end and responsive (Playwright), `e2e/lab-02..04`, three widths | `docker-compose exec client npx playwright test --workers=1` | 69 / 69 passed in one run (23 tests at each of desktop, tablet, mobile) |
 | Type checks | `npx tsc --noEmit` in `server` and `client` | clean |
 
 The complete suite is re-run on `lab4-staging` and again on `main` after the release PR (Issue 9);
