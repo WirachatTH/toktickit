@@ -318,6 +318,11 @@ test.describe("dashboards", () => {
     await openDashboard(page, ACCOUNTS.staff.email);
     await page.goto("/staff/queue");
     await expect(page.getByRole("heading", { level: 1, name: "Ticket Queue" })).toBeVisible();
+    // Let the queue page's own load settle first. Otherwise Playwright's
+    // "network idle" has not fired yet for this page, a wait on it would last
+    // until the held request below is answered, and this test could not tell
+    // that wait from the real one (PR #83 review).
+    await page.waitForLoadState("networkidle");
     // Hold the Dashboard's request, move to the Dashboard inside the app, and log out at once.
     await page.route("**/api/dashboard/staff", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 2000));

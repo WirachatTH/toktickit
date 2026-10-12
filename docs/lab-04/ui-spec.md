@@ -368,7 +368,7 @@ What the end-to-end and responsive pass changed (Issue 8):
   focus ring `--zg-secondary`, in place of Bootstrap's blue.
 - **Date field:** its focus ring stays while focus is on the calendar button inside it.
 
-What the pre-release check changed (from the PR #81 review):
+What the pre-release checks changed (from the PR #81 and PR #82 reviews):
 - **Dashboard rows:** a row's accessible name is everything it shows, with no
   `aria-label` replacing part of it (WCAG 2.5.3): number, summary, status, and time for
   a ticket row; time, description, and ticket number for a planned-action row.
