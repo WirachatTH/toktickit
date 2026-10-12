@@ -331,7 +331,7 @@ docker-compose exec client npx playwright test --workers=1    # e2e/lab-02..04, 
   `docker-compose exec client npx vitest run tests/lab-04` run only the Lab 4 suites.
 - The Playwright notes under "Running Lab 3 tests" still apply. One run covers the
   Lab 2–3 journeys and the Lab 4 ones in `e2e/lab-04/` (Actions Taken, the resolution
-  gate, and the dashboards) at desktop, tablet, and mobile: 66 tests, roughly
+  gate, and the dashboards) at desktop, tablet, and mobile: 69 tests, roughly
   7 to 17 minutes with one worker, depending on the machine. `npx playwright test lab-04/` runs only the Lab 4 suites.
 - The Lab 4 journeys use the seeded tickets for what they only read (run the seed
   first; `prisma migrate reset` restores it) and create their own tickets and users,

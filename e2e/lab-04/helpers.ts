@@ -13,9 +13,24 @@ export * from "../lab-03/helpers.js";
 // Logging out while a request is still in flight makes that request answer 401,
 // which the E2E-08 watch rightly reports as a failure. On a slow machine a
 // screen's own request could still be out when a journey logs out, so the Lab 4
-// journeys let the page settle first. (This named export replaces Lab 3's.)
+// journeys wait for the app's own API requests to finish first. The watch
+// counts them: Playwright's "networkidle" only follows full page loads, and a
+// move between screens inside the app is not one. (This named export replaces Lab 3's.)
+const pendingApi = new WeakMap<Page, Set<unknown>>();
+export async function settle(page: Page): Promise<void> {
+  const pending = pendingApi.get(page);
+  if (!pending) return;
+  // Quiet twice in a row, so a request a render is about to send is caught too.
+  let quiet = 0;
+  await expect
+    .poll(() => {
+      quiet = pending.size === 0 ? quiet + 1 : 0;
+      return quiet;
+    }, { message: "the app's API requests finish", intervals: [150], timeout: 15_000 })
+    .toBeGreaterThanOrEqual(2);
+}
 export async function logOut(page: Page): Promise<void> {
-  await page.waitForLoadState("networkidle");
+  await settle(page);
   await logOutNow(page);
 }
 
@@ -88,6 +103,19 @@ export class Expected {
   /** Watches one more page (a second browser context, for example). */
   watch(page: Page, label = "page"): void {
     page.on("pageerror", (error) => this.problems.push(`${label}: uncaught ${error.message}`));
+    // The API requests still out, for settle() above.
+    const pending = new Set<unknown>();
+    pendingApi.set(page, pending);
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname.startsWith("/api/")) pending.add(request);
+    });
+    // Answered is enough: the server has decided by then.
+    page.on("response", (response) => pending.delete(response.request()));
+    // A request cut off by a full page load may never report anything, and the
+    // new document cannot be waiting for it: start again from nothing.
+    page.on("domcontentloaded", () => pending.clear());
+    page.on("requestfinished", (request) => pending.delete(request));
+    page.on("requestfailed", (request) => pending.delete(request));
     page.on("response", (response) => {
       const url = new URL(response.url());
       if (url.origin !== ORIGIN || response.status() < 400) return;

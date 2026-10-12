@@ -311,6 +311,28 @@ test.describe("dashboards", () => {
     await expect(page.getByRole("region", { name: "Getting started" })).toBeVisible();
   });
 
+  // The Lab 4 logOut waits for the app's own requests. Without that, logging out
+  // while the Dashboard is still loading answers its request with 401, and the
+  // watch fails the journey (seen on a slow run before the release).
+  test("E2E-08 logging out while a screen is still loading leaves no failed request behind", async ({ page }) => {
+    await openDashboard(page, ACCOUNTS.staff.email);
+    await page.goto("/staff/queue");
+    await expect(page.getByRole("heading", { level: 1, name: "Ticket Queue" })).toBeVisible();
+    // Hold the Dashboard's request, move to the Dashboard inside the app, and log out at once.
+    await page.route("**/api/dashboard/staff", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.continue();
+    });
+    const answered = page.waitForResponse("**/api/dashboard/staff");
+    await openNav(page);
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Dashboard" }).click();
+    await expect(page.getByRole("status", { name: "Loading dashboard" })).toBeVisible();
+    await logOut(page);
+    await expect(page).toHaveURL(/\/login$/);
+    // The held request was answered while the session still existed.
+    expect((await answered).status()).toBe(200);
+  });
+
   // E2E-08 is the watch every Lab 4 test runs under (helpers.ts). This proves the
   // watch can fail: an unexpected error is reported, and so is an unused allowance.
   test("E2E-08 the console and request watch reports an unexpected failure, and an allowance nothing used", async ({ page, expected }) => {
